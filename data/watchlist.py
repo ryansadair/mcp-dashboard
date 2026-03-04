@@ -116,7 +116,7 @@ def enrich_from_supabase(tickers):
     Returns dict: { "TICK": {info}, ... } for tickers found in Supabase.
     """
     SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
-    SUPABASE_KEY = "YOUR_SERVICE_ROLE_KEY"   # paste your service role key here
+    SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # paste your service role key here
 
     if SUPABASE_KEY == "YOUR_SERVICE_ROLE_KEY" or not tickers:
         return {}

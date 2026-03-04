@@ -25,7 +25,7 @@ from datetime import datetime
 
 # ── Supabase config (must match market_data.py) ────────────────────────────
 SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
-SUPABASE_KEY = "YOUR_SERVICE_ROLE_KEY"   # paste your service role key here
+SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # paste your service role key here
 
 _SB_HEADERS = {
     "apikey":        SUPABASE_KEY,
