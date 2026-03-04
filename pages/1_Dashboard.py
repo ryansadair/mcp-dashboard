@@ -153,10 +153,12 @@ PLOTLY_DARK = dict(
     plot_bgcolor="rgba(0,0,0,0)",
     font=dict(family="DM Sans", color="rgba(255,255,255,0.6)"),
     legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(size=11)),
-    xaxis=dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10)),
-    yaxis=dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10)),
     margin=dict(l=10, r=10, t=40, b=10),
 )
+
+# Reusable axis style dicts — apply per-chart to avoid conflicts with **PLOTLY_DARK
+_XAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10))
+_YAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10))
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -236,7 +238,10 @@ with tab_overview:
             ))
             fig.update_layout(
                 title="YTD Cumulative Performance",
-                **PLOTLY_DARK, yaxis_ticksuffix="%", height=280,
+                **PLOTLY_DARK,
+                xaxis=_XAXIS,
+                yaxis={**_YAXIS, "ticksuffix": "%"},
+                height=280,
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -412,7 +417,7 @@ with tab_holdings:
                 except (ValueError, TypeError):
                     return ""
 
-            styled = filtered.style.applymap(_color_1d, subset=["1D Chg %"]).format({
+            styled = filtered.style.map(_color_1d, subset=["1D Chg %"]).format({
                 "Weight %": "{:.2f}",
                 "Price": "${:.2f}",
                 "1D Chg %": "{:+.2f}%",
@@ -563,7 +568,10 @@ with tab_perf:
                 ))
             fig2.update_layout(
                 title=f"Cumulative Return — {period}",
-                **PLOTLY_DARK, yaxis_ticksuffix="%", height=360,
+                **PLOTLY_DARK,
+                xaxis=_XAXIS,
+                yaxis={**_YAXIS, "ticksuffix": "%"},
+                height=360,
                 hovermode="x unified",
             )
             st.plotly_chart(fig2, use_container_width=True)
@@ -647,7 +655,7 @@ with tab_perf:
                     fill="tozeroy", fillcolor="rgba(196,84,84,0.15)",
                     line=dict(color="#c45454", width=1.5), name="Drawdown",
                 ))
-                fig_dd.update_layout(**PLOTLY_DARK, height=220, yaxis_ticksuffix="%", showlegend=False)
+                fig_dd.update_layout(**PLOTLY_DARK, xaxis=_XAXIS, yaxis={**_YAXIS, "ticksuffix": "%"}, height=220, showlegend=False)
                 st.plotly_chart(fig_dd, use_container_width=True)
 
             # Monthly Returns Heatmap
@@ -745,7 +753,10 @@ with tab_perf:
         ))
         fig2.update_layout(
             title="YTD Cumulative Return — Strategy vs Benchmark",
-            **PLOTLY_DARK, yaxis_ticksuffix="%", height=320,
+            **PLOTLY_DARK,
+            xaxis=_XAXIS,
+            yaxis={**_YAXIS, "ticksuffix": "%"},
+            height=320,
         )
         st.plotly_chart(fig2, use_container_width=True)
 
@@ -873,7 +884,8 @@ with tab_divs:
                 fig3.update_layout(
                     **PLOTLY_DARK,
                     title="Current Dividend Yield (%)",
-                    xaxis_title="Yield %",
+                    xaxis={**_XAXIS, "title": "Yield %"},
+                    yaxis=_YAXIS,
                     height=max(300, len(yield_df) * 28 + 80),
                     showlegend=False,
                 )
@@ -903,6 +915,8 @@ with tab_divs:
                 fig4.update_layout(
                     **PLOTLY_DARK,
                     title="5-Year Dividend CAGR (%)",
+                    xaxis=_XAXIS,
+                    yaxis=_YAXIS,
                     height=max(300, len(growth_df) * 28 + 80),
                     showlegend=False,
                 )
@@ -939,7 +953,7 @@ with tab_divs:
                 labels={"div_yield": "Dividend Yield (%)", "ticker": ""},
                 title="Dividend Yield by Holding",
             )
-            fig3.update_layout(**PLOTLY_DARK, height=320, xaxis_ticksuffix="%")
+            fig3.update_layout(**PLOTLY_DARK, xaxis={**_XAXIS, "ticksuffix": "%"}, yaxis=_YAXIS, height=320)
             st.plotly_chart(fig3, use_container_width=True)
 
 
