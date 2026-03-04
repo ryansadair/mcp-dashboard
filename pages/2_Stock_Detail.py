@@ -19,6 +19,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import numpy as np
+import requests
 import yfinance as yf
 from datetime import datetime, timedelta
 from utils.auth import check_password
@@ -26,6 +27,72 @@ from utils.styles import inject_global_css
 from utils.config import BRAND
 from components.header import render_header
 from components.market_ticker import render_market_ticker
+
+# ── Supabase config ────────────────────────────────────────────────────────
+SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
+SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # paste your service role key here
+
+_SB_HEADERS = {
+    "apikey":        SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type":  "application/json",
+}
+
+def _sb_get_ticker(ticker):
+    """
+    Pull price + dividend data from Supabase for a single ticker.
+    Returns a partial `info` dict compatible with yfinance's tk.info format.
+    """
+    if SUPABASE_KEY == "YOUR_SERVICE_ROLE_KEY":
+        return {}
+    try:
+        # Prices
+        pr = requests.get(
+            f"{SUPABASE_URL}/rest/v1/prices",
+            headers=_SB_HEADERS,
+            params={"select": "*", "ticker": f"eq.{ticker}"},
+            timeout=10,
+        ).json()
+
+        # Dividends
+        dv = requests.get(
+            f"{SUPABASE_URL}/rest/v1/dividends",
+            headers=_SB_HEADERS,
+            params={"select": "*", "ticker": f"eq.{ticker}"},
+            timeout=10,
+        ).json()
+
+        if not pr:
+            return {}
+
+        p = pr[0]
+        d = dv[0] if dv else {}
+
+        # Map Supabase fields → yfinance info keys so rest of page works unchanged
+        return {
+            "longName":             p.get("name", ticker),
+            "shortName":            p.get("name", ticker),
+            "sector":               p.get("sector", ""),
+            "industry":             p.get("industry", ""),
+            "currentPrice":         p.get("price", 0),
+            "previousClose":        p.get("previous_close", 0),
+            "regularMarketPrice":   p.get("price", 0),
+            "marketCap":            p.get("market_cap", 0),
+            "trailingPE":           p.get("pe_ratio", 0),
+            "forwardPE":            p.get("forward_pe", 0),
+            "priceToBook":          p.get("price_to_book", 0),
+            "beta":                 p.get("beta", 0),
+            "fiftyTwoWeekHigh":     p.get("week52_high", 0),
+            "fiftyTwoWeekLow":      p.get("week52_low", 0),
+            "dividendYield":        (d.get("dividend_yield", 0) or 0) / 100,
+            "dividendRate":         d.get("dividend_rate", 0),
+            "payoutRatio":          (d.get("payout_ratio", 0) or 0) / 100,
+            "exDividendDate":       d.get("ex_dividend_date", ""),
+            "fiveYearAvgDividendYield": d.get("five_year_avg_yield", 0),
+            "_from_supabase":       True,  # flag so we know source
+        }
+    except Exception:
+        return {}
 
 if not check_password():
     st.stop()
@@ -96,40 +163,57 @@ if not ticker_input:
 # ── Fetch all data ────────────────────────────────────────────────────────
 @st.cache_data(ttl=900, show_spinner=False)
 def fetch_stock_data(ticker):
-    """Fetch comprehensive stock data from yfinance."""
-    tk = yf.Ticker(ticker)
-    info = tk.info or {}
+    """
+    Fetch comprehensive stock data.
+    Info/fundamentals: Supabase first, yfinance fallback.
+    History/financials/recs: yfinance (not stored in Supabase).
+    """
+    # ── 1. Get info from Supabase ─────────────────────────────────────────
+    info = _sb_get_ticker(ticker)
 
-    # Price history (2 years for chart + MAs)
-    hist = tk.history(period="2y")
+    # ── 2. Try yfinance for full info + history ───────────────────────────
+    hist               = pd.DataFrame()
+    div_hist           = pd.Series(dtype=float)
+    financials         = pd.DataFrame()
+    quarterly_financials = pd.DataFrame()
+    recs               = pd.DataFrame()
 
-    # Longer history for dividends
-    div_hist = tk.dividends
-
-    # Financials
     try:
-        financials = tk.financials
-    except Exception:
-        financials = pd.DataFrame()
+        tk       = yf.Ticker(ticker)
+        yf_info  = tk.info or {}
 
-    try:
-        quarterly_financials = tk.quarterly_financials
-    except Exception:
-        quarterly_financials = pd.DataFrame()
+        # Merge — prefer yfinance for richer fields, keep Supabase as fallback
+        if yf_info.get("longName") or yf_info.get("shortName"):
+            info = {**info, **yf_info}  # yfinance wins on overlap
 
-    # Recommendations
-    try:
-        recs = tk.recommendations
-    except Exception:
-        recs = pd.DataFrame()
+        hist     = tk.history(period="2y")
+        div_hist = tk.dividends
+
+        try:
+            financials = tk.financials
+        except Exception:
+            pass
+        try:
+            quarterly_financials = tk.quarterly_financials
+        except Exception:
+            pass
+        try:
+            recs = tk.recommendations
+        except Exception:
+            pass
+
+    except Exception as e:
+        # yfinance failed (rate limit etc.) — Supabase data is enough for the header
+        if not info:
+            raise  # re-raise only if we have nothing at all
 
     return {
-        "info": info,
-        "history": hist,
-        "dividends": div_hist,
-        "financials": financials,
-        "quarterly_financials": quarterly_financials,
-        "recommendations": recs,
+        "info":                  info,
+        "history":               hist,
+        "dividends":             div_hist,
+        "financials":            financials,
+        "quarterly_financials":  quarterly_financials,
+        "recommendations":       recs,
     }
 
 
