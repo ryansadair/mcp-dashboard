@@ -505,8 +505,6 @@ with tab_holdings:
 # PERFORMANCE — Sprint 2 upgrade: weighted returns from Tamarac + yfinance
 # ══════════════════════════════════════════════════════════════════════════
 with tab_perf:
-
-with tab_perf:
     # DEBUG - remove after testing
     from data.performance import load_strategy_returns
     debug = load_strategy_returns()
