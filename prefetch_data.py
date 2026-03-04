@@ -1,27 +1,26 @@
 """
-Martin Capital Partners — Local Data Pre--Fetcher
+Martin Capital Partners — Local Data Pre-Fetcher
 prefetch_data.py
 
 Runs on Ryan's office Windows machine via Task Scheduler.
-Fetches all market + dividend data from yfinance, saves as JSON files
-in data/cache/. These JSON files get committed to GitHub and the cloud
-dashboard reads them directly — zero yfinance calls in the cloud.
+Fetches all market + dividend data from yfinance locally (no IP blocking),
+then upserts results to Supabase (cloud PostgreSQL) so Streamlit Cloud
+can read fresh data without ever calling yfinance directly.
 
 Schedule: Every 15 minutes during market hours (9:30 AM – 4:15 PM ET)
           Plus one EOD run at 4:30 PM ET for final prices.
 
 Usage:
-    python prefetch_data.py              # fetch all tickers
-    python prefetch_data.py ----push       # fetch + git add/commit/push
+    python prefetch_data.py          # fetch all data + push to Supabase
+    python prefetch_data.py --dry    # fetch only, skip Supabase push (testing)
 
 Setup in Task Scheduler:
-    Program: python
-    Arguments: prefetch_data.py --push
-    Start in: (your project folder)
-    Trigger: Every 15 min, 9:30 AM – 4:30 PM ET, weekdays only
+    Program:   C:\\path\\to\\venv\\Scripts\\python.exe
+    Arguments: prefetch_data.py
+    Start in:  C:\\Users\\RyanAdair\\Martin Capital Partners LLC\\Eugene - Documents\\Operations\\Scripts\\Portfolio Dashboard
+    Trigger:   Every 15 min, 9:30 AM – 4:30 PM ET, weekdays only
 """
 
-import json
 import os
 import sys
 import time
@@ -29,14 +28,20 @@ from datetime import datetime
 
 # ── Path setup ─────────────────────────────────────────────────────────────
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(SCRIPT_DIR, "data")
-CACHE_DIR = os.path.join(DATA_DIR, "cache")
-os.makedirs(CACHE_DIR, exist_ok=True)
-
-# Add project root to path so we can import data modules
+DATA_DIR   = os.path.join(SCRIPT_DIR, "data")
 sys.path.insert(0, SCRIPT_DIR)
 
-# ── Collect all tickers from Tamarac + Watchlists ──────────────────────────
+# ── Supabase config ────────────────────────────────────────────────────────
+# Paste your Supabase project URL and service role key here after setup.
+# Get these from: supabase.com → your project → Settings → API
+SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
+SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# TICKER COLLECTION
+# ══════════════════════════════════════════════════════════════════════════
+
 def get_all_tickers():
     """Gather unique tickers from Tamarac holdings and watchlists."""
     tickers = set()
@@ -68,16 +73,18 @@ def get_all_tickers():
     except Exception as e:
         print(f"  [WARN] Could not load watchlists: {e}")
 
-    # Filter out empties and cash--like entries
+    # Filter out empties and cash-like entries
     tickers = {t for t in tickers if t and len(t) <= 6 and t.isalpha()}
-
     print(f"  Found {len(tickers)} unique tickers")
     return sorted(tickers)
 
 
-# ── Fetch price/market data ────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+# PRICE FETCHING  (5-day history for accurate daily change)
+# ══════════════════════════════════════════════════════════════════════════
+
 def fetch_all_prices(tickers):
-    """Fetch price data for all tickers via yfinance. Returns dict."""
+    """Fetch price + fundamentals for all tickers. Returns dict."""
     import yfinance as yf
 
     results = {}
@@ -85,52 +92,69 @@ def fetch_all_prices(tickers):
 
     for i, ticker in enumerate(tickers, 1):
         try:
-            t = yf.Ticker(ticker)
-            info = t.info or {}
+            tk = yf.Ticker(ticker)
+
+            # ── Daily price & change via 5-day history ─────────────────────
+            # tk.info["previousClose"] is unreliable — often returns stale
+            # values causing 200%+ daily change readings. History is accurate.
+            hist5 = tk.history(period="5d", auto_adjust=True)
+            price, prev_close, chg_1d = 0.0, 0.0, 0.0
+            if hist5 is not None and len(hist5) >= 2:
+                price      = round(float(hist5["Close"].iloc[-1]), 2)
+                prev_close = round(float(hist5["Close"].iloc[-2]), 2)
+                if prev_close > 0:
+                    chg_1d = round((price - prev_close) / prev_close * 100, 2)
+                    if abs(chg_1d) > 25:   # sanity cap
+                        chg_1d = 0.0
+            elif hist5 is not None and len(hist5) == 1:
+                price = round(float(hist5["Close"].iloc[-1]), 2)
+
+            # ── Lightweight fundamentals via fast_info ─────────────────────
+            fi          = tk.fast_info
+            market_cap  = getattr(fi, "market_cap", 0) or 0
+            week52_high = round(float(getattr(fi, "year_high", 0) or 0), 2)
+            week52_low  = round(float(getattr(fi, "year_low",  0) or 0), 2)
+
+            # ── Deeper fundamentals via info (sector, PE, div) ────────────
+            info = {}
+            try:
+                info = tk.info or {}
+            except Exception:
+                pass
 
             def g(key, default=0):
                 val = info.get(key, default)
                 return val if val is not None else default
 
-            price = g("currentPrice") or g("regularMarketPrice") or 0
-            prev_close = g("previousClose") or g("regularMarketPreviousClose") or 0
-
-            # Daily change
-            if price and prev_close and prev_close > 0:
-                chg_1d = round((price -- prev_close) / prev_close * 100, 2)
-            else:
-                chg_1d = 0
-
             # Dividend yield — safe calculation
-            div_rate = g("dividendRate") or 0
+            div_yield = 0.0
+            div_rate  = g("dividendRate") or 0
             if isinstance(div_rate, (int, float)) and div_rate > 0 and price > 0:
                 div_yield = round((div_rate / price) * 100, 2)
-                if div_yield > 15:
-                    div_yield = 0
             else:
                 raw = g("dividendYield") or 0
                 if isinstance(raw, (int, float)) and raw > 0:
                     div_yield = round(raw * 100, 2) if raw < 1 else round(raw, 2)
-                    if div_yield > 15:
-                        div_yield = 0
-                else:
-                    div_yield = 0
+            if div_yield > 15:
+                div_yield = 0.0
 
             results[ticker] = {
-                "price": round(float(price), 2) if price else 0,
-                "previous_close": round(float(prev_close), 2) if prev_close else 0,
-                "change_1d_pct": chg_1d,
+                "ticker":         ticker,
+                "price":          price,
+                "previous_close": prev_close,
+                "change_1d_pct":  chg_1d,
                 "dividend_yield": div_yield,
-                "sector": g("sector", ""),
-                "industry": g("industry", ""),
-                "pe_ratio": round(float(g("trailingPE") or 0), 2),
-                "forward_pe": round(float(g("forwardPE") or 0), 2),
-                "market_cap": g("marketCap", 0),
-                "52w_high": round(float(g("fiftyTwoWeekHigh") or 0), 2),
-                "52w_low": round(float(g("fiftyTwoWeekLow") or 0), 2),
-                "beta": round(float(g("beta") or 0), 2),
-                "name": g("longName", "") or g("shortName", ticker),
-                "price_to_book": round(float(g("priceToBook") or 0), 2),
+                "sector":         g("sector", ""),
+                "industry":       g("industry", ""),
+                "pe_ratio":       round(float(g("trailingPE")   or 0), 2),
+                "forward_pe":     round(float(g("forwardPE")    or 0), 2),
+                "market_cap":     market_cap,
+                "week52_high":    week52_high,
+                "week52_low":     week52_low,
+                "beta":           round(float(g("beta")         or 0), 2),
+                "name":           g("longName", "") or g("shortName", ticker),
+                "price_to_book":  round(float(g("priceToBook")  or 0), 2),
+                "fetched_at":     datetime.now().isoformat(),
             }
 
             if i % 10 == 0 or i == total:
@@ -138,80 +162,88 @@ def fetch_all_prices(tickers):
 
         except Exception as e:
             print(f"  [ERROR] {ticker}: {e}")
-            results[ticker] = {"price": 0, "change_1d_pct": 0, "dividend_yield": 0, "sector": ""}
+            results[ticker] = {
+                "ticker": ticker, "price": 0, "change_1d_pct": 0,
+                "dividend_yield": 0, "sector": "", "fetched_at": datetime.now().isoformat(),
+            }
 
-        # Gentle rate limiting — 0.3s between calls keeps us well under Yahoo limits
         time.sleep(0.3)
 
     return results
 
 
-# ── Fetch dividend data ────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+# DIVIDEND FETCHING
+# ══════════════════════════════════════════════════════════════════════════
+
 def fetch_all_dividends(tickers):
-    """Fetch dividend details for all tickers via yfinance. Returns dict."""
+    """Fetch dividend details for all tickers. Returns dict."""
     import yfinance as yf
     import pandas as pd
 
     results = {}
-    total = len(tickers)
+    total        = len(tickers)
     current_year = datetime.now().year
 
     for i, ticker in enumerate(tickers, 1):
         try:
-            t = yf.Ticker(ticker)
-            info = t.info or {}
-            divs = t.dividends
+            tk   = yf.Ticker(ticker)
+            info = {}
+            try:
+                info = tk.info or {}
+            except Exception:
+                pass
+            divs = tk.dividends
 
             def g(key, default=0):
                 val = info.get(key, default)
                 return val if val is not None else default
 
-            price = g("currentPrice") or g("regularMarketPrice") or 0
+            price    = g("currentPrice") or g("regularMarketPrice") or 0
             div_rate = g("dividendRate") or 0
 
-            # Yield — safe calc
+            # Yield
+            yld = 0.0
             if isinstance(div_rate, (int, float)) and div_rate > 0 and price > 0:
                 yld = round((div_rate / price) * 100, 2)
                 if yld > 15:
-                    yld = 0
+                    yld = 0.0
             else:
                 raw = g("dividendYield") or 0
                 if isinstance(raw, (int, float)) and raw > 0:
                     yld = round(raw * 100, 2) if raw < 1 else round(raw, 2)
                     if yld > 15:
-                        yld = 0
-                else:
-                    yld = 0
+                        yld = 0.0
 
             # Payout ratio
             pr = g("payoutRatio") or 0
+            payout = 0.0
             if isinstance(pr, (int, float)) and 0 < pr < 5:
                 payout = round(pr * 100, 1)
                 if payout > 150:
-                    payout = 0
-            else:
-                payout = 0
+                    payout = 0.0
 
             result = {
-                "symbol": ticker,
-                "dividend_yield": yld,
-                "dividend_rate": round(float(div_rate), 4) if div_rate else 0,
-                "payout_ratio": min(payout, 100),
-                "ex_dividend_date": "",
+                "ticker":              ticker,
+                "dividend_yield":      yld,
+                "dividend_rate":       round(float(div_rate), 4) if div_rate else 0,
+                "payout_ratio":        min(payout, 100),
+                "ex_dividend_date":    "",
                 "five_year_avg_yield": round(float(g("fiveYearAvgDividendYield") or 0), 2),
-                "div_growth_1y": 0,
-                "div_growth_3y": 0,
-                "div_growth_5y": 0,
-                "div_growth_years": 0,
-                "consecutive_years": 0,
+                "div_growth_1y":       0,
+                "div_growth_3y":       0,
+                "div_growth_5y":       0,
+                "div_growth_years":    0,
+                "consecutive_years":   0,
+                "fetched_at":          datetime.now().isoformat(),
             }
 
-            # Ex--dividend date
+            # Ex-dividend date
             ex_div = info.get("exDividendDate")
             if ex_div:
                 try:
                     if isinstance(ex_div, (int, float)):
-                        result["ex_dividend_date"] = datetime.fromtimestamp(ex_div).strftime("%Y--%m--%d")
+                        result["ex_dividend_date"] = datetime.fromtimestamp(ex_div).strftime("%Y-%m-%d")
                     else:
                         result["ex_dividend_date"] = str(ex_div)
                 except Exception:
@@ -222,30 +254,26 @@ def fetch_all_dividends(tickers):
                 divs_df = divs.reset_index()
                 divs_df.columns = ["date", "amount"]
                 divs_df["year"] = pd.to_datetime(divs_df["date"]).dt.year
-
-                # Exclude current partial year for CAGR
                 annual = divs_df[divs_df["year"] < current_year].groupby("year")["amount"].sum()
 
                 if len(annual) >= 2:
-                    recent = annual.iloc[--1]
-
+                    recent = annual.iloc[-1]
                     for label, years_back in [("div_growth_1y", 1), ("div_growth_3y", 3), ("div_growth_5y", 5)]:
-                        yb = min(years_back, len(annual) -- 1)
+                        yb = min(years_back, len(annual) - 1)
                         if yb >= 1:
-                            older = annual.iloc[--(yb + 1)]
+                            older = annual.iloc[-(yb + 1)]
                             if older > 0 and recent > 0:
-                                cagr = ((recent / older) ** (1 / yb) -- 1) * 100
-                                if --50 < cagr < 100:
+                                cagr = ((recent / older) ** (1 / yb) - 1) * 100
+                                if -50 < cagr < 100:
                                     result[label] = round(cagr, 1)
                                     if label == "div_growth_5y":
                                         result["div_growth_years"] = yb
 
-                # Consecutive years of increases
                 annual_all = divs_df.groupby("year")["amount"].sum()
                 if len(annual_all) >= 3:
                     consec = 0
-                    for j in range(len(annual_all) -- 1, 0, --1):
-                        if annual_all.iloc[j] > annual_all.iloc[j -- 1] * 0.99:
+                    for j in range(len(annual_all) - 1, 0, -1):
+                        if annual_all.iloc[j] > annual_all.iloc[j - 1] * 0.99:
                             consec += 1
                         else:
                             break
@@ -259,10 +287,11 @@ def fetch_all_dividends(tickers):
         except Exception as e:
             print(f"  [ERROR] {ticker} divs: {e}")
             results[ticker] = {
-                "symbol": ticker, "dividend_yield": 0, "dividend_rate": 0,
+                "ticker": ticker, "dividend_yield": 0, "dividend_rate": 0,
                 "payout_ratio": 0, "ex_dividend_date": "", "five_year_avg_yield": 0,
                 "div_growth_1y": 0, "div_growth_3y": 0, "div_growth_5y": 0,
                 "div_growth_years": 0, "consecutive_years": 0,
+                "fetched_at": datetime.now().isoformat(),
             }
 
         time.sleep(0.3)
@@ -270,97 +299,118 @@ def fetch_all_dividends(tickers):
     return results
 
 
-# ── Fetch market index data (for the ticker bar) ──────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+# INDEX FETCHING
+# ══════════════════════════════════════════════════════════════════════════
+
 def fetch_index_data():
     """Fetch major market indices for the top ticker bar."""
     import yfinance as yf
 
     indices = {
-        "^GSPC": "S&P 500",
-        "^DJI": "DJIA",
-        "^IXIC": "Nasdaq",
-        "^TNX": "10Y Treasury",
-        "^VIX": "VIX",
-        "DX--Y.NYB": "US Dollar",
-        "CL=F": "Crude Oil",
+        "^GSPC":    "S&P 500",
+        "^DJI":     "DJIA",
+        "^IXIC":    "Nasdaq",
+        "^TNX":     "10Y Treasury",
+        "^VIX":     "VIX",
+        "DX-Y.NYB": "US Dollar",
+        "CL=F":     "Crude Oil",
     }
 
     results = {}
     for symbol, name in indices.items():
         try:
-            t = yf.Ticker(symbol)
-            info = t.info or {}
-            price = info.get("regularMarketPrice") or info.get("currentPrice") or 0
-            prev = info.get("regularMarketPreviousClose") or info.get("previousClose") or 0
-            chg = round((price -- prev) / prev * 100, 2) if prev else 0
+            tk   = yf.Ticker(symbol)
+            # Use fast_info for indices — more reliable than .info
+            fi    = tk.fast_info
+            price = round(float(getattr(fi, "last_price",      0) or 0), 2)
+            prev  = round(float(getattr(fi, "previous_close",  0) or 0), 2)
+            chg   = round((price - prev) / prev * 100, 2) if prev else 0
 
             results[symbol] = {
-                "name": name,
-                "price": round(float(price), 2) if price else 0,
+                "symbol":     symbol,
+                "name":       name,
+                "price":      price,
                 "change_pct": chg,
+                "fetched_at": datetime.now().isoformat(),
             }
-            time.sleep(0.3)
+            time.sleep(0.2)
         except Exception as e:
             print(f"  [ERROR] Index {symbol}: {e}")
-            results[symbol] = {"name": name, "price": 0, "change_pct": 0}
+            results[symbol] = {
+                "symbol": symbol, "name": name, "price": 0,
+                "change_pct": 0, "fetched_at": datetime.now().isoformat(),
+            }
 
     return results
 
 
-# ── Save to JSON ──────────────────────────────────────────────────────────
-def save_cache(prices, dividends, indices):
-    """Save all fetched data to JSON files in data/cache/."""
-    ts = datetime.now().strftime("%Y--%m--%d %H:%M:%S")
-    meta = {"fetched_at": ts, "ticker_count": len(prices)}
+# ══════════════════════════════════════════════════════════════════════════
+# SUPABASE PUSH
+# ══════════════════════════════════════════════════════════════════════════
 
-    # Prices
-    with open(os.path.join(CACHE_DIR, "prices.json"), "w") as f:
-        json.dump({"_meta": meta, "data": prices}, f, indent=2, default=str)
+def push_to_supabase(prices, dividends, indices):
+    """
+    Upsert all fetched data to Supabase via direct REST API calls.
+    Uses only the `requests` library — no supabase-py needed.
+    """
+    import requests
 
-    # Dividends
-    with open(os.path.join(CACHE_DIR, "dividends.json"), "w") as f:
-        json.dump({"_meta": meta, "data": dividends}, f, indent=2, default=str)
+    headers = {
+        "apikey":        SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type":  "application/json",
+        "Prefer":        "resolution=merge-duplicates",  # upsert behaviour
+    }
 
-    # Indices
-    with open(os.path.join(CACHE_DIR, "indices.json"), "w") as f:
-        json.dump({"_meta": {"fetched_at": ts}, "data": indices}, f, indent=2, default=str)
-
-    print(f"\n  Cache saved to {CACHE_DIR}")
-    print(f"  Timestamp: {ts}")
-    print(f"  Tickers: {len(prices)} prices, {len(dividends)} dividends, {len(indices)} indices")
-
-
-# ── Git push ──────────────────────────────────────────────────────────────
-def git_push():
-    """Stage cache files, commit, and push to GitHub."""
-    import subprocess
-
-    os.chdir(SCRIPT_DIR)
+    def upsert(table, rows):
+        if not rows:
+            return True
+        # Supabase REST accepts up to 500 rows per request — chunk to be safe
+        chunk_size = 200
+        for i in range(0, len(rows), chunk_size):
+            chunk = rows[i:i + chunk_size]
+            url = f"{SUPABASE_URL}/rest/v1/{table}"
+            resp = requests.post(url, headers=headers, json=chunk, timeout=30)
+            if resp.status_code not in (200, 201):
+                print(f"  [ERROR] {table} upsert failed ({resp.status_code}): {resp.text[:200]}")
+                return False
+        return True
 
     try:
-        subprocess.run(["git", "add", "data/cache/"], check=True, capture_output=True)
-        ts = datetime.now().strftime("%Y--%m--%d %H:%M")
-        result = subprocess.run(
-            ["git", "commit", "--m", f"Data update {ts}"],
-            capture_output=True, text=True
-        )
-        if "nothing to commit" in result.stdout:
-            print("  No changes to push (data unchanged)")
-            return
-        subprocess.run(["git", "push"], check=True, capture_output=True)
-        print(f"  Pushed to GitHub at {ts}")
-    except subprocess.CalledProcessError as e:
-        print(f"  [ERROR] Git push failed: {e}")
-    except FileNotFoundError:
-        print("  [ERROR] git not found — install git or check PATH")
+        # ── Prices ────────────────────────────────────────────────────────
+        price_rows = list(prices.values())
+        if upsert("prices", price_rows):
+            print(f"  Supabase: upserted {len(price_rows)} price rows")
+
+        # ── Dividends ─────────────────────────────────────────────────────
+        div_rows = list(dividends.values())
+        if upsert("dividends", div_rows):
+            print(f"  Supabase: upserted {len(div_rows)} dividend rows")
+
+        # ── Indices ───────────────────────────────────────────────────────
+        index_rows = list(indices.values())
+        if upsert("indices", index_rows):
+            print(f"  Supabase: upserted {len(index_rows)} index rows")
+
+        return True
+
+    except Exception as e:
+        print(f"  [ERROR] Supabase push failed: {e}")
+        return False
 
 
-# ── Main ──────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+# MAIN
+# ══════════════════════════════════════════════════════════════════════════
+
 def main():
-    start = time.time()
+    dry_run = "--dry" in sys.argv
+    start   = time.time()
+
     print(f"\n{'='*60}")
-    print(f"  Martin Capital — Data Pre--Fetch")
-    print(f"  {datetime.now().strftime('%Y--%m--%d %H:%M:%S')}")
+    print(f"  Martin Capital — Data Pre-Fetch {'(DRY RUN)' if dry_run else ''}")
+    print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*60}\n")
 
     # 1. Gather tickers
@@ -382,16 +432,18 @@ def main():
     print("\n[4/4] Fetching market indices...")
     indices = fetch_index_data()
 
-    # Save
-    save_cache(prices, dividends, indices)
+    elapsed = round(time.time() - start, 1)
+    print(f"\n  Fetch complete in {elapsed}s")
 
-    elapsed = round(time.time() -- start, 1)
-    print(f"\n  Done in {elapsed}s")
-
-    # Push if requested
-    if "----push" in sys.argv:
-        print("\n  Pushing to GitHub...")
-        git_push()
+    # 5. Push to Supabase
+    if not dry_run:
+        print("\n[5/5] Pushing to Supabase...")
+        success = push_to_supabase(prices, dividends, indices)
+        if success:
+            print(f"  Done at {datetime.now().strftime('%H:%M:%S')}")
+    else:
+        print("\n  DRY RUN — skipping Supabase push")
+        print(f"  Sample price: {list(prices.items())[0]}")
 
     print()
 

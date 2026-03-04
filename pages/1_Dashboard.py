@@ -359,8 +359,8 @@ with tab_holdings:
                     "Div Yield %": mkt.get("dividend_yield", 0),
                     "P/E": round(mkt.get("pe_ratio", 0), 1) if mkt.get("pe_ratio") else "—",
                     "Sector": mkt.get("sector", ""),
-                    "52W High": mkt.get("fifty_two_week_high", 0),
-                    "52W Low": mkt.get("fifty_two_week_low", 0),
+                    "52W High": mkt.get("52w_high", 0),
+                    "52W Low":  mkt.get("52w_low", 0),
                 })
             display_df = pd.DataFrame(rows)
 
@@ -514,8 +514,11 @@ with tab_perf:
             all_hist = {}
             for t in symbols + [bench_ticker]:
                 hist = fetch_price_history(t, period=yf_period)
-                if not hist.empty:
-                    all_hist[t] = hist.set_index("Date")["Close"]
+                if hist is not None and not hist.empty:
+                    # yfinance returns a DatetimeIndex already — no need to set_index
+                    close = hist["Close"] if "Close" in hist.columns else hist.iloc[:, 0]
+                    close.index = pd.to_datetime(close.index).tz_localize(None)
+                    all_hist[t] = close
             if len(all_hist) < 2:
                 return None, None, None
             price_df = pd.DataFrame(all_hist).dropna(how="all").ffill()
