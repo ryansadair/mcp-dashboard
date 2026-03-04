@@ -18,9 +18,35 @@ Known yfinance data quirks handled:
 """
 
 import json
+import requests
 import os
 import streamlit as st
 from datetime import datetime
+
+# ── Supabase config (must match market_data.py) ────────────────────────────
+SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
+SUPABASE_KEY = "YOUR_SERVICE_ROLE_KEY"   # paste your service role key here
+
+_SB_HEADERS = {
+    "apikey":        SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type":  "application/json",
+}
+
+def _sb_get_dividends(tickers):
+    """Fetch dividend rows from Supabase for a list of tickers."""
+    if SUPABASE_KEY == "YOUR_SERVICE_ROLE_KEY":
+        return None
+    try:
+        url    = f"{SUPABASE_URL}/rest/v1/dividends"
+        params = {"select": "*", "ticker": f"in.({','.join(tickers)})"}
+        resp   = requests.get(url, headers=_SB_HEADERS, params=params, timeout=10)
+        if resp.status_code == 200:
+            rows = resp.json()
+            return {row["ticker"]: row for row in rows} if rows else None
+        return None
+    except Exception:
+        return None
 
 # ── Cache path ─────────────────────────────────────────────────────────────
 _DATA_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -83,9 +109,27 @@ def _safe_payout_ratio(info):
 def get_dividend_details(ticker, _cache_v=3):
     """
     Get comprehensive dividend data for a single ticker.
-    Checks JSON cache first, falls back to yfinance.
+    Priority: Supabase -> JSON cache -> yfinance live.
     """
-    # Try cache first
+    # ── 1. Try Supabase ───────────────────────────────────────────────────
+    sb_data = _sb_get_dividends([ticker])
+    if sb_data and ticker in sb_data:
+        row = sb_data[ticker]
+        return {
+            "symbol":              ticker,
+            "dividend_yield":      row.get("dividend_yield", 0),
+            "dividend_rate":       row.get("dividend_rate", 0),
+            "payout_ratio":        row.get("payout_ratio", 0),
+            "ex_dividend_date":    row.get("ex_dividend_date", ""),
+            "five_year_avg_yield": row.get("five_year_avg_yield", 0),
+            "div_growth_1y":       row.get("div_growth_1y", 0),
+            "div_growth_3y":       row.get("div_growth_3y", 0),
+            "div_growth_5y":       row.get("div_growth_5y", 0),
+            "div_growth_years":    row.get("div_growth_years", 0),
+            "consecutive_years":   row.get("consecutive_years", 0),
+        }
+
+    # ── 2. Try local JSON cache ───────────────────────────────────────────
     cache, _ = _load_div_cache()
     if cache and ticker in cache:
         return cache[ticker]
@@ -172,27 +216,45 @@ def get_dividend_details(ticker, _cache_v=3):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_batch_dividend_details(tickers_tuple, _cache_v=3):
-    """Fetch dividend details for a batch of tickers."""
-    # Try to serve entirely from cache for speed
-    cache, _ = _load_div_cache()
-
+    """Fetch dividend details for a batch of tickers.
+    Priority: Supabase -> local JSON cache -> yfinance per-ticker fallback.
+    """
     results = {}
-    if cache:
-        all_cached = True
-        for t in tickers_tuple:
-            if t in cache:
-                results[t] = cache[t]
-            else:
-                all_cached = False
-                break
+    missing = list(tickers_tuple)
 
-        if all_cached:
-            return results
+    # ── 1. Try Supabase ───────────────────────────────────────────────────
+    sb_data = _sb_get_dividends(list(tickers_tuple))
+    if sb_data:
+        for t, row in sb_data.items():
+            results[t] = {
+                "symbol":              t,
+                "dividend_yield":      row.get("dividend_yield", 0),
+                "dividend_rate":       row.get("dividend_rate", 0),
+                "payout_ratio":        row.get("payout_ratio", 0),
+                "ex_dividend_date":    row.get("ex_dividend_date", ""),
+                "five_year_avg_yield": row.get("five_year_avg_yield", 0),
+                "div_growth_1y":       row.get("div_growth_1y", 0),
+                "div_growth_3y":       row.get("div_growth_3y", 0),
+                "div_growth_5y":       row.get("div_growth_5y", 0),
+                "div_growth_years":    row.get("div_growth_years", 0),
+                "consecutive_years":   row.get("consecutive_years", 0),
+            }
+        missing = [t for t in tickers_tuple if t not in results]
 
-    # If not all cached, fall back to per-ticker fetch
-    results = {}
-    for t in tickers_tuple:
-        results[t] = get_dividend_details(t)
+    # ── 2. Try local JSON cache for anything still missing ────────────────
+    if missing:
+        cache, _ = _load_div_cache()
+        if cache:
+            for t in list(missing):
+                if t in cache:
+                    results[t] = cache[t]
+                    missing.remove(t)
+
+    # ── 3. yfinance fallback for anything still missing ───────────────────
+    if missing:
+        for t in missing:
+            results[t] = get_dividend_details(t)
+
     return results
 
 

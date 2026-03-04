@@ -110,6 +110,64 @@ def get_watchlist_names(parsed):
     return ordered + extras
 
 
+def enrich_from_supabase(tickers):
+    """
+    Fetch enrichment data from Supabase prices table.
+    Returns dict: { "TICK": {info}, ... } for tickers found in Supabase.
+    """
+    SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
+    SUPABASE_KEY = "YOUR_SERVICE_ROLE_KEY"   # paste your service role key here
+
+    if SUPABASE_KEY == "YOUR_SERVICE_ROLE_KEY" or not tickers:
+        return {}
+
+    try:
+        import requests
+        headers = {
+            "apikey":        SUPABASE_KEY,
+            "Authorization": f"Bearer {SUPABASE_KEY}",
+            "Content-Type":  "application/json",
+        }
+        params = {"select": "*", "ticker": f"in.({','.join(tickers)})"}
+        resp   = requests.get(
+            f"{SUPABASE_URL}/rest/v1/prices",
+            headers=headers, params=params, timeout=10
+        )
+        if resp.status_code != 200:
+            return {}
+
+        results = {}
+        for row in resp.json():
+            t  = row.get("ticker")
+            mc = row.get("market_cap", 0) or 0
+            if mc >= 1e12:
+                mc_str = f"${mc/1e12:.1f}T"
+            elif mc >= 1e9:
+                mc_str = f"${mc/1e9:.1f}B"
+            elif mc >= 1e6:
+                mc_str = f"${mc/1e6:.0f}M"
+            else:
+                mc_str = ""
+
+            results[t] = {
+                "company_name":   row.get("name", t),
+                "sector":         row.get("sector", ""),
+                "market_cap":     mc_str,
+                "current_price":  row.get("price", 0),
+                "dividend_yield": row.get("dividend_yield", 0),
+                "pe_ratio":       row.get("pe_ratio", 0),
+                "forward_pe":     row.get("forward_pe", 0),
+                "price_to_book":  row.get("price_to_book", 0),
+                "52w_high":       row.get("week52_high", 0),
+                "52w_low":        row.get("week52_low", 0),
+                "beta":           row.get("beta", 0),
+                "payout_ratio":   0,  # not in prices table, comes from dividends
+            }
+        return results
+    except Exception:
+        return {}
+
+
 def enrich_from_yfinance(ticker):
     """
     Fetch company name, sector, market cap, valuation from yfinance.
@@ -178,10 +236,18 @@ def enrich_from_yfinance(ticker):
 
 
 def enrich_batch(tickers):
-    """Enrich a list of tickers. Returns dict: { "TICK": {info}, ... }"""
+    """Enrich a list of tickers. Tries Supabase first, yfinance for any missing."""
     results = {}
-    for t in tickers:
+
+    # ── 1. Try Supabase prices table ──────────────────────────────────────
+    sb_results = enrich_from_supabase(tickers)
+    results.update(sb_results)
+    missing = [t for t in tickers if t not in results]
+
+    # ── 2. yfinance fallback for anything not in Supabase ─────────────────
+    for t in missing:
         info = enrich_from_yfinance(t)
         if info:
             results[t] = info
+
     return results
