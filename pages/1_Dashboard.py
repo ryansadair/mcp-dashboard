@@ -215,7 +215,7 @@ with tab_overview:
                         yaxis=dict(showgrid=False, showline=False, tickfont=dict(size=10)),
                         showlegend=False,
                     )
-                    st.plotly_chart(fig_bar, use_container_width=True)
+                    st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
                 else:
                     st.info("No holdings data available.")
             else:
@@ -243,7 +243,7 @@ with tab_overview:
                 yaxis={**_YAXIS, "ticksuffix": "%"},
                 height=280,
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
     with right:
         st.markdown("<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:12px;'>Sector Allocation</div>", unsafe_allow_html=True)
@@ -395,7 +395,7 @@ with tab_holdings:
                 )
             with c_go:
                 if detail_ticker:
-                    if st.button(f"📊 Open {detail_ticker}", key="go_detail_btn", use_container_width=True):
+                    if st.button(f"📊 Open {detail_ticker}", key="go_detail_btn", use_container_width=True, config={"displayModeBar": False}):
                         st.query_params["ticker"] = detail_ticker
                         st.switch_page("pages/2_Stock_Detail.py")
             with c_sector:
@@ -574,7 +574,7 @@ with tab_perf:
                 height=360,
                 hovermode="x unified",
             )
-            st.plotly_chart(fig2, use_container_width=True)
+            st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
 
             # KPIs
             port_total = round(float(port_cum.iloc[-1]) * 100, 2)
@@ -643,7 +643,7 @@ with tab_perf:
                 st.dataframe(pd.DataFrame({
                     "Metric": ["Sharpe Ratio","Sortino Ratio","Beta","Max Drawdown","Ann. Volatility"],
                     "Value": [f"{sharpe:.2f}", f"{sortino:.2f}", f"{beta_val:.2f}", f"{max_dd:.2f}%", f"{ann_vol:.1f}%"],
-                }), hide_index=True, use_container_width=True)
+                }), hide_index=True, use_container_width=True, config={"displayModeBar": False})
 
             # Drawdown chart
             if len(port_daily) > 1:
@@ -656,7 +656,7 @@ with tab_perf:
                     line=dict(color="#c45454", width=1.5), name="Drawdown",
                 ))
                 fig_dd.update_layout(**PLOTLY_DARK, xaxis=_XAXIS, yaxis={**_YAXIS, "ticksuffix": "%"}, height=220, showlegend=False)
-                st.plotly_chart(fig_dd, use_container_width=True)
+                st.plotly_chart(fig_dd, use_container_width=True, config={"displayModeBar": False})
 
             # Monthly Returns Heatmap
             if port_daily is not None and len(port_daily) > 20:
@@ -726,7 +726,7 @@ with tab_perf:
                             side="top",
                         ),
                     )
-                    st.plotly_chart(fig_hm, use_container_width=True)
+                    st.plotly_chart(fig_hm, use_container_width=True, config={"displayModeBar": False})
 
             st.caption(f"Weighted returns using Tamarac holdings • {datetime.now().strftime('%I:%M %p')}")
 
@@ -758,7 +758,7 @@ with tab_perf:
             yaxis={**_YAXIS, "ticksuffix": "%"},
             height=320,
         )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
 
         c1, c2 = st.columns(2)
         with c1:
@@ -766,13 +766,13 @@ with tab_perf:
             st.dataframe(pd.DataFrame({
                 "Source": ["Security Selection","Sector Allocation","Interaction Effect","Total Alpha"],
                 "Contribution": ["+0.84%","+0.31%","+0.12%",f"+{alpha:.2f}%"],
-            }), hide_index=True, use_container_width=True)
+            }), hide_index=True, use_container_width=True, config={"displayModeBar": False})
         with c2:
             st.markdown("**Risk Metrics**")
             st.dataframe(pd.DataFrame({
                 "Metric": ["Sharpe Ratio","Sortino Ratio","Beta","Max Drawdown","Tracking Error","Info Ratio"],
                 "Value": ["1.42","1.87","0.82","-6.2%","3.41%","0.37"],
-            }), hide_index=True, use_container_width=True)
+            }), hide_index=True, use_container_width=True, config={"displayModeBar": False})
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -889,7 +889,7 @@ with tab_divs:
                     height=max(300, len(yield_df) * 28 + 80),
                     showlegend=False,
                 )
-                st.plotly_chart(fig3, use_container_width=True)
+                st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
 
             # Growth chart
             st.divider()
@@ -920,7 +920,7 @@ with tab_divs:
                     height=max(300, len(growth_df) * 28 + 80),
                     showlegend=False,
                 )
-                st.plotly_chart(fig4, use_container_width=True)
+                st.plotly_chart(fig4, use_container_width=True, config={"displayModeBar": False})
 
             st.caption(f"Dividend data via yfinance • {datetime.now().strftime('%I:%M %p')}")
 
@@ -942,7 +942,7 @@ with tab_divs:
             {"Ticker":"KO", "Ex-Date":"Mar 18","Amount":"$0.49","Yield":"2.98%","Consecutive Years":62,"Payout Ratio":"66%"},
             {"Ticker":"ABT","Ex-Date":"Mar 22","Amount":"$0.55","Yield":"1.92%","Consecutive Years":52,"Payout Ratio":"48%"},
             {"Ticker":"TXN","Ex-Date":"Apr 01","Amount":"$1.34","Yield":"2.67%","Consecutive Years":21,"Payout Ratio":"62%"},
-        ]), hide_index=True, use_container_width=True)
+        ]), hide_index=True, use_container_width=True, config={"displayModeBar": False})
 
         holdings_df = get_holdings(active)
         if not holdings_df.empty and "div_yield" in holdings_df.columns:
@@ -954,7 +954,7 @@ with tab_divs:
                 title="Dividend Yield by Holding",
             )
             fig3.update_layout(**PLOTLY_DARK, xaxis={**_XAXIS, "ticksuffix": "%"}, yaxis=_YAXIS, height=320)
-            st.plotly_chart(fig3, use_container_width=True)
+            st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
 
 
 # ══════════════════════════════════════════════════════════════════════════
