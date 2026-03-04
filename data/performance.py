@@ -23,7 +23,7 @@ _SB_HEADERS = {
 
 def _sb_get_benchmark_ytd(bench_ticker):
     """Fetch YTD return for a benchmark from Supabase."""
-    if SUPABASE_KEY == "YOUR_SERVICE_ROLE_KEY":
+    if SUPABASE_KEY == "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7":
         return None
     try:
         url    = f"{SUPABASE_URL}/rest/v1/benchmark_ytd"
