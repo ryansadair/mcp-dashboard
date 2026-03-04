@@ -211,11 +211,17 @@ with tab_overview:
                             gridcolor="rgba(255,255,255,0.04)",
                             showline=False, ticksuffix="%", zeroline=True,
                             zerolinecolor="rgba(255,255,255,0.1)",
+                            fixedrange=True,
                         ),
-                        yaxis=dict(showgrid=False, showline=False, tickfont=dict(size=10)),
+                        yaxis=dict(showgrid=False, showline=False, tickfont=dict(size=10), fixedrange=True),
                         showlegend=False,
+                        dragmode=False,
                     )
-                    st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
+                    st.plotly_chart(fig_bar, use_container_width=True, config={
+                        "displayModeBar": False,
+                        "scrollZoom":     False,
+                        "doubleClick":    False,
+                    })
                 else:
                     st.info("No holdings data available.")
             else:
