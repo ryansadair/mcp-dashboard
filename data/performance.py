@@ -13,7 +13,7 @@ from utils.cache import query
 
 # ── Supabase config ────────────────────────────────────────────────────────
 SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
-SUPABASE_KEY = "YOUR_SERVICE_ROLE_KEY"   # paste your service role key here
+SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # paste your service role key here
 
 _SB_HEADERS = {
     "apikey":        SUPABASE_KEY,
@@ -39,7 +39,7 @@ def _sb_get_benchmark_ytd(bench_ticker):
 
 def _sb_get_benchmark_history(bench_ticker):
     """Fetch full YTD price history for a benchmark from Supabase."""
-    if SUPABASE_KEY == "YOUR_SERVICE_ROLE_KEY":
+    if SUPABASE_KEY == "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7":
         return None
     try:
         url    = f"{SUPABASE_URL}/rest/v1/benchmark_history"
