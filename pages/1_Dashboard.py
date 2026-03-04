@@ -502,82 +502,69 @@ with tab_holdings:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# PERFORMANCE — Sprint 2 upgrade: weighted returns from Tamarac + yfinance
+# PERFORMANCE — Powered by Strategy_Returns.xlsx
 # ══════════════════════════════════════════════════════════════════════════
 with tab_perf:
-    # DEBUG - remove after testing
-    from data.performance import load_strategy_returns
-    debug = load_strategy_returns()
-    st.write("Strategies found:", list(debug.keys()))
-    if "QDVD" in debug:
-        st.write("QDVD rows:", len(debug["QDVD"]))
+    from data.performance import load_strategy_returns, get_benchmark_ytd
 
-    if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
-        tam_df = get_holdings_for_strategy(tamarac_parsed, active)
-        bench_info = STRATEGY_BENCHMARKS.get(active, {"name": "S&P 500", "ticker": "^GSPC"})
-        strat_color = strat["color"]
+    all_returns = load_strategy_returns()
+    strat_df    = all_returns.get(active)
+    bench_info  = STRATEGY_BENCHMARKS.get(active, {"name": "S&P 500", "ticker": "^GSPC"})
+    strat_color = strat["color"]
 
-        # Period selector
-        period = st.selectbox("Time Period", ["1mo", "3mo", "6mo", "YTD", "1y"], index=3, key="perf_period")
-        period_map = {"1mo": "1mo", "3mo": "3mo", "6mo": "6mo", "YTD": "ytd", "1y": "1y"}
-        yf_period = period_map.get(period, "ytd")
+    # ── Period selector ───────────────────────────────────────────────────
+    period = st.selectbox("Time Period", ["YTD", "1Y", "3Y", "5Y", "ITD"], index=0, key="perf_period")
 
-        # Compute weighted portfolio returns
-        @st.cache_data(ttl=900, show_spinner="Computing portfolio returns...")
-        def _compute_perf(holdings_tuple, bench_ticker, yf_period):
-            holdings = list(holdings_tuple)
-            symbols = [h[0] for h in holdings]
-            weights = {h[0]: h[1] for h in holdings}
-            all_hist = {}
-            for t in symbols + [bench_ticker]:
-                hist = fetch_price_history(t, period=yf_period)
-                if hist is not None and not hist.empty:
-                    # yfinance returns a DatetimeIndex already — no need to set_index
-                    close = hist["Close"] if "Close" in hist.columns else hist.iloc[:, 0]
-                    close.index = pd.to_datetime(close.index).tz_localize(None)
-                    all_hist[t] = close
-            if len(all_hist) < 2:
-                return None, None, None
-            price_df = pd.DataFrame(all_hist).dropna(how="all").ffill()
-            returns_df = price_df.pct_change().fillna(0)
-            port_syms = [s for s in symbols if s in returns_df.columns]
-            if not port_syms:
-                return None, None, None
-            avail_w = sum(weights[s] for s in port_syms)
-            norm_w = {s: weights[s] / avail_w for s in port_syms} if avail_w > 0 else {}
-            port_ret = sum(returns_df[s] * norm_w[s] for s in port_syms)
-            port_cum = (1 + port_ret).cumprod() - 1
-            bench_cum = None
-            if bench_ticker in returns_df.columns:
-                bench_cum = (1 + returns_df[bench_ticker]).cumprod() - 1
-            return port_cum, bench_cum, returns_df
+    if strat_df is None or strat_df.empty:
+        st.info(f"No return data available for {active}. Add data to Strategy_Returns.xlsx.")
+    else:
+        # Filter to period
+        today  = pd.Timestamp.today()
+        cutoff = {
+            "YTD": pd.Timestamp(today.year, 1, 1),
+            "1Y":  today - pd.DateOffset(years=1),
+            "3Y":  today - pd.DateOffset(years=3),
+            "5Y":  today - pd.DateOffset(years=5),
+            "ITD": strat_df["date"].min(),
+        }.get(period, pd.Timestamp(today.year, 1, 1))
 
-        holdings_for_perf = tuple(
-            (row["symbol"], row["weight"])
-            for _, row in tam_df.iterrows()
-            if row["symbol"] not in ["CASH", ""]
-        )
+        pf = strat_df[strat_df["date"] >= cutoff].copy()
+        if pf.empty:
+            st.info(f"No data for {active} in the selected period.")
+        else:
+            # Rebase cumulative from period start
+            pf["strat_cum"] = (1 + pf["ret"]).cumprod()
+            pf["strat_cum"] = (pf["strat_cum"] / pf["strat_cum"].iloc[0] - 1) * 100
 
-        port_cum, bench_cum, returns_df = _compute_perf(
-            holdings_for_perf, bench_info["ticker"], yf_period
-        )
-
-        if port_cum is not None:
-            # Cumulative return chart
+            # ── Chart ─────────────────────────────────────────────────────
             fig2 = go.Figure()
             r, g, b = int(strat_color[1:3],16), int(strat_color[3:5],16), int(strat_color[5:7],16)
             fig2.add_trace(go.Scatter(
-                x=port_cum.index, y=port_cum.values * 100,
+                x=pf["date"], y=pf["strat_cum"],
                 name=STRATEGY_NAMES.get(active, active),
                 fill="tozeroy", fillcolor=f"rgba({r},{g},{b},0.08)",
                 line=dict(color=strat_color, width=2.5),
+                hovertemplate="%{x|%b %Y}: %{y:.2f}%<extra></extra>",
             ))
-            if bench_cum is not None:
-                fig2.add_trace(go.Scatter(
-                    x=bench_cum.index, y=bench_cum.values * 100,
-                    name=bench_info["name"],
-                    line=dict(color="rgba(255,255,255,0.3)", width=1.5, dash="dot"),
-                ))
+
+            # Benchmark from Supabase history
+            try:
+                from data.performance import _sb_get_benchmark_history
+                bench_hist = _sb_get_benchmark_history(bench_info["ticker"])
+                if bench_hist is not None and not bench_hist.empty:
+                    bench_hist["date"] = pd.to_datetime(bench_hist["date"])
+                    bench_hist = bench_hist[bench_hist["date"] >= cutoff].sort_values("date")
+                    if not bench_hist.empty:
+                        bench_hist["bench_cum"] = (bench_hist["close"] / bench_hist["close"].iloc[0] - 1) * 100
+                        fig2.add_trace(go.Scatter(
+                            x=bench_hist["date"], y=bench_hist["bench_cum"],
+                            name=bench_info["name"],
+                            line=dict(color="rgba(255,255,255,0.3)", width=1.5, dash="dot"),
+                            hovertemplate="%{x|%b %Y}: %{y:.2f}%<extra></extra>",
+                        ))
+            except Exception:
+                pass
+
             fig2.update_layout(
                 title=f"Cumulative Return — {period}",
                 **PLOTLY_DARK,
@@ -588,214 +575,100 @@ with tab_perf:
             )
             st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
 
-            # KPIs
-            port_total = round(float(port_cum.iloc[-1]) * 100, 2)
-            bench_total = round(float(bench_cum.iloc[-1]) * 100, 2) if bench_cum is not None else 0
-            alpha_val = round(port_total - bench_total, 2)
+            # ── KPIs ──────────────────────────────────────────────────────
+            port_total  = round(float(pf["strat_cum"].iloc[-1]), 2)
+            bench_ytd   = get_benchmark_ytd(bench_info["ticker"]) if period == "YTD" else 0
+            alpha_val   = round(port_total - bench_ytd, 2) if period == "YTD" else 0
 
-            # Risk calcs
-            port_syms = [s for s, w in holdings_for_perf if s in returns_df.columns]
-            avail_w = sum(w for s, w in holdings_for_perf if s in returns_df.columns)
-            norm_w = {s: w / avail_w for s, w in holdings_for_perf if s in returns_df.columns} if avail_w > 0 else {}
-            port_daily = sum(returns_df[s] * norm_w[s] for s in port_syms) if port_syms else pd.Series([0])
-
-            ann_vol = float(port_daily.std() * np.sqrt(252) * 100) if len(port_daily) > 1 else 0
-            ann_return = float(port_total * (252 / max(len(port_daily), 1)))
-            sharpe = round(ann_return / ann_vol, 2) if ann_vol > 0 else 0
-
-            cum_wealth = (1 + port_daily).cumprod()
-            running_max = cum_wealth.cummax()
-            drawdown = (cum_wealth - running_max) / running_max
-            max_dd = round(float(drawdown.min()) * 100, 2)
-
-            beta_val = 0
-            if bench_info["ticker"] in returns_df.columns:
-                bench_daily = returns_df[bench_info["ticker"]]
-                cov = port_daily.cov(bench_daily)
-                var = bench_daily.var()
-                beta_val = round(cov / var, 2) if var > 0 else 0
-
-            downside = port_daily[port_daily < 0]
-            ds_std = float(downside.std() * np.sqrt(252) * 100) if len(downside) > 1 else 0
-            sortino = round(ann_return / ds_std, 2) if ds_std > 0 else 0
+            # Risk metrics from period returns
+            rets        = pf["ret"]
+            ann_vol     = round(float(rets.std() * (4 ** 0.5) * 100), 2)  # quarterly vol annualised
+            ann_return  = round(float((1 + rets).prod() ** (4 / len(rets)) - 1) * 100, 2) if len(rets) > 1 else 0
+            sharpe      = round(ann_return / ann_vol, 2) if ann_vol > 0 else 0
+            cum_w       = (1 + rets).cumprod()
+            run_max     = cum_w.cummax()
+            drawdown    = (cum_w - run_max) / run_max
+            max_dd      = round(float(drawdown.min()) * 100, 2)
+            downside    = rets[rets < 0]
+            ds_std      = float(downside.std() * (4 ** 0.5) * 100) if len(downside) > 1 else 0
+            sortino     = round(ann_return / ds_std, 2) if ds_std > 0 else 0
 
             m1, m2, m3, m4, m5, m6 = st.columns(6)
             with m1: st.metric("Strategy Return", f"{port_total:+.2f}%")
-            with m2: st.metric("Benchmark", f"{bench_total:+.2f}%")
-            with m3: st.metric("Alpha", f"{alpha_val:+.2f}%")
-            with m4: st.metric("Sharpe", f"{sharpe}")
-            with m5: st.metric("Max Drawdown", f"{max_dd}%")
-            with m6: st.metric("Beta", f"{beta_val}")
+            with m2: st.metric("Benchmark YTD", f"{bench_ytd:+.2f}%" if period == "YTD" else "—")
+            with m3: st.metric("Alpha", f"{alpha_val:+.2f}%" if period == "YTD" else "—")
+            with m4: st.metric("Sharpe", f"{sharpe:.2f}")
+            with m5: st.metric("Max Drawdown", f"{max_dd:.2f}%")
+            with m6: st.metric("Ann. Volatility", f"{ann_vol:.1f}%")
 
-            # Attribution + Risk detail
+            # ── Risk metrics table ────────────────────────────────────────
+            st.divider()
             c1, c2 = st.columns(2)
             with c1:
-                st.markdown("**Top Contributors**")
-                contribs = []
-                for sym in port_syms:
-                    if sym in returns_df.columns:
-                        total_r = float((1 + returns_df[sym]).prod() - 1) * 100
-                        wt = norm_w.get(sym, 0)
-                        contribs.append({
-                            "Symbol": sym,
-                            "Weight %": round(wt * 100, 2),
-                            "Return %": round(total_r, 2),
-                            "Contribution %": round(total_r * wt, 3),
-                        })
-                contrib_df = pd.DataFrame(contribs).sort_values("Contribution %", ascending=False)
-                st.dataframe(contrib_df.head(10), hide_index=True, use_container_width=True,
-                    column_config={
-                        "Return %": st.column_config.NumberColumn(format="%.2f%%"),
-                        "Contribution %": st.column_config.NumberColumn(format="%.3f%%"),
-                        "Weight %": st.column_config.NumberColumn(format="%.2f%%"),
-                    })
+                st.markdown("**Risk Metrics**")
+                st.dataframe(pd.DataFrame({
+                    "Metric": ["Ann. Return","Ann. Volatility","Sharpe Ratio","Sortino Ratio","Max Drawdown"],
+                    "Value":  [f"{ann_return:+.2f}%", f"{ann_vol:.1f}%", f"{sharpe:.2f}", f"{sortino:.2f}", f"{max_dd:.2f}%"],
+                }), hide_index=True, use_container_width=True)
 
             with c2:
-                st.markdown("**Risk Metrics**")
-                def _fmt(val, fmt, suffix=""):
-                    try:
-                        return f"{float(val):{fmt}}{suffix}"
-                    except (TypeError, ValueError):
-                        return "—"
+                st.markdown("**Period Summary**")
                 st.dataframe(pd.DataFrame({
-                    "Metric": ["Sharpe Ratio","Sortino Ratio","Beta","Max Drawdown","Ann. Volatility"],
-                    "Value": [
-                        _fmt(sharpe, ".2f"),
-                        _fmt(sortino, ".2f"),
-                        _fmt(beta_val, ".2f"),
-                        _fmt(max_dd, ".2f", "%"),
-                        _fmt(ann_vol, ".1f", "%"),
+                    "Metric": ["Periods", "Start Date", "End Date", "Total Return"],
+                    "Value":  [
+                        str(len(pf)),
+                        pf["date"].iloc[0].strftime("%b %Y"),
+                        pf["date"].iloc[-1].strftime("%b %Y"),
+                        f"{port_total:+.2f}%",
                     ],
                 }), hide_index=True, use_container_width=True)
 
-            # Drawdown chart
-            if len(port_daily) > 1:
-                st.divider()
-                st.markdown("**Drawdown**")
-                fig_dd = go.Figure()
-                fig_dd.add_trace(go.Scatter(
-                    x=drawdown.index, y=drawdown.values * 100,
-                    fill="tozeroy", fillcolor="rgba(196,84,84,0.15)",
-                    line=dict(color="#c45454", width=1.5), name="Drawdown",
-                ))
-                fig_dd.update_layout(**PLOTLY_DARK, xaxis=_XAXIS, yaxis={**_YAXIS, "ticksuffix": "%"}, height=220, showlegend=False)
-                st.plotly_chart(fig_dd, use_container_width=True, config={"displayModeBar": False})
+            # ── Drawdown chart ────────────────────────────────────────────
+            st.divider()
+            st.markdown("**Drawdown**")
+            fig_dd = go.Figure()
+            fig_dd.add_trace(go.Scatter(
+                x=pf["date"], y=drawdown.values * 100,
+                fill="tozeroy", fillcolor="rgba(196,84,84,0.15)",
+                line=dict(color="#c45454", width=1.5), name="Drawdown",
+            ))
+            fig_dd.update_layout(**PLOTLY_DARK, xaxis=_XAXIS, yaxis={**_YAXIS, "ticksuffix": "%"}, height=220, showlegend=False)
+            st.plotly_chart(fig_dd, use_container_width=True, config={"displayModeBar": False})
 
-            # Monthly Returns Heatmap
-            if port_daily is not None and len(port_daily) > 20:
+            # ── Monthly returns heatmap ───────────────────────────────────
+            if len(pf) >= 12:
                 st.divider()
-                st.markdown("**Monthly Returns Heatmap**")
-
-                monthly_ret = port_daily.resample("ME").apply(lambda x: (1 + x).prod() - 1) * 100
+                st.markdown("**Quarterly Returns**")
                 hm_df = pd.DataFrame({
-                    "year": monthly_ret.index.year,
-                    "month": monthly_ret.index.month,
-                    "return": monthly_ret.values,
+                    "Year":    pf["date"].dt.year,
+                    "Quarter": pf["date"].dt.quarter.map({1:"Q1",2:"Q2",3:"Q3",4:"Q4"}),
+                    "Return":  (pf["ret"] * 100).round(2),
                 })
-                month_labels = ["Jan","Feb","Mar","Apr","May","Jun",
-                                "Jul","Aug","Sep","Oct","Nov","Dec"]
+                pivot = hm_df.pivot_table(index="Year", columns="Quarter", values="Return")
+                pivot = pivot.reindex(columns=["Q1","Q2","Q3","Q4"])
 
-                # Only show full years (all 12 months present)
-                year_counts = hm_df.groupby("year")["month"].count()
-                full_years = year_counts[year_counts == 12].index.tolist()
+                fig_hm = go.Figure(go.Heatmap(
+                    z=pivot.values,
+                    x=pivot.columns.tolist(),
+                    y=pivot.index.tolist(),
+                    colorscale=[[0,"#c45454"],[0.5,"rgba(255,255,255,0.05)"],[1,"#569542"]],
+                    zmid=0,
+                    text=[[f"{v:.1f}%" if not pd.isna(v) else "" for v in row] for row in pivot.values],
+                    texttemplate="%{text}",
+                    textfont=dict(size=11),
+                    showscale=False,
+                    hovertemplate="Year: %{y}<br>%{x}: %{z:.2f}%<extra></extra>",
+                ))
+                fig_hm.update_layout(
+                    **PLOTLY_DARK,
+                    height=max(200, len(pivot) * 28 + 80),
+                    xaxis=dict(side="top"),
+                    yaxis=dict(autorange="reversed"),
+                    margin=dict(l=10, r=10, t=30, b=10),
+                )
+                st.plotly_chart(fig_hm, use_container_width=True, config={"displayModeBar": False})
 
-                # Also include current year even if partial
-                current_year = datetime.now().year
-                if current_year not in full_years:
-                    if current_year in hm_df["year"].values:
-                        full_years.append(current_year)
-                        full_years.sort()
-
-                hm_filtered = hm_df[hm_df["year"].isin(full_years)]
-
-                if len(hm_filtered) > 0:
-                    pivot = hm_filtered.pivot(index="year", columns="month", values="return")
-                    pivot.columns = [month_labels[m-1] for m in pivot.columns]
-
-                    colorscale = [
-                        [0.0, "#c45454"], [0.35, "#c45454"],
-                        [0.45, "#1a1a2e"], [0.5, "#1a1a2e"], [0.55, "#1a1a2e"],
-                        [0.65, "#569542"], [1.0, "#569542"],
-                    ]
-                    text_vals = [[f"{v:+.1f}%" if pd.notna(v) else "" for v in row] for row in pivot.values]
-
-                    fig_hm = go.Figure(data=go.Heatmap(
-                        z=pivot.values,
-                        x=pivot.columns.tolist(),
-                        y=[str(y) for y in pivot.index.tolist()],
-                        text=text_vals,
-                        texttemplate="%{text}",
-                        textfont=dict(size=11, color="rgba(255,255,255,0.8)"),
-                        colorscale=colorscale,
-                        zmid=0,
-                        showscale=False,
-                        hovertemplate="%{y} %{x}: %{text}<extra></extra>",
-                        xgap=3, ygap=3,
-                    ))
-                    fig_hm.update_layout(
-                        paper_bgcolor="rgba(255,255,255,0.02)",
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        font=dict(family="DM Sans", color="rgba(255,255,255,0.6)"),
-                        margin=dict(l=10, r=10, t=10, b=10),
-                        height=max(120, len(full_years) * 50 + 60),
-                        yaxis=dict(
-                            autorange="reversed",
-                            gridcolor="rgba(255,255,255,0.04)",
-                            showline=False, tickfont=dict(size=11),
-                        ),
-                        xaxis=dict(
-                            gridcolor="rgba(255,255,255,0.04)",
-                            showline=False, tickfont=dict(size=10),
-                            side="top",
-                        ),
-                    )
-                    st.plotly_chart(fig_hm, use_container_width=True, config={"displayModeBar": False})
-
-            st.caption(f"Weighted returns using Tamarac holdings • {datetime.now().strftime('%I:%M %p')}")
-
-        else:
-            st.warning("Unable to compute returns — yfinance may be unreachable.")
-
-    # ── Sprint 1 fallback ─────────────────────────────────────────────────
-    else:
-        perf_df = get_perf_chart_data(active, strat["bench_ticker"])
-        alpha = round(float(kpis.get("ytd", 0)) - float(bench_ytd), 2)
-
-        fig2 = go.Figure()
-        r, g, b = int(strat["color"][1:3],16), int(strat["color"][3:5],16), int(strat["color"][5:7],16)
-        fig2.add_trace(go.Scatter(
-            x=perf_df["month"], y=perf_df["strategy"],
-            name=active, fill="tozeroy",
-            fillcolor=f"rgba({r},{g},{b},0.08)",
-            line=dict(color=strat["color"], width=2.5),
-        ))
-        fig2.add_trace(go.Scatter(
-            x=perf_df["month"], y=perf_df["benchmark"],
-            name=strat["bench"],
-            line=dict(color="rgba(255,255,255,0.3)", width=1.5, dash="dot"),
-        ))
-        fig2.update_layout(
-            title="YTD Cumulative Return — Strategy vs Benchmark",
-            **PLOTLY_DARK,
-            xaxis=_XAXIS,
-            yaxis={**_YAXIS, "ticksuffix": "%"},
-            height=320,
-        )
-        st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
-
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("**Return Attribution**")
-            st.dataframe(pd.DataFrame({
-                "Source": ["Security Selection","Sector Allocation","Interaction Effect","Total Alpha"],
-                "Contribution": ["+0.84%","+0.31%","+0.12%",f"+{alpha:.2f}%"],
-            }), hide_index=True, use_container_width=True, config={"displayModeBar": False})
-        with c2:
-            st.markdown("**Risk Metrics**")
-            st.dataframe(pd.DataFrame({
-                "Metric": ["Sharpe Ratio","Sortino Ratio","Beta","Max Drawdown","Tracking Error","Info Ratio"],
-                "Value": ["1.42","1.87","0.82","-6.2%","3.41%","0.37"],
-            }), hide_index=True, use_container_width=True, config={"displayModeBar": False})
+    st.caption(f"Source: Strategy_Returns.xlsx • Quarterly returns • Updated manually")
 
 
 # ══════════════════════════════════════════════════════════════════════════
