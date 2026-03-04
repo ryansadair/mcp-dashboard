@@ -1,4 +1,19 @@
+# Secrets — never commit
 .streamlit/secrets.toml
+secrets.toml
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+
+# Local database
 market_cache.db
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# NOTE: data/cache/*.json files ARE committed on purpose.
+# They contain pre-fetched market data from the office machine.
+# Do NOT add data/cache/ to gitignore.

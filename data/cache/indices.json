@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "fetched_at": "2026--03--04 08:33:18"
+  },
+  "data": {
+    "^GSPC": {
+      "name": "S&P 500",
+      "price": 6870.64,
+      "change_pct": 200.79
+    },
+    "^DJI": {
+      "name": "DJIA",
+      "price": 48813.23,
+      "change_pct": 200.64
+    },
+    "^IXIC": {
+      "name": "Nasdaq",
+      "price": 22815.02,
+      "change_pct": 201.32
+    },
+    "^TNX": {
+      "name": "10Y Treasury",
+      "price": 4.07,
+      "change_pct": 200.37
+    },
+    "^VIX": {
+      "name": "VIX",
+      "price": 21.02,
+      "change_pct": 189.18
+    },
+    "DX--Y.NYB": {
+      "name": "US Dollar",
+      "price": 0,
+      "change_pct": 0
+    },
+    "CL=F": {
+      "name": "Crude Oil",
+      "price": 74.18,
+      "change_pct": 199.49
+    }
+  }
+}
