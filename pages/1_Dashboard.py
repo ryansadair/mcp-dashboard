@@ -506,6 +506,14 @@ with tab_holdings:
 # ══════════════════════════════════════════════════════════════════════════
 with tab_perf:
 
+with tab_perf:
+    # DEBUG - remove after testing
+    from data.performance import load_strategy_returns
+    debug = load_strategy_returns()
+    st.write("Strategies found:", list(debug.keys()))
+    if "QDVD" in debug:
+        st.write("QDVD rows:", len(debug["QDVD"]))
+
     if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
         tam_df = get_holdings_for_strategy(tamarac_parsed, active)
         bench_info = STRATEGY_BENCHMARKS.get(active, {"name": "S&P 500", "ticker": "^GSPC"})
