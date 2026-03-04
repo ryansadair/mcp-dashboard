@@ -14,12 +14,15 @@ def get_logo_b64() -> str:
 
 def check_password() -> bool:
     def _submit():
+        password = st.session_state.get("password", "")
+        if not password:
+            return
         if hmac.compare_digest(
-            st.session_state["password"],
+            password,
             st.secrets.get("PASSWORD", "Mcpqdg2010$"),
         ):
             st.session_state["authenticated"] = True
-            del st.session_state["password"]
+            st.session_state.pop("password", None)
         else:
             st.session_state["authenticated"] = False
             st.error("Incorrect password.")
