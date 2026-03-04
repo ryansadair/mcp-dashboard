@@ -43,7 +43,7 @@ def _sb_get_ticker(ticker):
     Pull price + dividend data from Supabase for a single ticker.
     Returns a partial `info` dict compatible with yfinance's tk.info format.
     """
-    if SUPABASE_KEY == "YOUR_SERVICE_ROLE_KEY":
+    if SUPABASE_KEY == "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7":
         return {}
     try:
         # Prices
@@ -143,7 +143,11 @@ except Exception:
 col_sel, col_back = st.columns([3, 1])
 with col_sel:
     # Check if coming from Holdings tab with a pre-selected ticker
-    default_ticker = st.query_params.get("ticker", "AMGN").upper()
+    default_ticker = (
+        st.query_params.get("ticker")
+        or st.session_state.get("detail_ticker")
+        or ""
+    ).upper()
     ticker_input = st.text_input(
         "Enter Ticker Symbol",
         value=default_ticker,
