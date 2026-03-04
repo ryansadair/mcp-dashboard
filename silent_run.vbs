@@ -1,0 +1,2 @@
+Set objShell = CreateObject("WScript.Shell")
+objShell.Run "cmd /c " & Chr(34) & "C:\Users\RyanAdair\Martin Capital Partners LLC\Eugene - Documents\Operations\Scripts\Portfolio Dashboard\venv\Scripts\python.exe" & Chr(34) & " prefetch_data.py", 0, False

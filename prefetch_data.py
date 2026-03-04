@@ -35,8 +35,7 @@ sys.path.insert(0, SCRIPT_DIR)
 # Paste your Supabase project URL and service role key here after setup.
 # Get these from: supabase.com → your project → Settings → API
 SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
-SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"
-
+SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # use service role key, not anon key
 
 # ══════════════════════════════════════════════════════════════════════════
 # TICKER COLLECTION
@@ -345,11 +344,82 @@ def fetch_index_data():
     return results
 
 
-# ══════════════════════════════════════════════════════════════════════════
-# SUPABASE PUSH
-# ══════════════════════════════════════════════════════════════════════════
+# ── Benchmark tickers to track ─────────────────────────────────────────────
+BENCHMARK_TICKERS = {
+    "^GSPC":  "S&P 500",
+    "^DJI":   "DJIA",
+    "^RUT":   "Russell 2000",
+    "NOBL":   "S&P Dividend Aristocrats",
+    "IVW":    "S&P 500 Growth",
+}
 
-def push_to_supabase(prices, dividends, indices):
+
+def fetch_benchmark_data():
+    """
+    Fetch YTD price history for all benchmark tickers.
+    Returns dict: { "^GSPC": { "ytd_return": 7.15, "history": [...] }, ... }
+    """
+    import yfinance as yf
+    import pandas as pd
+    from datetime import date
+
+    results = {}
+    start = date(date.today().year, 1, 1).strftime("%Y-%m-%d")
+
+    for symbol, name in BENCHMARK_TICKERS.items():
+        try:
+            hist = yf.download(symbol, start=start, progress=False, auto_adjust=True)
+            if hist is None or len(hist) < 2:
+                raise ValueError("Not enough data")
+
+            # Handle multi-level columns from yf.download
+            if isinstance(hist.columns, pd.MultiIndex):
+                closes = hist["Close"][symbol]
+            else:
+                closes = hist["Close"]
+
+            # Convert to simple float series
+            closes = closes.dropna()
+            if len(closes) < 2:
+                raise ValueError("Not enough data after dropna")
+
+            first = float(closes.iloc[0])
+            last  = float(closes.iloc[-1])
+            ytd   = round(((last - first) / first) * 100, 2)
+
+            # Build history rows for Supabase
+            history_rows = []
+            for dt, close in closes.items():
+                date_str = str(dt)[:10]
+                history_rows.append({
+                    "id":         f"{symbol}_{date_str}",
+                    "symbol":     symbol,
+                    "date":       date_str,
+                    "close":      round(float(close), 4),
+                    "fetched_at": datetime.now().isoformat(),
+                })
+
+            results[symbol] = {
+                "symbol":     symbol,
+                "ytd_return": ytd,
+                "history":    history_rows,
+                "fetched_at": datetime.now().isoformat(),
+            }
+            print(f"  Benchmark {symbol}: YTD {ytd:+.2f}%")
+            time.sleep(0.3)
+
+        except Exception as e:
+            print(f"  [ERROR] Benchmark {symbol}: {e}")
+            results[symbol] = {
+                "symbol": symbol, "ytd_return": 0, "history": [], "fetched_at": datetime.now().isoformat()
+            }
+
+    return results
+
+
+
+
+def push_to_supabase(prices, dividends, indices, benchmarks=None):
     """
     Upsert all fetched data to Supabase via direct REST API calls.
     Uses only the `requests` library — no supabase-py needed.
@@ -360,17 +430,16 @@ def push_to_supabase(prices, dividends, indices):
         "apikey":        SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type":  "application/json",
-        "Prefer":        "resolution=merge-duplicates",  # upsert behaviour
+        "Prefer":        "resolution=merge-duplicates",
     }
 
     def upsert(table, rows):
         if not rows:
             return True
-        # Supabase REST accepts up to 500 rows per request — chunk to be safe
         chunk_size = 200
         for i in range(0, len(rows), chunk_size):
             chunk = rows[i:i + chunk_size]
-            url = f"{SUPABASE_URL}/rest/v1/{table}"
+            url  = f"{SUPABASE_URL}/rest/v1/{table}"
             resp = requests.post(url, headers=headers, json=chunk, timeout=30)
             if resp.status_code not in (200, 201):
                 print(f"  [ERROR] {table} upsert failed ({resp.status_code}): {resp.text[:200]}")
@@ -393,6 +462,21 @@ def push_to_supabase(prices, dividends, indices):
         if upsert("indices", index_rows):
             print(f"  Supabase: upserted {len(index_rows)} index rows")
 
+        # ── Benchmarks ────────────────────────────────────────────────────
+        if benchmarks:
+            # YTD summary
+            ytd_rows = [{"symbol": s, "ytd_return": d["ytd_return"], "fetched_at": d["fetched_at"]}
+                        for s, d in benchmarks.items()]
+            if upsert("benchmark_ytd", ytd_rows):
+                print(f"  Supabase: upserted {len(ytd_rows)} benchmark YTD rows")
+
+            # Full history (only push once per day — expensive otherwise)
+            all_history = []
+            for d in benchmarks.values():
+                all_history.extend(d.get("history", []))
+            if all_history and upsert("benchmark_history", all_history):
+                print(f"  Supabase: upserted {len(all_history)} benchmark history rows")
+
         return True
 
     except Exception as e:
@@ -414,36 +498,55 @@ def main():
     print(f"{'='*60}\n")
 
     # 1. Gather tickers
-    print("[1/4] Gathering tickers...")
+    print("[1/5] Gathering tickers...")
     tickers = get_all_tickers()
     if not tickers:
         print("  No tickers found! Check Tamarac_Holdings.xlsx exists.")
         return
 
     # 2. Fetch prices
-    print(f"\n[2/4] Fetching prices for {len(tickers)} tickers...")
+    print(f"\n[2/5] Fetching prices for {len(tickers)} tickers...")
     prices = fetch_all_prices(tickers)
 
     # 3. Fetch dividends
-    print(f"\n[3/4] Fetching dividend data for {len(tickers)} tickers...")
+    print(f"\n[3/5] Fetching dividend data for {len(tickers)} tickers...")
     dividends = fetch_all_dividends(tickers)
 
     # 4. Fetch indices
-    print("\n[4/4] Fetching market indices...")
+    print("\n[4/5] Fetching market indices...")
     indices = fetch_index_data()
+
+    # 5. Fetch benchmark history
+    print("\n[5/5] Fetching benchmark history...")
+    benchmarks = fetch_benchmark_data()
 
     elapsed = round(time.time() - start, 1)
     print(f"\n  Fetch complete in {elapsed}s")
 
-    # 5. Push to Supabase
+    # 6. Push to Supabase
+    success = False
     if not dry_run:
-        print("\n[5/5] Pushing to Supabase...")
-        success = push_to_supabase(prices, dividends, indices)
+        print("\n[6/6] Pushing to Supabase...")
+        success = push_to_supabase(prices, dividends, indices, benchmarks)
         if success:
             print(f"  Done at {datetime.now().strftime('%H:%M:%S')}")
     else:
         print("\n  DRY RUN — skipping Supabase push")
         print(f"  Sample price: {list(prices.items())[0]}")
+
+    # 6. Write to log file
+    log_path = os.path.join(SCRIPT_DIR, "prefetch_log.txt")
+    try:
+        status = "DRY RUN" if dry_run else ("SUCCESS" if success else "FAILED")
+        with open(log_path, "a") as log:
+            log.write(
+                f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} — "
+                f"{status} — "
+                f"{len(prices)} tickers — "
+                f"{elapsed}s\n"
+            )
+    except Exception as e:
+        print(f"  [WARN] Could not write log: {e}")
 
     print()
 
