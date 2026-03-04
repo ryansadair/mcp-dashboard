@@ -646,9 +646,20 @@ with tab_perf:
 
             with c2:
                 st.markdown("**Risk Metrics**")
+                def _fmt(val, fmt, suffix=""):
+                    try:
+                        return f"{float(val):{fmt}}{suffix}"
+                    except (TypeError, ValueError):
+                        return "—"
                 st.dataframe(pd.DataFrame({
                     "Metric": ["Sharpe Ratio","Sortino Ratio","Beta","Max Drawdown","Ann. Volatility"],
-                    "Value": [f"{sharpe:.2f}", f"{sortino:.2f}", f"{beta_val:.2f}", f"{max_dd:.2f}%", f"{ann_vol:.1f}%"],
+                    "Value": [
+                        _fmt(sharpe, ".2f"),
+                        _fmt(sortino, ".2f"),
+                        _fmt(beta_val, ".2f"),
+                        _fmt(max_dd, ".2f", "%"),
+                        _fmt(ann_vol, ".1f", "%"),
+                    ],
                 }), hide_index=True, use_container_width=True, config={"displayModeBar": False})
 
             # Drawdown chart
