@@ -401,7 +401,7 @@ with tab_holdings:
                 )
             with c_go:
                 if detail_ticker:
-                    if st.button(f"📊 Open {detail_ticker}", key="go_detail_btn", use_container_width=True, config={"displayModeBar": False}):
+                    if st.button(f"📊 Open {detail_ticker}", key="go_detail_btn", use_container_width=True):
                         st.query_params["ticker"] = detail_ticker
                         st.switch_page("pages/2_Stock_Detail.py")
             with c_sector:
