@@ -660,7 +660,7 @@ with tab_perf:
                         _fmt(max_dd, ".2f", "%"),
                         _fmt(ann_vol, ".1f", "%"),
                     ],
-                }), hide_index=True, use_container_width=True, config={"displayModeBar": False})
+                }), hide_index=True, use_container_width=True)
 
             # Drawdown chart
             if len(port_daily) > 1:
