@@ -182,7 +182,13 @@ def render_watchlist_tab():
             height=max(250, len(yield_df) * 30 + 60),
             showlegend=False,
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, config={
+            "displayModeBar": False,
+            "scrollZoom": False,
+            "doubleClick": False,
+            "showTips": False,
+            "staticPlot": True,
+        })
 
     st.caption(f"Data via yfinance · {datetime.now().strftime('%I:%M %p PT')}")
 
