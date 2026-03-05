@@ -402,18 +402,6 @@ with tab_holdings:
                 })
             display_df = pd.DataFrame(rows)
 
-            # KPI summary
-            num_h = len(display_df)
-            invested = round(100 - cash_wt, 1)
-            avg_yield = round(display_df["Div Yield %"].mean(), 2) if num_h > 0 else 0
-            top_wt = display_df["Weight %"].max() if num_h > 0 else 0
-
-            k1, k2, k3, k4, k5 = st.columns(5)
-            with k1: st.metric("Holdings", num_h)
-            with k2: st.metric("Invested", f"{invested}%")
-            with k3: st.metric("Cash", f"{cash_wt:.1f}%")
-            with k4: st.metric("Avg Yield", f"{avg_yield}%")
-            with k5: st.metric("Top Wt", f"{top_wt:.1f}%")
 
             # Detail selector & sector filter — single row
             c_detail, c_go, c_sector = st.columns([3, 1, 1])
