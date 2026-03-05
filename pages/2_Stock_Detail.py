@@ -43,7 +43,7 @@ def _sb_get_ticker(ticker):
     Pull price + dividend data from Supabase for a single ticker.
     Returns a partial `info` dict compatible with yfinance's tk.info format.
     """
-    if SUPABASE_KEY == "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7":
+    if not SUPABASE_KEY or SUPABASE_KEY == "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7":
         return {}
     try:
         # Prices
