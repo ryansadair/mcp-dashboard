@@ -80,7 +80,9 @@ st.markdown("""
     background: rgba(255,255,255,0.03) !important;
     border: 1px solid rgba(201,168,76,0.4) !important;
     border-radius: 8px !important;
-    min-height: 46px !important;
+    min-height: 58px !important;
+    display: flex !important;
+    align-items: center !important;
     transition: border-color 0.2s, background 0.2s;
 }
 [data-testid="stSelectbox"] [data-baseweb="select"] > div:first-child:hover {
@@ -92,10 +94,13 @@ st.markdown("""
     color: rgba(255,255,255,0.92) !important;
     font-size: 15px !important;
     font-weight: 600 !important;
+    line-height: 1 !important;
 }
 [data-testid="stSelectbox"] svg[data-baseweb="icon"] {
     color: #C9A84C !important;
     fill: #C9A84C !important;
+    width: 20px !important;
+    height: 20px !important;
 }
 </style>
 """, unsafe_allow_html=True)
