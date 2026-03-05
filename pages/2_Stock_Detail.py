@@ -113,22 +113,35 @@ def _sb_get_ticker(ticker):
 def _sb_get_price_history(ticker):
     """Fetch full price history from Supabase for a ticker."""
     try:
-        resp = requests.get(
-            f"{SUPABASE_URL}/rest/v1/price_history",
-            headers=_SB_HEADERS,
-            params={"select": "date,open,high,low,close,volume",
-                    "ticker": f"eq.{ticker}", "order": "date.asc", "limit": "10000"},
-            timeout=15,
-        )
-        rows = resp.json() if resp.status_code == 200 else []
-        if not rows:
+        all_rows = []
+        offset = 0
+        batch = 1000
+        while True:
+            resp = requests.get(
+                f"{SUPABASE_URL}/rest/v1/price_history",
+                headers={**_SB_HEADERS, "Range-Unit": "items", "Range": f"{offset}-{offset+batch-1}"},
+                params={"select": "date,open,high,low,close,volume",
+                        "ticker": f"eq.{ticker}", "order": "date.asc"},
+                timeout=20,
+            )
+            if resp.status_code not in (200, 206):
+                break
+            batch_rows = resp.json()
+            if not batch_rows:
+                break
+            all_rows.extend(batch_rows)
+            if len(batch_rows) < batch:
+                break
+            offset += batch
+
+        if not all_rows:
             return pd.DataFrame()
-        df = pd.DataFrame(rows)
+        df = pd.DataFrame(all_rows)
         df["Date"] = pd.to_datetime(df["date"])
         df = df.set_index("Date")
-        df.columns = [c.capitalize() for c in df.columns if c != "date"]
-        df = df.rename(columns={"date": "Date"})
-        for col in ["Open","High","Low","Close"]:
+        df = df.drop(columns=["date"], errors="ignore")
+        df.columns = [c.capitalize() for c in df.columns]
+        for col in ["Open", "High", "Low", "Close"]:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
         return df
