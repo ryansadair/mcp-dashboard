@@ -175,43 +175,78 @@ if not ticker_input:
 # ── Fetch all data ────────────────────────────────────────────────────────
 def _fetch_yfinance_with_retry(ticker, max_retries=3, delay=2):
     """
-    Call yfinance with retry logic for rate limit (429) errors.
-    Returns (yf_info, hist, div_hist, financials, quarterly_financials, recs)
-    or raises the last exception if all retries fail.
+    Call yfinance with retry logic for rate limits.
+    tk.info silently returns {} on rate limit — we treat that as retryable too.
+    Falls back to tk.fast_info if tk.info is empty after all retries.
+    Returns (yf_info, hist, div_hist, financials, quarterly_financials, recs).
     """
     import time
-    last_err = None
+
+    tk = yf.Ticker(ticker)
+    yf_info = {}
+
+    # Retry tk.info (silently returns {} on rate limit)
     for attempt in range(max_retries):
         try:
-            tk      = yf.Ticker(ticker)
-            yf_info = tk.info or {}
-            hist    = tk.history(period="2y")
-            divs    = tk.dividends
-            fins    = pd.DataFrame()
-            qfins   = pd.DataFrame()
-            recs    = pd.DataFrame()
-            try:
-                fins  = tk.financials
-            except Exception:
-                pass
-            try:
-                qfins = tk.quarterly_financials
-            except Exception:
-                pass
-            try:
-                recs  = tk.recommendations
-            except Exception:
-                pass
-            return yf_info, hist, divs, fins, qfins, recs
+            candidate = tk.info or {}
+            # A real response always has at least symbol or shortName
+            if candidate.get("symbol") or candidate.get("shortName") or candidate.get("longName"):
+                yf_info = candidate
+                break
+            # Empty dict — likely rate limited, wait and retry
+            if attempt < max_retries - 1:
+                time.sleep(delay * (attempt + 1))
         except Exception as e:
-            last_err = e
             err_str = str(e).lower()
-            if "too many requests" in err_str or "rate limit" in err_str or "429" in err_str:
-                if attempt < max_retries - 1:
-                    time.sleep(delay * (attempt + 1))  # back off: 2s, 4s
-                    continue
-            break  # non-rate-limit error, don't retry
-    raise last_err
+            if ("too many requests" in err_str or "rate limit" in err_str or "429" in err_str) \
+                    and attempt < max_retries - 1:
+                time.sleep(delay * (attempt + 1))
+            else:
+                break
+
+    # fast_info fallback if tk.info still empty
+    if not yf_info:
+        try:
+            fi = tk.fast_info
+            yf_info = {
+                "symbol":             ticker,
+                "shortName":          ticker,
+                "currentPrice":       getattr(fi, "last_price", 0) or 0,
+                "previousClose":      getattr(fi, "previous_close", 0) or 0,
+                "regularMarketPrice": getattr(fi, "last_price", 0) or 0,
+                "fiftyTwoWeekHigh":   getattr(fi, "year_high", 0) or 0,
+                "fiftyTwoWeekLow":    getattr(fi, "year_low", 0) or 0,
+                "marketCap":          getattr(fi, "market_cap", 0) or 0,
+            }
+        except Exception:
+            pass
+
+    # History and supplemental data
+    hist  = pd.DataFrame()
+    divs  = pd.Series(dtype=float)
+    fins  = pd.DataFrame()
+    qfins = pd.DataFrame()
+    recs  = pd.DataFrame()
+
+    try:
+        hist = tk.history(period="2y")
+        divs = tk.dividends
+    except Exception:
+        pass
+    try:
+        fins = tk.financials
+    except Exception:
+        pass
+    try:
+        qfins = tk.quarterly_financials
+    except Exception:
+        pass
+    try:
+        recs = tk.recommendations
+    except Exception:
+        pass
+
+    return yf_info, hist, divs, fins, qfins, recs
 
 
 @st.cache_data(ttl=900, show_spinner=False)
