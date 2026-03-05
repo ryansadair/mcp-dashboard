@@ -75,25 +75,28 @@ if "active_strategy" not in st.session_state:
 
 st.markdown("""
 <style>
-[data-testid="stSelectbox"] > div > div[data-baseweb="select"] > div {
+[data-testid="stSelectbox"] { max-width: 460px; }
+[data-testid="stSelectbox"] [data-baseweb="select"] > div:first-child {
     background: rgba(255,255,255,0.03) !important;
     border: 1px solid rgba(201,168,76,0.4) !important;
     border-radius: 8px !important;
     min-height: 46px !important;
     transition: border-color 0.2s, background 0.2s;
 }
-[data-testid="stSelectbox"] > div > div[data-baseweb="select"] > div:hover {
+[data-testid="stSelectbox"] [data-baseweb="select"] > div:first-child:hover {
     border-color: #C9A84C !important;
     background: rgba(201,168,76,0.06) !important;
 }
-[data-testid="stSelectbox"] > div > div[data-baseweb="select"] > div > div {
+[data-testid="stSelectbox"] [data-baseweb="select"] div[class*="st-at"],
+[data-testid="stSelectbox"] [data-baseweb="select"] div[class*="st-ax"] {
     color: rgba(255,255,255,0.92) !important;
     font-size: 15px !important;
     font-weight: 600 !important;
-    padding-left: 14px !important;
 }
-[data-testid="stSelectbox"] svg { color: #C9A84C !important; fill: #C9A84C !important; }
-[data-testid="stSelectbox"] { max-width: 460px; }
+[data-testid="stSelectbox"] svg[data-baseweb="icon"] {
+    color: #C9A84C !important;
+    fill: #C9A84C !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
