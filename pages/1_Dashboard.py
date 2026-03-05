@@ -73,54 +73,55 @@ if SPRINT2_AVAILABLE:
 if "active_strategy" not in st.session_state:
     st.session_state["active_strategy"] = "QDVD"
 
-# CSS: hide desktop buttons on mobile, hide mobile dropdown on desktop
+# Styled strategy dropdown — works on desktop and mobile
 st.markdown("""
 <style>
-@media (max-width: 768px) {
-    .desktop-strategy-selector { display: none !important; }
-    .mobile-strategy-selector  { display: block !important; }
+div[data-testid="stSelectbox"].strategy-sel > div > div {
+    background: rgba(255,255,255,0.03) !important;
+    border: 1px solid rgba(201,168,76,0.35) !important;
+    border-radius: 8px !important;
+    color: rgba(255,255,255,0.9) !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.03em !important;
+    padding: 4px 10px !important;
+    transition: border-color 0.2s;
 }
-@media (min-width: 769px) {
-    .desktop-strategy-selector { display: flex !important; }
-    .mobile-strategy-selector  { display: none !important; }
+div[data-testid="stSelectbox"].strategy-sel > div > div:hover {
+    border-color: rgba(201,168,76,0.75) !important;
+    background: rgba(201,168,76,0.05) !important;
 }
-.mobile-strategy-selector { display: none; }
+div[data-testid="stSelectbox"].strategy-sel svg {
+    color: #C9A84C !important;
+    fill: #C9A84C !important;
+}
+/* Cap width so it doesn't span full page */
+div[data-testid="stSelectbox"].strategy-sel {
+    max-width: 440px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# Mobile: selectbox wrapped in a hidden-on-desktop div
-st.markdown("<div class='mobile-strategy-selector'>", unsafe_allow_html=True)
 strat_keys   = list(STRATEGIES.keys())
-strat_labels = [f"{k} — {STRATEGIES[k]['name']}" for k in strat_keys]
+strat_labels = [f"{STRATEGIES[k]['full_name']}  ({k})" for k in strat_keys]
 current_idx  = strat_keys.index(st.session_state["active_strategy"])
-mobile_sel   = st.selectbox(
-    "Strategy",
-    options=strat_labels,
-    index=current_idx,
-    key="mobile_strategy_select",
-    label_visibility="collapsed",
-)
-mobile_key = strat_keys[strat_labels.index(mobile_sel)]
-if mobile_key != st.session_state["active_strategy"]:
-    st.session_state["active_strategy"] = mobile_key
-    st.rerun()
-st.markdown("</div>", unsafe_allow_html=True)
 
-# Desktop: button row wrapped in a hidden-on-mobile div
-st.markdown("<div class='desktop-strategy-selector' style='gap:8px;'>", unsafe_allow_html=True)
-cols = st.columns(len(STRATEGIES))
-for i, (key, s) in enumerate(STRATEGIES.items()):
-    with cols[i]:
-        is_active = st.session_state["active_strategy"] == key
-        if st.button(
-            f"**{key}**  \n{s['name']}",
-            key=f"strat_{key}",
-            use_container_width=True,
-            type="primary" if is_active else "secondary",
-        ):
-            st.session_state["active_strategy"] = key
-            st.rerun()
-st.markdown("</div>", unsafe_allow_html=True)
+# Inject class name via container trick
+with st.container():
+    st.markdown("<div class='strategy-sel'>", unsafe_allow_html=True)
+    selected_label = st.selectbox(
+        "Strategy",
+        options=strat_labels,
+        index=current_idx,
+        key="strategy_select",
+        label_visibility="collapsed",
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+selected_key = strat_keys[strat_labels.index(selected_label)]
+if selected_key != st.session_state["active_strategy"]:
+    st.session_state["active_strategy"] = selected_key
+    st.rerun()
 
 active = st.session_state["active_strategy"]
 strat = STRATEGIES[active]
