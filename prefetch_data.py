@@ -427,11 +427,7 @@ def fetch_price_history(tickers):
     import requests as req
     import math as _math
 
-    sb_headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
+    sb_headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Content-Type": "application/json"}
     today_str = datetime.now().strftime("%Y-%m-%d")
     try:
         resp = req.get(f"{SUPABASE_URL}/rest/v1/price_history", headers=sb_headers,
@@ -521,11 +517,7 @@ def fetch_financials(tickers):
     import math as _math
     from datetime import timedelta
 
-    sb_headers = {
-        "apikey": SUPABASE_KEY,
-        "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type": "application/json",
-    }
+    sb_headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Content-Type": "application/json"}
     week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
     try:
         resp = req.get(f"{SUPABASE_URL}/rest/v1/financials", headers=sb_headers,
@@ -560,7 +552,7 @@ def fetch_financials(tickers):
             if qfins is None or qfins.empty:
                 continue
             for period_idx, row in qfins.T.sort_index().iterrows():
-                ps = str(period_idx)[:10]
+                ps  = str(period_idx)[:10]
                 rev = _sf(row.get("Total Revenue"))
                 gp  = _sf(row.get("Gross Profit"))
                 ni  = _sf(row.get("Net Income"))
@@ -591,8 +583,10 @@ def push_to_supabase(prices, dividends, indices, benchmarks=None,
                      price_history=None, div_history=None, financials=None):
     """
     Upsert all fetched data to Supabase. Each table is fully independent.
+    price_history is pushed ticker-by-ticker to avoid memory issues.
     """
     import requests
+    import sys
 
     headers = {
         "apikey":        SUPABASE_KEY,
@@ -601,44 +595,34 @@ def push_to_supabase(prices, dividends, indices, benchmarks=None,
         "Prefer":        "resolution=merge-duplicates",
     }
 
-    def upsert(table, rows, chunk_size=200, timeout=60):
+    def upsert(table, rows, chunk_size=200, timeout=30):
         if not rows:
-            print(f"  Supabase: {table} — no rows to push, skipping")
             return True
-        total_chunks = (len(rows) + chunk_size - 1) // chunk_size
-        ok = 0
+        url = f"{SUPABASE_URL}/rest/v1/{table}"
         for i in range(0, len(rows), chunk_size):
             chunk = rows[i:i + chunk_size]
-            url   = f"{SUPABASE_URL}/rest/v1/{table}"
             try:
                 resp = requests.post(url, headers=headers, json=chunk, timeout=timeout)
-                if resp.status_code in (200, 201):
-                    ok += 1
-                else:
-                    print(f"  [ERROR] {table} chunk {i//chunk_size+1}/{total_chunks} "
-                          f"({resp.status_code}): {resp.text[:200]}")
+                if resp.status_code not in (200, 201):
+                    print(f"  [ERROR] {table} chunk {i//chunk_size+1} ({resp.status_code}): {resp.text[:150]}")
+                    return False
             except Exception as e:
-                print(f"  [ERROR] {table} chunk {i//chunk_size+1}/{total_chunks} exception: {e}")
-        if ok == total_chunks:
-            return True
-        print(f"  [WARN] {table}: {ok}/{total_chunks} chunks succeeded")
-        return False
+                print(f"  [ERROR] {table} chunk {i//chunk_size+1}: {e}")
+                return False
+        return True
 
-    # Each block is fully independent — no try/except wrapping all of them
+    # ── Standard tables (always fast) ────────────────────────────────────
     print("  Pushing: prices...")
-    price_rows = list(prices.values())
-    if upsert("prices", price_rows):
-        print(f"  Supabase: upserted {len(price_rows)} price rows")
+    if upsert("prices", list(prices.values())):
+        print(f"  Supabase: upserted {len(prices)} price rows")
 
     print("  Pushing: dividends...")
-    div_rows = list(dividends.values())
-    if upsert("dividends", div_rows):
-        print(f"  Supabase: upserted {len(div_rows)} dividend rows")
+    if upsert("dividends", list(dividends.values())):
+        print(f"  Supabase: upserted {len(dividends)} dividend rows")
 
     print("  Pushing: indices...")
-    index_rows = list(indices.values())
-    if upsert("indices", index_rows):
-        print(f"  Supabase: upserted {len(index_rows)} index rows")
+    if upsert("indices", list(indices.values())):
+        print(f"  Supabase: upserted {len(indices)} index rows")
 
     if benchmarks:
         print("  Pushing: benchmark_ytd...")
@@ -654,20 +638,36 @@ def push_to_supabase(prices, dividends, indices, benchmarks=None,
         if all_history and upsert("benchmark_history", all_history):
             print(f"  Supabase: upserted {len(all_history)} benchmark history rows")
 
-    if price_history:
-        print(f"  Pushing: price_history ({len(price_history)} rows)...")
-        if upsert("price_history", price_history, chunk_size=500, timeout=120):
-            print(f"  Supabase: upserted {len(price_history)} price history rows")
-
+    # ── Dividend history ──────────────────────────────────────────────────
     if div_history:
         print(f"  Pushing: dividend_history ({len(div_history)} rows)...")
         if upsert("dividend_history", div_history):
             print(f"  Supabase: upserted {len(div_history)} dividend history rows")
 
+    # ── Financials ────────────────────────────────────────────────────────
     if financials:
         print(f"  Pushing: financials ({len(financials)} rows)...")
         if upsert("financials", financials):
             print(f"  Supabase: upserted {len(financials)} financials rows")
+
+    # ── Price history — push ticker by ticker to avoid memory issues ──────
+    if price_history:
+        # Group by ticker
+        by_ticker = {}
+        for row in price_history:
+            by_ticker.setdefault(row["ticker"], []).append(row)
+        total_tickers = len(by_ticker)
+        pushed = 0
+        failed = 0
+        print(f"  Pushing: price_history ({len(price_history)} rows across {total_tickers} tickers)...")
+        for t, rows in by_ticker.items():
+            sys.stdout.write(f"\r  price_history: {pushed+failed+1}/{total_tickers} ({t})    ")
+            sys.stdout.flush()
+            if upsert("price_history", rows, chunk_size=100, timeout=30):
+                pushed += 1
+            else:
+                failed += 1
+        print(f"\n  Supabase: price_history done — {pushed} tickers OK, {failed} failed")
 
     print("  Push complete.")
     return True
