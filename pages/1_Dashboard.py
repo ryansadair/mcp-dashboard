@@ -717,7 +717,7 @@ with tab_divs:
 
             avg_growth_1y = _avg_growth("div_growth_1y", 2)
             avg_growth_3y = _avg_growth("div_growth_3y", 4)
-            avg_growth_5y = _avg_growth("div_growth_5y", 6)
+            avg_growth_5y = _avg_growth("div_growth_5y", 5)
 
             # Avg consecutive years: only include tickers with meaningful history
             consec = [div_data[t].get("consecutive_years", 0) for t in tickers
