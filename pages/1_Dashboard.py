@@ -73,51 +73,37 @@ if SPRINT2_AVAILABLE:
 if "active_strategy" not in st.session_state:
     st.session_state["active_strategy"] = "QDVD"
 
-# Styled strategy dropdown — works on desktop and mobile
 st.markdown("""
 <style>
-div[data-testid="stSelectbox"].strategy-sel > div > div {
+[data-testid="stSelectbox"] > div > div[data-baseweb="select"] > div {
     background: rgba(255,255,255,0.03) !important;
-    border: 1px solid rgba(201,168,76,0.35) !important;
+    border: 1px solid rgba(201,168,76,0.4) !important;
     border-radius: 8px !important;
-    color: rgba(255,255,255,0.9) !important;
-    font-size: 14px !important;
+    min-height: 46px !important;
+    transition: border-color 0.2s, background 0.2s;
+}
+[data-testid="stSelectbox"] > div > div[data-baseweb="select"] > div:hover {
+    border-color: #C9A84C !important;
+    background: rgba(201,168,76,0.06) !important;
+}
+[data-testid="stSelectbox"] > div > div[data-baseweb="select"] > div > div {
+    color: rgba(255,255,255,0.92) !important;
+    font-size: 15px !important;
     font-weight: 600 !important;
-    letter-spacing: 0.03em !important;
-    padding: 4px 10px !important;
-    transition: border-color 0.2s;
+    padding-left: 14px !important;
 }
-div[data-testid="stSelectbox"].strategy-sel > div > div:hover {
-    border-color: rgba(201,168,76,0.75) !important;
-    background: rgba(201,168,76,0.05) !important;
-}
-div[data-testid="stSelectbox"].strategy-sel svg {
-    color: #C9A84C !important;
-    fill: #C9A84C !important;
-}
-/* Cap width so it doesn't span full page */
-div[data-testid="stSelectbox"].strategy-sel {
-    max-width: 440px;
-}
+[data-testid="stSelectbox"] svg { color: #C9A84C !important; fill: #C9A84C !important; }
+[data-testid="stSelectbox"] { max-width: 460px; }
 </style>
 """, unsafe_allow_html=True)
 
 strat_keys   = list(STRATEGIES.keys())
 strat_labels = [f"{STRATEGIES[k]['full_name']}  ({k})" for k in strat_keys]
 current_idx  = strat_keys.index(st.session_state["active_strategy"])
-
-# Inject class name via container trick
-with st.container():
-    st.markdown("<div class='strategy-sel'>", unsafe_allow_html=True)
-    selected_label = st.selectbox(
-        "Strategy",
-        options=strat_labels,
-        index=current_idx,
-        key="strategy_select",
-        label_visibility="collapsed",
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
-
+selected_label = st.selectbox(
+    "Strategy", options=strat_labels, index=current_idx,
+    key="strategy_select", label_visibility="collapsed",
+)
 selected_key = strat_keys[strat_labels.index(selected_label)]
 if selected_key != st.session_state["active_strategy"]:
     st.session_state["active_strategy"] = selected_key
