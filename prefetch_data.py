@@ -421,33 +421,24 @@ def fetch_benchmark_data():
 
 
 
-# ══════════════════════════════════════════════════════════════════════════
-# PRICE HISTORY FETCHING
-# ══════════════════════════════════════════════════════════════════════════
-
 def fetch_price_history(tickers):
-    """Fetch full OHLCV history for all tickers. Skips tickers already updated today."""
+    """Fetch full OHLCV history. Skips tickers already stored today."""
     import yfinance as yf
     import requests as req
     import math as _math
 
-    headers = {
-        "apikey":        SUPABASE_KEY,
+    sb_headers = {
+        "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type":  "application/json",
+        "Content-Type": "application/json",
     }
-
     today_str = datetime.now().strftime("%Y-%m-%d")
     try:
-        resp = req.get(
-            f"{SUPABASE_URL}/rest/v1/price_history",
-            headers=headers,
-            params={"select": "ticker", "date": f"eq.{today_str}"},
-            timeout=10,
-        )
-        already_updated = {r["ticker"] for r in (resp.json() if resp.status_code == 200 else [])}
+        resp = req.get(f"{SUPABASE_URL}/rest/v1/price_history", headers=sb_headers,
+                       params={"select": "ticker", "date": f"eq.{today_str}"}, timeout=10)
+        already = {r["ticker"] for r in (resp.json() if resp.status_code == 200 else [])}
     except Exception:
-        already_updated = set()
+        already = set()
 
     def _sf(v):
         try:
@@ -458,26 +449,25 @@ def fetch_price_history(tickers):
 
     all_rows = []
     total = len(tickers)
+    skipped = 0
     for i, ticker in enumerate(tickers, 1):
-        if ticker in already_updated:
+        if ticker in already:
+            skipped += 1
             continue
         try:
-            tk   = yf.Ticker(ticker)
-            hist = tk.history(period="max", auto_adjust=True)
+            hist = yf.Ticker(ticker).history(period="max", auto_adjust=True)
             if hist is None or hist.empty:
                 continue
             hist = hist.reset_index()
             for _, row in hist.iterrows():
-                date_str = str(row["Date"])[:10]
+                ds = str(row["Date"])[:10]
                 all_rows.append({
-                    "id":         f"{ticker}_{date_str}",
-                    "ticker":     ticker,
-                    "date":       date_str,
-                    "open":       round(_sf(row.get("Open",  0)), 4),
-                    "high":       round(_sf(row.get("High",  0)), 4),
-                    "low":        round(_sf(row.get("Low",   0)), 4),
-                    "close":      round(_sf(row.get("Close", 0)), 4),
-                    "volume":     int(_sf(row.get("Volume",  0))),
+                    "id": f"{ticker}_{ds}", "ticker": ticker, "date": ds,
+                    "open":  round(_sf(row.get("Open",  0)), 4),
+                    "high":  round(_sf(row.get("High",  0)), 4),
+                    "low":   round(_sf(row.get("Low",   0)), 4),
+                    "close": round(_sf(row.get("Close", 0)), 4),
+                    "volume": int(_sf(row.get("Volume", 0))),
                     "fetched_at": datetime.now().isoformat(),
                 })
             if i % 10 == 0 or i == total:
@@ -486,39 +476,33 @@ def fetch_price_history(tickers):
             print(f"  [ERROR] Price history {ticker}: {e}")
         time.sleep(0.4)
 
+    if skipped:
+        print(f"  Price history: skipped {skipped} tickers already updated today")
     print(f"  Price history: {len(all_rows)} total rows to upsert")
     return all_rows
 
 
-# ══════════════════════════════════════════════════════════════════════════
-# DIVIDEND HISTORY FETCHING
-# ══════════════════════════════════════════════════════════════════════════
-
 def fetch_dividend_history(tickers):
-    """Fetch annual dividend totals per ticker for history chart."""
+    """Fetch annual dividend totals per ticker."""
     import yfinance as yf
     import pandas as pd
 
     all_rows = []
-    total = len(tickers)
     current_year = datetime.now().year
-
+    total = len(tickers)
     for i, ticker in enumerate(tickers, 1):
         try:
-            tk   = yf.Ticker(ticker)
-            divs = tk.dividends
+            divs = yf.Ticker(ticker).dividends
             if divs is None or divs.empty:
                 continue
-            divs_df = divs.reset_index()
-            divs_df.columns = ["date", "amount"]
-            divs_df["year"] = pd.to_datetime(divs_df["date"]).dt.year
-            annual = divs_df[divs_df["year"] < current_year].groupby("year")["amount"].sum()
-            for year, amount in annual.items():
+            df = divs.reset_index()
+            df.columns = ["date", "amount"]
+            df["year"] = pd.to_datetime(df["date"]).dt.year
+            annual = df[df["year"] < current_year].groupby("year")["amount"].sum()
+            for year, amt in annual.items():
                 all_rows.append({
-                    "id":         f"{ticker}_{year}",
-                    "ticker":     ticker,
-                    "year":       int(year),
-                    "amount":     round(float(amount), 4),
+                    "id": f"{ticker}_{year}", "ticker": ticker,
+                    "year": int(year), "amount": round(float(amt), 4),
                     "fetched_at": datetime.now().isoformat(),
                 })
             if i % 10 == 0 or i == total:
@@ -526,14 +510,9 @@ def fetch_dividend_history(tickers):
         except Exception as e:
             print(f"  [ERROR] Div history {ticker}: {e}")
         time.sleep(0.3)
-
     print(f"  Div history: {len(all_rows)} total rows to upsert")
     return all_rows
 
-
-# ══════════════════════════════════════════════════════════════════════════
-# FINANCIALS FETCHING
-# ══════════════════════════════════════════════════════════════════════════
 
 def fetch_financials(tickers):
     """Fetch quarterly financials. Skips tickers updated within 7 days."""
@@ -542,23 +521,18 @@ def fetch_financials(tickers):
     import math as _math
     from datetime import timedelta
 
-    headers = {
-        "apikey":        SUPABASE_KEY,
+    sb_headers = {
+        "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
-        "Content-Type":  "application/json",
+        "Content-Type": "application/json",
     }
-
     week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
     try:
-        resp = req.get(
-            f"{SUPABASE_URL}/rest/v1/financials",
-            headers=headers,
-            params={"select": "ticker", "fetched_at": f"gte.{week_ago}"},
-            timeout=10,
-        )
-        recently_updated = {r["ticker"] for r in (resp.json() if resp.status_code == 200 else [])}
+        resp = req.get(f"{SUPABASE_URL}/rest/v1/financials", headers=sb_headers,
+                       params={"select": "ticker", "fetched_at": f"gte.{week_ago}"}, timeout=10)
+        recent = {r["ticker"] for r in (resp.json() if resp.status_code == 200 else [])}
     except Exception:
-        recently_updated = set()
+        recent = set()
 
     def _sf(v):
         try:
@@ -576,39 +550,30 @@ def fetch_financials(tickers):
 
     all_rows = []
     total = len(tickers)
-
+    skipped = 0
     for i, ticker in enumerate(tickers, 1):
-        if ticker in recently_updated:
+        if ticker in recent:
+            skipped += 1
             continue
         try:
-            tk    = yf.Ticker(ticker)
-            qfins = tk.quarterly_financials
+            qfins = yf.Ticker(ticker).quarterly_financials
             if qfins is None or qfins.empty:
                 continue
-            qfins_t = qfins.T.sort_index()
-            for period_idx, row in qfins_t.iterrows():
-                period_str    = str(period_idx)[:10]
-                revenue       = _sf(row.get("Total Revenue"))
-                gross_profit  = _sf(row.get("Gross Profit"))
-                net_income    = _sf(row.get("Net Income"))
-                operating_inc = _sf(row.get("Operating Income"))
-                ebitda        = _sf(row.get("EBITDA"))
-                gross_margin  = round(gross_profit  / revenue * 100, 2) if revenue else 0.0
-                net_margin    = round(net_income    / revenue * 100, 2) if revenue else 0.0
-                op_margin     = round(operating_inc / revenue * 100, 2) if revenue else 0.0
+            for period_idx, row in qfins.T.sort_index().iterrows():
+                ps = str(period_idx)[:10]
+                rev = _sf(row.get("Total Revenue"))
+                gp  = _sf(row.get("Gross Profit"))
+                ni  = _sf(row.get("Net Income"))
+                oi  = _sf(row.get("Operating Income"))
+                eb  = _sf(row.get("EBITDA"))
                 all_rows.append({
-                    "id":               f"{ticker}_{period_str}",
-                    "ticker":           ticker,
-                    "period":           period_str,
-                    "revenue":          _si(revenue),
-                    "gross_profit":     _si(gross_profit),
-                    "net_income":       _si(net_income),
-                    "operating_income": _si(operating_inc),
-                    "ebitda":           _si(ebitda),
-                    "gross_margin":     gross_margin,
-                    "net_margin":       net_margin,
-                    "op_margin":        op_margin,
-                    "fetched_at":       datetime.now().isoformat(),
+                    "id": f"{ticker}_{ps}", "ticker": ticker, "period": ps,
+                    "revenue": _si(rev), "gross_profit": _si(gp),
+                    "net_income": _si(ni), "operating_income": _si(oi), "ebitda": _si(eb),
+                    "gross_margin":  round(gp / rev * 100, 2) if rev else 0.0,
+                    "net_margin":    round(ni / rev * 100, 2) if rev else 0.0,
+                    "op_margin":     round(oi / rev * 100, 2) if rev else 0.0,
+                    "fetched_at": datetime.now().isoformat(),
                 })
             if i % 10 == 0 or i == total:
                 print(f"  Financials: {i}/{total} ({ticker})")
@@ -616,6 +581,8 @@ def fetch_financials(tickers):
             print(f"  [ERROR] Financials {ticker}: {e}")
         time.sleep(0.4)
 
+    if skipped:
+        print(f"  Financials: skipped {skipped} tickers updated within 7 days")
     print(f"  Financials: {len(all_rows)} total rows to upsert")
     return all_rows
 
@@ -623,8 +590,7 @@ def fetch_financials(tickers):
 def push_to_supabase(prices, dividends, indices, benchmarks=None,
                      price_history=None, div_history=None, financials=None):
     """
-    Upsert all fetched data to Supabase via direct REST API calls.
-    Each table is pushed independently — one failure won't block others.
+    Upsert all fetched data to Supabase. Each table is fully independent.
     """
     import requests
 
@@ -637,79 +603,74 @@ def push_to_supabase(prices, dividends, indices, benchmarks=None,
 
     def upsert(table, rows, chunk_size=200, timeout=60):
         if not rows:
+            print(f"  Supabase: {table} — no rows to push, skipping")
             return True
-        success = True
+        total_chunks = (len(rows) + chunk_size - 1) // chunk_size
+        ok = 0
         for i in range(0, len(rows), chunk_size):
             chunk = rows[i:i + chunk_size]
             url   = f"{SUPABASE_URL}/rest/v1/{table}"
             try:
                 resp = requests.post(url, headers=headers, json=chunk, timeout=timeout)
-                if resp.status_code not in (200, 201):
-                    print(f"  [ERROR] {table} chunk {i//chunk_size+1} failed ({resp.status_code}): {resp.text[:200]}")
-                    success = False
+                if resp.status_code in (200, 201):
+                    ok += 1
+                else:
+                    print(f"  [ERROR] {table} chunk {i//chunk_size+1}/{total_chunks} "
+                          f"({resp.status_code}): {resp.text[:200]}")
             except Exception as e:
-                print(f"  [ERROR] {table} chunk {i//chunk_size+1} exception: {e}")
-                success = False
-        return success
+                print(f"  [ERROR] {table} chunk {i//chunk_size+1}/{total_chunks} exception: {e}")
+        if ok == total_chunks:
+            return True
+        print(f"  [WARN] {table}: {ok}/{total_chunks} chunks succeeded")
+        return False
 
-    overall = True
-
-    # ── Prices ────────────────────────────────────────────────────────────
+    # Each block is fully independent — no try/except wrapping all of them
+    print("  Pushing: prices...")
     price_rows = list(prices.values())
     if upsert("prices", price_rows):
         print(f"  Supabase: upserted {len(price_rows)} price rows")
-    else:
-        overall = False
 
-    # ── Dividends ─────────────────────────────────────────────────────────
+    print("  Pushing: dividends...")
     div_rows = list(dividends.values())
     if upsert("dividends", div_rows):
         print(f"  Supabase: upserted {len(div_rows)} dividend rows")
-    else:
-        overall = False
 
-    # ── Indices ───────────────────────────────────────────────────────────
+    print("  Pushing: indices...")
     index_rows = list(indices.values())
     if upsert("indices", index_rows):
         print(f"  Supabase: upserted {len(index_rows)} index rows")
-    else:
-        overall = False
 
-    # ── Benchmarks ────────────────────────────────────────────────────────
     if benchmarks:
+        print("  Pushing: benchmark_ytd...")
         ytd_rows = [{"symbol": s, "ytd_return": d["ytd_return"], "fetched_at": d["fetched_at"]}
                     for s, d in benchmarks.items()]
         if upsert("benchmark_ytd", ytd_rows):
             print(f"  Supabase: upserted {len(ytd_rows)} benchmark YTD rows")
 
+        print("  Pushing: benchmark_history...")
         all_history = []
         for d in benchmarks.values():
             all_history.extend(d.get("history", []))
         if all_history and upsert("benchmark_history", all_history):
             print(f"  Supabase: upserted {len(all_history)} benchmark history rows")
 
-    # ── Price History ─────────────────────────────────────────────────────
     if price_history:
+        print(f"  Pushing: price_history ({len(price_history)} rows)...")
         if upsert("price_history", price_history, chunk_size=500, timeout=120):
             print(f"  Supabase: upserted {len(price_history)} price history rows")
-        else:
-            overall = False
 
-    # ── Dividend History ──────────────────────────────────────────────────
     if div_history:
+        print(f"  Pushing: dividend_history ({len(div_history)} rows)...")
         if upsert("dividend_history", div_history):
             print(f"  Supabase: upserted {len(div_history)} dividend history rows")
-        else:
-            overall = False
 
-    # ── Financials ────────────────────────────────────────────────────────
     if financials:
+        print(f"  Pushing: financials ({len(financials)} rows)...")
         if upsert("financials", financials):
             print(f"  Supabase: upserted {len(financials)} financials rows")
-        else:
-            overall = False
 
-    return overall
+    print("  Push complete.")
+    return True
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -751,7 +712,7 @@ def main():
     elapsed = round(time.time() - start, 1)
     print(f"\n  Fetch complete in {elapsed}s")
 
-    # 6. Fetch price history (skips tickers already updated today)
+    # 6. Fetch price history
     print(f"\n[6/8] Fetching price history for {len(tickers)} tickers...")
     price_hist_rows = fetch_price_history(tickers)
 
@@ -759,7 +720,7 @@ def main():
     print(f"\n[7/8] Fetching dividend history for {len(tickers)} tickers...")
     div_hist_rows = fetch_dividend_history(tickers)
 
-    # 8. Fetch financials (skips tickers updated within 7 days)
+    # 8. Fetch financials
     print(f"\n[8/8] Fetching financials for {len(tickers)} tickers...")
     financials_rows = fetch_financials(tickers)
 
