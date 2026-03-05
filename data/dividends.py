@@ -106,7 +106,7 @@ def _safe_payout_ratio(info):
 # ── Public API ─────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_dividend_details(ticker, _cache_v=3):
+def get_dividend_details(ticker, _cache_v=4):
     """
     Get comprehensive dividend data for a single ticker.
     Priority: Supabase -> JSON cache -> yfinance live.
@@ -191,8 +191,8 @@ def get_dividend_details(ticker, _cache_v=3):
                                 if label == "div_growth_5y":
                                     result["div_growth_years"] = yb
 
-            # Consecutive years
-            annual_all = divs_df.groupby("year")["amount"].sum()
+            # Consecutive years — exclude current partial year
+            annual_all = divs_df[divs_df["year"] < current_year].groupby("year")["amount"].sum()
             if len(annual_all) >= 3:
                 consec = 0
                 for j in range(len(annual_all) - 1, 0, -1):
@@ -215,7 +215,7 @@ def get_dividend_details(ticker, _cache_v=3):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_batch_dividend_details(tickers_tuple, _cache_v=3):
+def get_batch_dividend_details(tickers_tuple, _cache_v=4):
     """Fetch dividend details for a batch of tickers.
     Priority: Supabase -> local JSON cache -> yfinance per-ticker fallback.
     """
