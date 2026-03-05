@@ -152,8 +152,26 @@ def fetch_all_prices(tickers):
                 "week52_low":     week52_low,
                 "beta":           round(float(g("beta")         or 0), 2),
                 "name":           g("longName", "") or g("shortName", ticker),
-                "price_to_book":  round(float(g("priceToBook")  or 0), 2),
-                "fetched_at":     datetime.now().isoformat(),
+                "price_to_book":         round(float(g("priceToBook")                   or 0), 2),
+                # Valuation fields for stock detail page
+                "peg_ratio":             round(float(g("pegRatio")                      or 0), 2),
+                "price_to_sales":        round(float(g("priceToSalesTrailing12Months")  or 0), 2),
+                "ev_ebitda":             round(float(g("enterpriseToEbitda")            or 0), 2),
+                "enterprise_value":      int(g("enterpriseValue")                       or 0),
+                "return_on_equity":      round(float(g("returnOnEquity")                or 0), 4),
+                "debt_to_equity":        round(float(g("debtToEquity")                  or 0), 2),
+                "current_ratio":         round(float(g("currentRatio")                  or 0), 2),
+                "free_cashflow":         int(g("freeCashflow")                           or 0),
+                "gross_margins":         round(float(g("grossMargins")                  or 0), 4),
+                "operating_margins":     round(float(g("operatingMargins")              or 0), 4),
+                "profit_margins":        round(float(g("profitMargins")                 or 0), 4),
+                # Company profile fields
+                "long_name":             g("longName", "") or g("shortName", ticker),
+                "long_business_summary": (g("longBusinessSummary", "") or "")[:2000],
+                "full_time_employees":   int(g("fullTimeEmployees")                     or 0),
+                "country":               g("country", ""),
+                "website":               g("website", ""),
+                "fetched_at":            datetime.now().isoformat(),
             }
 
             if i % 10 == 0 or i == total:
