@@ -300,40 +300,59 @@ with tab_overview:
                 unsafe_allow_html=True
             )
 
-        # Top 5 Holdings — compact display
+        # Top 10 Holdings — compact display with headers
         st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
         st.markdown("<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:10px;'>Top Holdings</div>", unsafe_allow_html=True)
 
+        # Header row
+        st.markdown(
+            "<div style='display:flex;align-items:center;padding:4px 0 6px 0;border-bottom:1px solid rgba(255,255,255,0.10);margin-bottom:2px;'>"
+            "<div style='flex:0 0 50px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;'>Ticker</div>"
+            "<div style='flex:1;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;'></div>"
+            "<div style='flex:0 0 46px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;text-align:right;'>Wt%</div>"
+            "<div style='flex:0 0 65px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;text-align:right;'>Price</div>"
+            "<div style='flex:0 0 52px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;text-align:right;'>1D Chg</div>"
+            "<div style='flex:0 0 52px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;text-align:right;'>Yield</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
         if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
-            tam_top5 = get_holdings_for_strategy(tamarac_parsed, active)
-            if not tam_top5.empty:
-                top5_tickers = tuple(tam_top5["symbol"].head(5).tolist())
-                top5_prices = fetch_batch_prices(top5_tickers)
-                for _, h in tam_top5.head(5).iterrows():
+            tam_top10 = get_holdings_for_strategy(tamarac_parsed, active)
+            if not tam_top10.empty:
+                top10_tickers = tuple(tam_top10["symbol"].head(10).tolist())
+                top10_prices = fetch_batch_prices(top10_tickers)
+                for _, h in tam_top10.head(10).iterrows():
                     sym = h["symbol"]
-                    mkt = top5_prices.get(sym, {})
+                    mkt = top10_prices.get(sym, {})
                     price = mkt.get("price", 0)
                     chg = mkt.get("change_1d_pct", 0) or 0
+                    yld = mkt.get("dividend_yield", 0) or 0
                     chg_color = "#569542" if chg >= 0 else "#c45454"
+                    yld_str = f"{yld:.2f}%" if yld > 0 else "—"
                     st.markdown(
                         f"<div style='display:flex;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);'>"
                         f"<div style='flex:0 0 50px;font-size:12px;font-weight:600;color:#C9A84C;'>{sym}</div>"
                         f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{h['description']}</div>"
-                        f"<div style='flex:0 0 55px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h['weight_pct']:.1f}%</div>"
+                        f"<div style='flex:0 0 46px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h['weight_pct']:.1f}%</div>"
                         f"<div style='flex:0 0 65px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>${price:.2f}</div>"
-                        f"<div style='flex:0 0 55px;font-size:12px;color:{chg_color};text-align:right;font-weight:500;'>{chg:+.2f}%</div>"
+                        f"<div style='flex:0 0 52px;font-size:12px;color:{chg_color};text-align:right;font-weight:500;'>{chg:+.2f}%</div>"
+                        f"<div style='flex:0 0 52px;font-size:12px;color:#C9A84C;text-align:right;'>{yld_str}</div>"
                         f"</div>",
                         unsafe_allow_html=True,
                     )
         else:
             holdings_df = get_holdings(active)
             if not holdings_df.empty:
-                for _, h in holdings_df.head(5).iterrows():
+                for _, h in holdings_df.head(10).iterrows():
                     st.markdown(
                         f"<div style='display:flex;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);'>"
                         f"<div style='flex:0 0 50px;font-size:12px;font-weight:600;color:#C9A84C;'>{h.get('ticker','')}</div>"
                         f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.45);'>{h.get('name','')}</div>"
-                        f"<div style='flex:0 0 55px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h.get('weight',0):.1f}%</div>"
+                        f"<div style='flex:0 0 46px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h.get('weight',0):.1f}%</div>"
+                        f"<div style='flex:0 0 65px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>${h.get('price',0):.2f}</div>"
+                        f"<div style='flex:0 0 52px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h.get('chg1d',0):+.2f}%</div>"
+                        f"<div style='flex:0 0 52px;font-size:12px;color:#C9A84C;text-align:right;'>—</div>"
                         f"</div>",
                         unsafe_allow_html=True,
                     )
