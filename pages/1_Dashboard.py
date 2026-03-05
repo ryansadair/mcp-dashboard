@@ -799,6 +799,7 @@ with tab_divs:
                 upcoming = ex_df[(ex_df["Days Until"] >= -7) & (ex_df["Days Until"] <= 90)]
                 if len(upcoming) > 0:
                     st.dataframe(upcoming, use_container_width=True, hide_index=True,
+                        height=42 + len(upcoming) * 36,
                         column_config={
                             "Yield %": st.column_config.NumberColumn(format="%.2f%%"),
                             "Payout %": st.column_config.NumberColumn(format="%.1f%%"),
