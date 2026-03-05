@@ -129,6 +129,9 @@ if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
         if total_portfolio_weight > 0:
             kpis["daily_return"] = round(weighted_daily / total_portfolio_weight, 2)
 
+        # Cash weight for KPI card
+        kpis["cash_pct"] = round(cash_kpi, 1)
+
 # Override YTD with official Tamarac monthly numbers when available
 if MONTHLY_RETURNS_AVAILABLE and active in STRATEGY_YTD:
     kpis = dict(kpis) if not isinstance(kpis, dict) else kpis

@@ -14,7 +14,7 @@ def render_kpi_cards(strategy: str, kpis: dict, bench_ytd: float):
     div_yield = kpis.get("div_yield", 0)
     holdings = kpis.get("holdings", 0)
     ytd_as_of = kpis.get("ytd_as_of", "")
-    alpha = round(ytd - bench_ytd, 2)
+    cash_pct = kpis.get("cash_pct", 0)
 
     c1, c2, c3, c4, c5 = st.columns(5)
 
@@ -35,8 +35,8 @@ def render_kpi_cards(strategy: str, kpis: dict, bench_ytd: float):
             label = "YTD Return"
         st.metric(label, ytd_str)
     with c3:
-        alpha_str = f"+{alpha:.2f}%" if alpha >= 0 else f"{alpha:.2f}%"
-        st.metric(f"Alpha vs {s['bench']}", alpha_str)
+        cash_str = f"{cash_pct:.1f}%" if cash_pct > 0 else "—"
+        st.metric("Cash", cash_str)
     with c4:
         st.metric("Dividend Yield", f"{div_yield:.2f}%")
     with c5:
