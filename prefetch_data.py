@@ -421,7 +421,6 @@ def fetch_benchmark_data():
 
 
 
-
 # ══════════════════════════════════════════════════════════════════════════
 # PRICE HISTORY FETCHING
 # ══════════════════════════════════════════════════════════════════════════
@@ -620,11 +619,12 @@ def fetch_financials(tickers):
     print(f"  Financials: {len(all_rows)} total rows to upsert")
     return all_rows
 
+
 def push_to_supabase(prices, dividends, indices, benchmarks=None,
                      price_history=None, div_history=None, financials=None):
     """
     Upsert all fetched data to Supabase via direct REST API calls.
-    Uses only the `requests` library — no supabase-py needed.
+    Each table is pushed independently — one failure won't block others.
     """
     import requests
 
@@ -635,67 +635,81 @@ def push_to_supabase(prices, dividends, indices, benchmarks=None,
         "Prefer":        "resolution=merge-duplicates",
     }
 
-    def upsert(table, rows):
+    def upsert(table, rows, chunk_size=200, timeout=60):
         if not rows:
             return True
-        chunk_size = 200
+        success = True
         for i in range(0, len(rows), chunk_size):
             chunk = rows[i:i + chunk_size]
-            url  = f"{SUPABASE_URL}/rest/v1/{table}"
-            resp = requests.post(url, headers=headers, json=chunk, timeout=30)
-            if resp.status_code not in (200, 201):
-                print(f"  [ERROR] {table} upsert failed ({resp.status_code}): {resp.text[:200]}")
-                return False
-        return True
+            url   = f"{SUPABASE_URL}/rest/v1/{table}"
+            try:
+                resp = requests.post(url, headers=headers, json=chunk, timeout=timeout)
+                if resp.status_code not in (200, 201):
+                    print(f"  [ERROR] {table} chunk {i//chunk_size+1} failed ({resp.status_code}): {resp.text[:200]}")
+                    success = False
+            except Exception as e:
+                print(f"  [ERROR] {table} chunk {i//chunk_size+1} exception: {e}")
+                success = False
+        return success
 
-    try:
-        # ── Prices ────────────────────────────────────────────────────────
-        price_rows = list(prices.values())
-        if upsert("prices", price_rows):
-            print(f"  Supabase: upserted {len(price_rows)} price rows")
+    overall = True
 
-        # ── Dividends ─────────────────────────────────────────────────────
-        div_rows = list(dividends.values())
-        if upsert("dividends", div_rows):
-            print(f"  Supabase: upserted {len(div_rows)} dividend rows")
+    # ── Prices ────────────────────────────────────────────────────────────
+    price_rows = list(prices.values())
+    if upsert("prices", price_rows):
+        print(f"  Supabase: upserted {len(price_rows)} price rows")
+    else:
+        overall = False
 
-        # ── Indices ───────────────────────────────────────────────────────
-        index_rows = list(indices.values())
-        if upsert("indices", index_rows):
-            print(f"  Supabase: upserted {len(index_rows)} index rows")
+    # ── Dividends ─────────────────────────────────────────────────────────
+    div_rows = list(dividends.values())
+    if upsert("dividends", div_rows):
+        print(f"  Supabase: upserted {len(div_rows)} dividend rows")
+    else:
+        overall = False
 
-        # ── Benchmarks ────────────────────────────────────────────────────
-        if benchmarks:
-            # YTD summary
-            ytd_rows = [{"symbol": s, "ytd_return": d["ytd_return"], "fetched_at": d["fetched_at"]}
-                        for s, d in benchmarks.items()]
-            if upsert("benchmark_ytd", ytd_rows):
-                print(f"  Supabase: upserted {len(ytd_rows)} benchmark YTD rows")
+    # ── Indices ───────────────────────────────────────────────────────────
+    index_rows = list(indices.values())
+    if upsert("indices", index_rows):
+        print(f"  Supabase: upserted {len(index_rows)} index rows")
+    else:
+        overall = False
 
-            # Full history (only push once per day — expensive otherwise)
-            all_history = []
-            for d in benchmarks.values():
-                all_history.extend(d.get("history", []))
-            if all_history and upsert("benchmark_history", all_history):
-                print(f"  Supabase: upserted {len(all_history)} benchmark history rows")
+    # ── Benchmarks ────────────────────────────────────────────────────────
+    if benchmarks:
+        ytd_rows = [{"symbol": s, "ytd_return": d["ytd_return"], "fetched_at": d["fetched_at"]}
+                    for s, d in benchmarks.items()]
+        if upsert("benchmark_ytd", ytd_rows):
+            print(f"  Supabase: upserted {len(ytd_rows)} benchmark YTD rows")
 
-        if price_history:
-            if upsert("price_history", price_history):
-                print(f"  Supabase: upserted {len(price_history)} price history rows")
+        all_history = []
+        for d in benchmarks.values():
+            all_history.extend(d.get("history", []))
+        if all_history and upsert("benchmark_history", all_history):
+            print(f"  Supabase: upserted {len(all_history)} benchmark history rows")
 
-        if div_history:
-            if upsert("dividend_history", div_history):
-                print(f"  Supabase: upserted {len(div_history)} dividend history rows")
+    # ── Price History ─────────────────────────────────────────────────────
+    if price_history:
+        if upsert("price_history", price_history, chunk_size=500, timeout=120):
+            print(f"  Supabase: upserted {len(price_history)} price history rows")
+        else:
+            overall = False
 
-        if financials:
-            if upsert("financials", financials):
-                print(f"  Supabase: upserted {len(financials)} financials rows")
+    # ── Dividend History ──────────────────────────────────────────────────
+    if div_history:
+        if upsert("dividend_history", div_history):
+            print(f"  Supabase: upserted {len(div_history)} dividend history rows")
+        else:
+            overall = False
 
-        return True
+    # ── Financials ────────────────────────────────────────────────────────
+    if financials:
+        if upsert("financials", financials):
+            print(f"  Supabase: upserted {len(financials)} financials rows")
+        else:
+            overall = False
 
-    except Exception as e:
-        print(f"  [ERROR] Supabase push failed: {e}")
-        return False
+    return overall
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -734,6 +748,9 @@ def main():
     print("\n[5/5] Fetching benchmark history...")
     benchmarks = fetch_benchmark_data()
 
+    elapsed = round(time.time() - start, 1)
+    print(f"\n  Fetch complete in {elapsed}s")
+
     # 6. Fetch price history (skips tickers already updated today)
     print(f"\n[6/8] Fetching price history for {len(tickers)} tickers...")
     price_hist_rows = fetch_price_history(tickers)
@@ -745,9 +762,6 @@ def main():
     # 8. Fetch financials (skips tickers updated within 7 days)
     print(f"\n[8/8] Fetching financials for {len(tickers)} tickers...")
     financials_rows = fetch_financials(tickers)
-
-    elapsed = round(time.time() - start, 1)
-    print(f"\n  Fetch complete in {elapsed}s")
 
     # Push to Supabase
     success = False
