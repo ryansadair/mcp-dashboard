@@ -117,6 +117,14 @@ PLOTLY_DARK = dict(
     margin=dict(l=10, r=10, t=40, b=10),
 )
 
+PLOTLY_CONFIG = {
+    "displayModeBar": False,
+    "scrollZoom": False,
+    "doubleClick": False,
+    "showTips": False,
+    "staticPlot": True,
+}
+
 # ── Get all holdings tickers for the selector ─────────────────────────────
 available_tickers = []
 try:
@@ -165,51 +173,83 @@ if not ticker_input:
 
 
 # ── Fetch all data ────────────────────────────────────────────────────────
+def _fetch_yfinance_with_retry(ticker, max_retries=3, delay=2):
+    """
+    Call yfinance with retry logic for rate limit (429) errors.
+    Returns (yf_info, hist, div_hist, financials, quarterly_financials, recs)
+    or raises the last exception if all retries fail.
+    """
+    import time
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            tk      = yf.Ticker(ticker)
+            yf_info = tk.info or {}
+            hist    = tk.history(period="2y")
+            divs    = tk.dividends
+            fins    = pd.DataFrame()
+            qfins   = pd.DataFrame()
+            recs    = pd.DataFrame()
+            try:
+                fins  = tk.financials
+            except Exception:
+                pass
+            try:
+                qfins = tk.quarterly_financials
+            except Exception:
+                pass
+            try:
+                recs  = tk.recommendations
+            except Exception:
+                pass
+            return yf_info, hist, divs, fins, qfins, recs
+        except Exception as e:
+            last_err = e
+            err_str = str(e).lower()
+            if "too many requests" in err_str or "rate limit" in err_str or "429" in err_str:
+                if attempt < max_retries - 1:
+                    time.sleep(delay * (attempt + 1))  # back off: 2s, 4s
+                    continue
+            break  # non-rate-limit error, don't retry
+    raise last_err
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def fetch_stock_data(ticker):
     """
     Fetch comprehensive stock data.
     Info/fundamentals: Supabase first, yfinance fallback.
-    History/financials/recs: yfinance (not stored in Supabase).
+    History/financials/recs: yfinance with retry, graceful degradation if unavailable.
     """
-    # ── 1. Get info from Supabase ─────────────────────────────────────────
+    # 1. Get info from Supabase
     info = _sb_get_ticker(ticker)
 
-    # ── 2. Try yfinance for full info + history ───────────────────────────
-    hist               = pd.DataFrame()
-    div_hist           = pd.Series(dtype=float)
-    financials         = pd.DataFrame()
+    # 2. Try yfinance with retry
+    hist                 = pd.DataFrame()
+    div_hist             = pd.Series(dtype=float)
+    financials           = pd.DataFrame()
     quarterly_financials = pd.DataFrame()
-    recs               = pd.DataFrame()
+    recs                 = pd.DataFrame()
+    yf_warning           = None
 
     try:
-        tk       = yf.Ticker(ticker)
-        yf_info  = tk.info or {}
+        yf_info, hist, div_hist, financials, quarterly_financials, recs = \
+            _fetch_yfinance_with_retry(ticker)
 
-        # Merge — prefer yfinance for richer fields, keep Supabase as fallback
+        # Merge - prefer yfinance for richer fields, keep Supabase as fallback
         if yf_info.get("longName") or yf_info.get("shortName"):
-            info = {**info, **yf_info}  # yfinance wins on overlap
-
-        hist     = tk.history(period="2y")
-        div_hist = tk.dividends
-
-        try:
-            financials = tk.financials
-        except Exception:
-            pass
-        try:
-            quarterly_financials = tk.quarterly_financials
-        except Exception:
-            pass
-        try:
-            recs = tk.recommendations
-        except Exception:
-            pass
+            info = {**info, **yf_info}
 
     except Exception as e:
-        # yfinance failed (rate limit etc.) — Supabase data is enough for the header
+        err_str = str(e).lower()
+        if "too many requests" in err_str or "rate limit" in err_str or "429" in err_str:
+            yf_warning = "yfinance rate limited — showing cached data. Price chart and financials may be unavailable."
+        else:
+            yf_warning = f"yfinance unavailable ({e}) — showing cached data where available."
+
+        # If Supabase also has nothing, we truly have no data
         if not info:
-            raise  # re-raise only if we have nothing at all
+            raise Exception(f"No data available for '{ticker}'. Check the ticker symbol and try again.")
 
     return {
         "info":                  info,
@@ -218,7 +258,9 @@ def fetch_stock_data(ticker):
         "financials":            financials,
         "quarterly_financials":  quarterly_financials,
         "recommendations":       recs,
+        "yf_warning":            yf_warning,
     }
+
 
 
 with st.spinner(f"Loading {ticker_input}..."):
@@ -231,10 +273,14 @@ with st.spinner(f"Loading {ticker_input}..."):
 info = data["info"]
 hist = data["history"]
 divs = data["dividends"]
+yf_warning = data.get("yf_warning")
 
 if not info.get("longName") and not info.get("shortName"):
     st.error(f"No data found for '{ticker_input}'. Check the ticker symbol.")
     st.stop()
+
+if yf_warning:
+    st.warning(f"⚠️ {yf_warning}")
 
 # ── Helper ────────────────────────────────────────────────────────────────
 def g(key, default=""):
@@ -360,7 +406,7 @@ if not hist.empty:
         hovermode="x unified",
         yaxis_title="Price ($)",
     )
-    st.plotly_chart(fig_price, use_container_width=True)
+    st.plotly_chart(fig_price, use_container_width=True, config=PLOTLY_CONFIG)
 else:
     st.info("No price history available.")
 
@@ -399,7 +445,7 @@ if not divs.empty and len(divs) >= 2:
             yaxis_title="$/Share",
             showlegend=False,
         )
-        st.plotly_chart(fig_div, use_container_width=True)
+        st.plotly_chart(fig_div, use_container_width=True, config=PLOTLY_CONFIG)
 
     with col_div_stats:
         # Growth stats
@@ -552,7 +598,7 @@ if not financials.empty:
                     barmode="group",
                     showlegend=True,
                 )
-                st.plotly_chart(fig_fin, use_container_width=True)
+                st.plotly_chart(fig_fin, use_container_width=True, config=PLOTLY_CONFIG)
 
             with col_margin:
                 st.markdown("**Margins**")
