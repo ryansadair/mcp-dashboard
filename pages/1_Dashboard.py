@@ -245,25 +245,30 @@ with tab_overview:
                     bar_df = hm_df.sort_values("daily_return", ascending=True)
                     colors = ["#569542" if r >= 0 else "#c45454" for r in bar_df["daily_return"]]
                     fig_bar = go.Figure()
+                    _bar_min = bar_df["daily_return"].min()
+                    _bar_max = bar_df["daily_return"].max()
+                    _bar_pad = max(abs(_bar_min), abs(_bar_max)) * 0.25
                     fig_bar.add_trace(go.Bar(
                         x=bar_df["daily_return"], y=bar_df["symbol"], orientation="h",
                         marker=dict(color=colors),
                         text=[f"{r:+.2f}%" for r in bar_df["daily_return"]],
                         textposition="outside",
                         textfont=dict(size=10, color="rgba(255,255,255,0.6)"),
+                        cliponaxis=False,
                     ))
                     fig_bar.update_layout(
                         title=f"Today's Returns — {STRATEGY_NAMES.get(active, active)}",
                         paper_bgcolor="rgba(255,255,255,0.02)",
                         plot_bgcolor="rgba(0,0,0,0)",
                         font=dict(family="DM Sans", color="rgba(255,255,255,0.6)"),
-                        margin=dict(l=10, r=50, t=40, b=10),
+                        margin=dict(l=10, r=60, t=40, b=10),
                         height=max(250, len(bar_df) * 22 + 60),
                         xaxis=dict(
                             gridcolor="rgba(255,255,255,0.04)",
                             showline=False, ticksuffix="%", zeroline=True,
                             zerolinecolor="rgba(255,255,255,0.1)",
                             fixedrange=True,
+                            range=[_bar_min - _bar_pad, _bar_max + _bar_pad],
                         ),
                         yaxis=dict(showgrid=False, showline=False, tickfont=dict(size=10), fixedrange=True),
                         showlegend=False,
