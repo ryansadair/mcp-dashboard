@@ -203,7 +203,7 @@ def _fetch_yfinance_with_retry(ticker, max_retries=3, delay=2):
         try:
             tk      = yf.Ticker(ticker)
             yf_info = tk.info or {}
-            hist    = tk.history(period="2y")
+            hist    = tk.history(period="max")
             divs    = tk.dividends
             fins    = pd.DataFrame()
             qfins   = pd.DataFrame()
