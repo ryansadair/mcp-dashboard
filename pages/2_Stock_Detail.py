@@ -110,6 +110,76 @@ def _sb_get_ticker(ticker):
     except Exception:
         return {}
 
+def _sb_get_price_history(ticker):
+    """Fetch full price history from Supabase for a ticker."""
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/price_history",
+            headers=_SB_HEADERS,
+            params={"select": "date,open,high,low,close,volume",
+                    "ticker": f"eq.{ticker}", "order": "date.asc", "limit": "10000"},
+            timeout=15,
+        )
+        rows = resp.json() if resp.status_code == 200 else []
+        if not rows:
+            return pd.DataFrame()
+        df = pd.DataFrame(rows)
+        df["Date"] = pd.to_datetime(df["date"])
+        df = df.set_index("Date")
+        df.columns = [c.capitalize() for c in df.columns if c != "date"]
+        df = df.rename(columns={"date": "Date"})
+        for col in ["Open","High","Low","Close"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+
+def _sb_get_dividend_history(ticker):
+    """Fetch annual dividend history from Supabase for a ticker."""
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/dividend_history",
+            headers=_SB_HEADERS,
+            params={"select": "year,amount", "ticker": f"eq.{ticker}", "order": "year.asc"},
+            timeout=10,
+        )
+        rows = resp.json() if resp.status_code == 200 else []
+        if not rows:
+            return pd.Series(dtype=float)
+        df = pd.DataFrame(rows)
+        s = pd.Series(df["amount"].values, index=pd.to_datetime(df["year"].astype(str)))
+        return s
+    except Exception:
+        return pd.Series(dtype=float)
+
+
+def _sb_get_financials(ticker):
+    """Fetch quarterly financials from Supabase for a ticker."""
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/financials",
+            headers=_SB_HEADERS,
+            params={"select": "period,revenue,gross_profit,net_income,operating_income,ebitda,gross_margin,net_margin,op_margin",
+                    "ticker": f"eq.{ticker}", "order": "period.desc", "limit": "12"},
+            timeout=10,
+        )
+        rows = resp.json() if resp.status_code == 200 else []
+        if not rows:
+            return pd.DataFrame(), pd.DataFrame()
+        df = pd.DataFrame(rows)
+        df["period"] = pd.to_datetime(df["period"])
+        df = df.set_index("period").sort_index()
+        # Return same format as yfinance: rows=metrics, cols=dates
+        num_cols = ["revenue","gross_profit","net_income","operating_income","ebitda"]
+        fins = df[num_cols].T if num_cols[0] in df.columns else pd.DataFrame()
+        fins.index = ["Total Revenue","Gross Profit","Net Income","Operating Income","EBITDA"]
+        return fins, df
+    except Exception:
+        return pd.DataFrame(), pd.DataFrame()
+
+
 if not check_password():
     st.stop()
 
@@ -237,31 +307,44 @@ def fetch_stock_data(ticker):
     Info/fundamentals: Supabase first, yfinance fallback.
     History/financials/recs: yfinance with retry, graceful degradation if unavailable.
     """
-    # 1. Get info from Supabase
+    # 1. Get info/fundamentals from Supabase
     info = _sb_get_ticker(ticker)
 
-    # 2. Try yfinance with retry
-    hist                 = pd.DataFrame()
-    div_hist             = pd.Series(dtype=float)
-    financials           = pd.DataFrame()
-    quarterly_financials = pd.DataFrame()
+    # 2. Get history/dividends/financials from Supabase
+    hist                 = _sb_get_price_history(ticker)
+    div_hist             = _sb_get_dividend_history(ticker)
+    financials, quarterly_financials = _sb_get_financials(ticker)
     recs                 = pd.DataFrame()
     yf_warning           = None
 
+    # 3. Fall back to yfinance for anything missing from Supabase
+    sb_has_hist = not hist.empty
+    sb_has_fins = not financials.empty
+
     try:
-        yf_info, hist, div_hist, financials, quarterly_financials, recs = \
+        yf_info, yf_hist, yf_divs, yf_fins, yf_qfins, recs = \
             _fetch_yfinance_with_retry(ticker)
 
-        # Merge - prefer yfinance for richer fields, keep Supabase as fallback
+        # Merge info — prefer yfinance for richer fields
         if yf_info.get("longName") or yf_info.get("shortName"):
             info = {**info, **yf_info}
+        # Only use yfinance history/fins if Supabase was empty
+        if not sb_has_hist and not yf_hist.empty:
+            hist = yf_hist
+        if div_hist.empty and not yf_divs.empty:
+            div_hist = yf_divs
+        if not sb_has_fins and not yf_fins.empty:
+            financials = yf_fins
+            quarterly_financials = yf_qfins
 
     except Exception as e:
         err_str = str(e).lower()
         if "too many requests" in err_str or "rate limit" in err_str or "429" in err_str:
-            yf_warning = "yfinance rate limited — showing cached data. Price chart and financials may be unavailable."
+            if not sb_has_hist:
+                yf_warning = "yfinance rate limited — price chart unavailable until next prefetch."
         else:
-            yf_warning = f"yfinance unavailable ({e}) — showing cached data where available."
+            if not sb_has_hist:
+                yf_warning = f"yfinance unavailable ({e}) — showing cached data where available."
 
         # If Supabase also has nothing, we truly have no data
         if not info:
