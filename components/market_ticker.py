@@ -18,9 +18,9 @@ def render_market_ticker():
         ("^DJI",     "DJIA",        ""),
         ("^IXIC",    "Nasdaq",      ""),
         ("^TNX",     "10Y Treasury","%"),
-        ("^VIX",     "VIX",         ""),
-        ("DX-Y.NYB", "US Dollar",   ""),
+        ("GC=F",     "Gold",        "$"),
         ("CL=F",     "Crude Oil",   "$"),
+        ("DX-Y.NYB", "US Dollar",   ""),
     ]
 
     items_html = ""
@@ -52,10 +52,34 @@ def render_market_ticker():
             "</div>"
         )
 
+    # Duplicate items so the scroll loops seamlessly
+    ticker_content = items_html + items_html
+
+    css = """<style>
+@keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+.mc-ticker-wrap {
+    overflow: hidden;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(0,0,0,0.2);
+    width: 100%;
+}
+.mc-ticker-track {
+    display: flex;
+    width: max-content;
+    animation: ticker-scroll 40s linear infinite;
+}
+.mc-ticker-track:hover {
+    animation-play-state: paused;
+}
+</style>"""
+
     html = (
-        "<div style='display:flex;overflow-x:auto;border-bottom:1px solid rgba(255,255,255,0.06);"
-        "background:rgba(0,0,0,0.2);padding:0 8px;'>"
-        + items_html +
-        "</div>"
+        css +
+        "<div class='mc-ticker-wrap'><div class='mc-ticker-track'>" +
+        ticker_content +
+        "</div></div>"
     )
     st.markdown(html, unsafe_allow_html=True)

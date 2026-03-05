@@ -268,8 +268,7 @@ def fetch_all_dividends(tickers):
                                     if label == "div_growth_5y":
                                         result["div_growth_years"] = yb
 
-                # Exclude current partial year so incomplete data doesn't break streak
-                annual_all = divs_df[divs_df["year"] < current_year].groupby("year")["amount"].sum()
+                annual_all = divs_df.groupby("year")["amount"].sum()
                 if len(annual_all) >= 3:
                     consec = 0
                     for j in range(len(annual_all) - 1, 0, -1):
@@ -315,6 +314,7 @@ def fetch_index_data():
         "^VIX":     "VIX",
         "DX-Y.NYB": "US Dollar",
         "CL=F":     "Crude Oil",
+        "GC=F":     "Gold",
     }
 
     results = {}
