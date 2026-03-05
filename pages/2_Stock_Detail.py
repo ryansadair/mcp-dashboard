@@ -383,7 +383,7 @@ st.markdown("---")
 st.markdown("#### 📈 Price Chart")
 
 if not hist.empty:
-    period_options = {"1M": 21, "3M": 63, "6M": 126, "YTD": None, "1Y": 252, "2Y": 504}
+    period_options = {"1M": 21, "3M": 63, "6M": 126, "YTD": None, "1Y": 252, "2Y": 504, "3Y": 756, "5Y": 1260, "Max": 0}
     period_cols = st.columns(len(period_options))
     if "chart_period" not in st.session_state:
         st.session_state["chart_period"] = "1Y"
@@ -400,6 +400,8 @@ if not hist.empty:
     if selected_period == "YTD":
         year_start = datetime(datetime.now().year, 1, 1)
         chart_hist = chart_hist[chart_hist.index >= year_start.strftime("%Y-%m-%d")]
+    elif selected_period == "Max" or period_options[selected_period] == 0:
+        pass  # show full history
     elif period_options[selected_period]:
         chart_hist = chart_hist.tail(period_options[selected_period])
 
