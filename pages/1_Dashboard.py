@@ -73,6 +73,41 @@ if SPRINT2_AVAILABLE:
 if "active_strategy" not in st.session_state:
     st.session_state["active_strategy"] = "QDVD"
 
+# CSS: hide desktop buttons on mobile, hide mobile dropdown on desktop
+st.markdown("""
+<style>
+@media (max-width: 768px) {
+    .desktop-strategy-selector { display: none !important; }
+    .mobile-strategy-selector  { display: block !important; }
+}
+@media (min-width: 769px) {
+    .desktop-strategy-selector { display: flex !important; }
+    .mobile-strategy-selector  { display: none !important; }
+}
+.mobile-strategy-selector { display: none; }
+</style>
+""", unsafe_allow_html=True)
+
+# Mobile: selectbox wrapped in a hidden-on-desktop div
+st.markdown("<div class='mobile-strategy-selector'>", unsafe_allow_html=True)
+strat_keys   = list(STRATEGIES.keys())
+strat_labels = [f"{k} — {STRATEGIES[k]['name']}" for k in strat_keys]
+current_idx  = strat_keys.index(st.session_state["active_strategy"])
+mobile_sel   = st.selectbox(
+    "Strategy",
+    options=strat_labels,
+    index=current_idx,
+    key="mobile_strategy_select",
+    label_visibility="collapsed",
+)
+mobile_key = strat_keys[strat_labels.index(mobile_sel)]
+if mobile_key != st.session_state["active_strategy"]:
+    st.session_state["active_strategy"] = mobile_key
+    st.rerun()
+st.markdown("</div>", unsafe_allow_html=True)
+
+# Desktop: button row wrapped in a hidden-on-mobile div
+st.markdown("<div class='desktop-strategy-selector' style='gap:8px;'>", unsafe_allow_html=True)
 cols = st.columns(len(STRATEGIES))
 for i, (key, s) in enumerate(STRATEGIES.items()):
     with cols[i]:
@@ -85,6 +120,7 @@ for i, (key, s) in enumerate(STRATEGIES.items()):
         ):
             st.session_state["active_strategy"] = key
             st.rerun()
+st.markdown("</div>", unsafe_allow_html=True)
 
 active = st.session_state["active_strategy"]
 strat = STRATEGIES[active]
