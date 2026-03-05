@@ -199,6 +199,15 @@ PLOTLY_CONFIG = {
     "staticPlot": True,
 }
 
+# Hover-enabled config for performance charts (tooltips only, no zoom/pan)
+PLOTLY_CONFIG_HOVER = {
+    "displayModeBar": False,
+    "scrollZoom": False,
+    "doubleClick": False,
+    "showTips": False,
+    "staticPlot": False,
+}
+
 # Reusable axis style dicts — apply per-chart to avoid conflicts with **PLOTLY_DARK
 _XAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10))
 _YAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10))
@@ -613,12 +622,12 @@ with tab_perf:
             fig2.update_layout(
                 title=f"Cumulative Return — {period}",
                 **PLOTLY_DARK,
-                xaxis=_XAXIS,
-                yaxis={**_YAXIS, "ticksuffix": "%"},
+                xaxis={**_XAXIS, "fixedrange": True},
+                yaxis={**_YAXIS, "ticksuffix": "%", "fixedrange": True},
                 height=360,
                 hovermode="x unified",
             )
-            st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
+            st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG_HOVER)
 
             # ── KPIs ──────────────────────────────────────────────────────
             port_total  = round(float(pf["strat_cum"].iloc[-1]), 2)
@@ -677,8 +686,8 @@ with tab_perf:
                 fill="tozeroy", fillcolor="rgba(196,84,84,0.15)",
                 line=dict(color="#c45454", width=1.5), name="Drawdown",
             ))
-            fig_dd.update_layout(**PLOTLY_DARK, xaxis=_XAXIS, yaxis={**_YAXIS, "ticksuffix": "%"}, height=220, showlegend=False)
-            st.plotly_chart(fig_dd, use_container_width=True, config=PLOTLY_CONFIG)
+            fig_dd.update_layout(**PLOTLY_DARK, xaxis={**_XAXIS, "fixedrange": True}, yaxis={**_YAXIS, "ticksuffix": "%", "fixedrange": True}, height=220, showlegend=False, hovermode="x unified")
+            st.plotly_chart(fig_dd, use_container_width=True, config=PLOTLY_CONFIG_HOVER)
 
             # ── Monthly returns heatmap ───────────────────────────────────
             if len(pf) >= 12:
@@ -704,11 +713,13 @@ with tab_perf:
                     showscale=False,
                     hovertemplate="Year: %{y}<br>%{x}: %{z:.2f}%<extra></extra>",
                 ))
+                _hm_layout = {**PLOTLY_DARK}
+                _hm_layout["margin"] = dict(l=10, r=10, t=30, b=10)
                 fig_hm.update_layout(
-                    **{**PLOTLY_DARK, "margin": dict(l=10, r=10, t=30, b=10)},
+                    **_hm_layout,
                     height=max(200, len(pivot) * 28 + 80),
-                    xaxis=dict(side="top"),
-                    yaxis=dict(autorange="reversed"),
+                    xaxis=dict(side="top", fixedrange=True),
+                    yaxis=dict(autorange="reversed", fixedrange=True),
                 )
                 st.plotly_chart(fig_hm, use_container_width=True, config=PLOTLY_CONFIG_HOVER)
 
