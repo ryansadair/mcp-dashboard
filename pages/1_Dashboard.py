@@ -707,17 +707,16 @@ with tab_divs:
             wtd_yield = compute_weighted_yield(tam_df, div_data)
 
             # Helper: compute average growth for a given period key, filtering bad data
-            def _avg_growth(key, min_years):
+            def _avg_growth(key):
                 vals = [div_data[t].get(key, 0) for t in tickers
                         if t in div_data
                         and div_data[t].get(key, 0) != 0
-                        and div_data[t].get("div_growth_years", 0) >= min_years
                         and -50 < div_data[t].get(key, 0) < 100]
                 return round(sum(vals) / len(vals), 1) if vals else 0
 
-            avg_growth_1y = _avg_growth("div_growth_1y", 2)
-            avg_growth_3y = _avg_growth("div_growth_3y", 4)
-            avg_growth_5y = _avg_growth("div_growth_5y", 5)
+            avg_growth_1y = _avg_growth("div_growth_1y")
+            avg_growth_3y = _avg_growth("div_growth_3y")
+            avg_growth_5y = _avg_growth("div_growth_5y")
 
             # Avg consecutive years: only include tickers with meaningful history
             consec = [div_data[t].get("consecutive_years", 0) for t in tickers
