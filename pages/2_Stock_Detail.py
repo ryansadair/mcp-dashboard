@@ -111,7 +111,7 @@ def _sb_get_ticker(ticker):
         return {}
 
 def _sb_get_price_history(ticker):
-    """Fetch full price history from Supabase for a ticker."""
+    """Fetch full price history from Supabase for a ticker using limit/offset pagination."""
     try:
         all_rows = []
         offset = 0
@@ -119,12 +119,17 @@ def _sb_get_price_history(ticker):
         while True:
             resp = requests.get(
                 f"{SUPABASE_URL}/rest/v1/price_history",
-                headers={**_SB_HEADERS, "Range-Unit": "items", "Range": f"{offset}-{offset+batch-1}"},
-                params={"select": "date,open,high,low,close,volume",
-                        "ticker": f"eq.{ticker}", "order": "date.asc"},
+                headers=_SB_HEADERS,
+                params={
+                    "select": "date,open,high,low,close,volume",
+                    "ticker": f"eq.{ticker}",
+                    "order": "date.asc",
+                    "limit": str(batch),
+                    "offset": str(offset),
+                },
                 timeout=20,
             )
-            if resp.status_code not in (200, 206):
+            if resp.status_code != 200:
                 break
             batch_rows = resp.json()
             if not batch_rows:
@@ -133,7 +138,6 @@ def _sb_get_price_history(ticker):
             if len(batch_rows) < batch:
                 break
             offset += batch
-
         if not all_rows:
             return pd.DataFrame()
         df = pd.DataFrame(all_rows)
