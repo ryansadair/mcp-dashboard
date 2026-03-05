@@ -362,7 +362,22 @@ qs6.metric("52W Low", f"${g('fiftyTwoWeekLow', 0):.2f}" if g("fiftyTwoWeekLow", 
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 2. PRICE CHART WITH MOVING AVERAGES
+# 2. COMPANY DESCRIPTION
+# ══════════════════════════════════════════════════════════════════════════
+desc = g("longBusinessSummary", "")
+if desc:
+    st.markdown("---")
+    with st.expander("📄 Company Description", expanded=True):
+        st.markdown(f"<div style='font-size:13px;color:rgba(255,255,255,0.6);line-height:1.7;'>{desc}</div>",
+                    unsafe_allow_html=True)
+        ed1, ed2, ed3 = st.columns(3)
+        employees = g("fullTimeEmployees", 0)
+        ed1.metric("Employees", f"{employees:,}" if employees else "—")
+        ed2.metric("Country", g("country", "—"))
+        ed3.metric("Website", g("website", "—"))
+
+# ══════════════════════════════════════════════════════════════════════════
+# 3. PRICE CHART WITH MOVING AVERAGES
 # ══════════════════════════════════════════════════════════════════════════
 st.markdown("---")
 st.markdown("#### 📈 Price Chart")
@@ -647,22 +662,6 @@ else:
 
 
 
-# ══════════════════════════════════════════════════════════════════════════
-# COMPANY DESCRIPTION
-# ══════════════════════════════════════════════════════════════════════════
-desc = g("longBusinessSummary", "")
-if desc:
-    st.markdown("---")
-    with st.expander("📄 Company Description", expanded=False):
-        st.markdown(f"<div style='font-size:13px;color:rgba(255,255,255,0.6);line-height:1.7;'>{desc}</div>",
-                    unsafe_allow_html=True)
-
-        # Extra details
-        ed1, ed2, ed3 = st.columns(3)
-        employees = g("fullTimeEmployees", 0)
-        ed1.metric("Employees", f"{employees:,}" if employees else "—")
-        ed2.metric("Country", g("country", "—"))
-        ed3.metric("Website", g("website", "—"))
 
 
 # ── Footer ────────────────────────────────────────────────────────────────
