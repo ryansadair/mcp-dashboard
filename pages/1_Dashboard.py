@@ -481,7 +481,7 @@ with tab_holdings:
 
             st.dataframe(
                 styled, use_container_width=True, hide_index=True,
-                height=min(600, 42 + len(filtered) * 36),
+                height=(42 + len(filtered) * 36),
                 column_config={
                     "Symbol": st.column_config.TextColumn("Symbol", width="small"),
                     "Company": st.column_config.TextColumn("Company", width="medium"),
@@ -545,7 +545,7 @@ with tab_holdings:
             if "price" in show_df.columns:
                 show_df["price"] = show_df["price"].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "—")
             show_df.columns = [c.replace("_"," ").title() for c in show_df.columns]
-            st.dataframe(show_df, use_container_width=True, hide_index=True, height=500)
+            st.dataframe(show_df, use_container_width=True, hide_index=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════
