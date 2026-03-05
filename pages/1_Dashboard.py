@@ -435,7 +435,7 @@ with tab_holdings:
 
 
             # Detail selector & sector filter — single row
-            c_detail, c_go, c_sector = st.columns([3, 1, 1])
+            c_detail, c_sector = st.columns([3, 1])
             with c_detail:
                 detail_ticker = st.selectbox(
                     "Ticker Detail",
@@ -445,12 +445,10 @@ with tab_holdings:
                     index=None,
                     placeholder="Select a ticker for detail view...",
                 )
-            with c_go:
                 if detail_ticker:
-                    if st.button(f"📊 Open {detail_ticker}", key="go_detail_btn", use_container_width=True):
-                        st.session_state["detail_ticker"] = detail_ticker
-                        st.query_params["ticker"] = detail_ticker
-                        st.switch_page("pages/2_Stock_Detail.py")
+                    st.session_state["detail_ticker"] = detail_ticker
+                    st.query_params["ticker"] = detail_ticker
+                    st.switch_page("pages/2_Stock_Detail.py")
             with c_sector:
                 sectors = ["All"] + sorted(display_df["Sector"].dropna().unique().tolist())
                 sector_filter = st.selectbox("Sector", sectors, key="s2_sector", label_visibility="collapsed")
