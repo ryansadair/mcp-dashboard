@@ -432,16 +432,17 @@ with tab_holdings:
                 sym = h["symbol"]
                 mkt = price_data.get(sym, {})
                 chg_val = mkt.get("change_1d_pct", 0) or 0
+                yoc = h.get("yield_at_cost", 0) or 0
                 rows.append({
-                    "Symbol": sym,
                     "Company": h["description"],
+                    "Symbol": sym,
+                    "Sector": mkt.get("sector", ""),
                     "Weight %": round(h["weight_pct"], 2),
-                    "Shares": int(h["quantity"]) if h["quantity"] == int(h["quantity"]) else h["quantity"],
-                    "Price": mkt.get("price", 0),
                     "1D Chg %": chg_val,
+                    "Price": mkt.get("price", 0),
+                    "Yield on Cost %": round(float(yoc) * 100, 2) if yoc else 0.0,
                     "Div Yield %": mkt.get("dividend_yield", 0),
                     "P/E": round(mkt.get("pe_ratio", 0), 1) if mkt.get("pe_ratio") else "—",
-                    "Sector": mkt.get("sector", ""),
                     "52W High": mkt.get("52w_high", 0),
                     "52W Low":  mkt.get("52w_low", 0),
                 })
@@ -486,7 +487,8 @@ with tab_holdings:
                 "Weight %": "{:.2f}",
                 "Price": "${:.2f}",
                 "1D Chg %": "{:+.2f}%",
-                "Div Yield %": "{:.2f}",
+                "Yield on Cost %": "{:.2f}%",
+                "Div Yield %": "{:.2f}%",
                 "52W High": "${:.2f}",
                 "52W Low": "${:.2f}",
             })
@@ -495,14 +497,15 @@ with tab_holdings:
                 styled, use_container_width=True, hide_index=True,
                 height=(42 + len(filtered) * 36),
                 column_config={
-                    "Symbol": st.column_config.TextColumn("Symbol", width="small"),
                     "Company": st.column_config.TextColumn("Company", width="medium"),
-                    "Weight %": st.column_config.NumberColumn("Wt %", format="%.2f"),
-                    "Shares": st.column_config.NumberColumn("Shares", format="%d"),
-                    "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
-                    "1D Chg %": st.column_config.NumberColumn("1D %", format="%+.2f%%"),
-                    "Div Yield %": st.column_config.NumberColumn("Yield %", format="%.2f"),
+                    "Symbol": st.column_config.TextColumn("Symbol", width="small"),
                     "Sector": st.column_config.TextColumn("Sector", width="medium"),
+                    "Weight %": st.column_config.NumberColumn("Wt %", format="%.2f%%"),
+                    "1D Chg %": st.column_config.NumberColumn("1D %", format="%+.2f%%"),
+                    "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
+                    "Yield on Cost %": st.column_config.NumberColumn("Yield on Cost", format="%.2f%%"),
+                    "Div Yield %": st.column_config.NumberColumn("Curr Yield", format="%.2f%%"),
+                    "P/E": st.column_config.NumberColumn("P/E"),
                     "52W High": st.column_config.NumberColumn("52W Hi", format="$%.2f"),
                     "52W Low": st.column_config.NumberColumn("52W Lo", format="$%.2f"),
                 },
@@ -516,10 +519,12 @@ with tab_holdings:
                     Holdings=("Symbol", "count"),
                     Total_Weight=("Weight %", "sum"),
                     Avg_Yield=("Div Yield %", "mean"),
+                    Avg_YoC=("Yield on Cost %", "mean"),
                 ).round(2).sort_values("Total_Weight", ascending=False)
                 st.dataframe(sect_agg, use_container_width=True, column_config={
-                    "Total_Weight": st.column_config.NumberColumn("Weight %", format="%.2f"),
-                    "Avg_Yield": st.column_config.NumberColumn("Avg Yield %", format="%.2f"),
+                    "Total_Weight": st.column_config.NumberColumn("Weight %", format="%.2f%%"),
+                    "Avg_Yield": st.column_config.NumberColumn("Avg Yield %", format="%.2f%%"),
+                    "Avg_YoC": st.column_config.NumberColumn("Avg YoC %", format="%.2f%%"),
                 })
 
             st.caption(f"Tamarac export + yfinance live prices • {datetime.now().strftime('%I:%M %p')}")

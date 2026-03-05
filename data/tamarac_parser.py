@@ -81,7 +81,7 @@ def parse_tamarac_excel(filepath):
                         record[col] = float(val) if val else 0.0
                     except (ValueError, TypeError):
                         record[col] = 0.0
-                elif col == "quantity":
+                elif col in ("quantity", "yield_at_cost", "current_yield", "unit_cost", "cost_basis", "value", "annual_income", "cumulative_income"):
                     try:
                         record[col] = float(val) if val else 0.0
                     except (ValueError, TypeError):
@@ -101,6 +101,12 @@ def parse_tamarac_excel(filepath):
             "cusip": "cusip",
             "description": "description",
             "quantity": "quantity",
+            "unit_cost": "unit_cost",
+            "cost_basis": "cost_basis",
+            "annual_income": "annual_income",
+            "cumulative_income": "cumulative_income",
+            "yield_at_cost": "yield_at_cost",
+            "current_yield": "current_yield",
         }
         df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
 
