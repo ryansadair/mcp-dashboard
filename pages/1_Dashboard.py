@@ -156,6 +156,15 @@ PLOTLY_DARK = dict(
     margin=dict(l=10, r=10, t=40, b=10),
 )
 
+# Shared Plotly config — disables toolbar, hover tooltip, and zoom/pan
+PLOTLY_CONFIG = {
+    "displayModeBar": False,
+    "scrollZoom": False,
+    "doubleClick": False,
+    "showTips": False,
+    "staticPlot": True,
+}
+
 # Reusable axis style dicts — apply per-chart to avoid conflicts with **PLOTLY_DARK
 _XAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10))
 _YAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10))
@@ -217,11 +226,7 @@ with tab_overview:
                         showlegend=False,
                         dragmode=False,
                     )
-                    st.plotly_chart(fig_bar, use_container_width=True, config={
-                        "displayModeBar": False,
-                        "scrollZoom":     False,
-                        "doubleClick":    False,
-                    })
+                    st.plotly_chart(fig_bar, use_container_width=True, config=PLOTLY_CONFIG)
                 else:
                     st.info("No holdings data available.")
             else:
@@ -249,7 +254,7 @@ with tab_overview:
                 yaxis={**_YAXIS, "ticksuffix": "%"},
                 height=280,
             )
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
     with right:
         st.markdown("<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:12px;'>Sector Allocation</div>", unsafe_allow_html=True)
@@ -300,59 +305,40 @@ with tab_overview:
                 unsafe_allow_html=True
             )
 
-        # Top 10 Holdings — compact display with headers
+        # Top 5 Holdings — compact display
         st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
         st.markdown("<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:10px;'>Top Holdings</div>", unsafe_allow_html=True)
 
-        # Header row
-        st.markdown(
-            "<div style='display:flex;align-items:center;padding:4px 0 6px 0;border-bottom:1px solid rgba(255,255,255,0.10);margin-bottom:2px;'>"
-            "<div style='flex:0 0 50px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;'>Ticker</div>"
-            "<div style='flex:1;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;'></div>"
-            "<div style='flex:0 0 46px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;text-align:right;'>Wt%</div>"
-            "<div style='flex:0 0 65px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;text-align:right;'>Price</div>"
-            "<div style='flex:0 0 52px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;text-align:right;'>1D Chg</div>"
-            "<div style='flex:0 0 52px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;text-align:right;'>Yield</div>"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
         if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
-            tam_top10 = get_holdings_for_strategy(tamarac_parsed, active)
-            if not tam_top10.empty:
-                top10_tickers = tuple(tam_top10["symbol"].head(10).tolist())
-                top10_prices = fetch_batch_prices(top10_tickers)
-                for _, h in tam_top10.head(10).iterrows():
+            tam_top5 = get_holdings_for_strategy(tamarac_parsed, active)
+            if not tam_top5.empty:
+                top5_tickers = tuple(tam_top5["symbol"].head(5).tolist())
+                top5_prices = fetch_batch_prices(top5_tickers)
+                for _, h in tam_top5.head(5).iterrows():
                     sym = h["symbol"]
-                    mkt = top10_prices.get(sym, {})
+                    mkt = top5_prices.get(sym, {})
                     price = mkt.get("price", 0)
                     chg = mkt.get("change_1d_pct", 0) or 0
-                    yld = mkt.get("dividend_yield", 0) or 0
                     chg_color = "#569542" if chg >= 0 else "#c45454"
-                    yld_str = f"{yld:.2f}%" if yld > 0 else "—"
                     st.markdown(
                         f"<div style='display:flex;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);'>"
                         f"<div style='flex:0 0 50px;font-size:12px;font-weight:600;color:#C9A84C;'>{sym}</div>"
                         f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{h['description']}</div>"
-                        f"<div style='flex:0 0 46px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h['weight_pct']:.1f}%</div>"
+                        f"<div style='flex:0 0 55px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h['weight_pct']:.1f}%</div>"
                         f"<div style='flex:0 0 65px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>${price:.2f}</div>"
-                        f"<div style='flex:0 0 52px;font-size:12px;color:{chg_color};text-align:right;font-weight:500;'>{chg:+.2f}%</div>"
-                        f"<div style='flex:0 0 52px;font-size:12px;color:#C9A84C;text-align:right;'>{yld_str}</div>"
+                        f"<div style='flex:0 0 55px;font-size:12px;color:{chg_color};text-align:right;font-weight:500;'>{chg:+.2f}%</div>"
                         f"</div>",
                         unsafe_allow_html=True,
                     )
         else:
             holdings_df = get_holdings(active)
             if not holdings_df.empty:
-                for _, h in holdings_df.head(10).iterrows():
+                for _, h in holdings_df.head(5).iterrows():
                     st.markdown(
                         f"<div style='display:flex;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);'>"
                         f"<div style='flex:0 0 50px;font-size:12px;font-weight:600;color:#C9A84C;'>{h.get('ticker','')}</div>"
                         f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.45);'>{h.get('name','')}</div>"
-                        f"<div style='flex:0 0 46px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h.get('weight',0):.1f}%</div>"
-                        f"<div style='flex:0 0 65px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>${h.get('price',0):.2f}</div>"
-                        f"<div style='flex:0 0 52px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h.get('chg1d',0):+.2f}%</div>"
-                        f"<div style='flex:0 0 52px;font-size:12px;color:#C9A84C;text-align:right;'>—</div>"
+                        f"<div style='flex:0 0 55px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h.get('weight',0):.1f}%</div>"
                         f"</div>",
                         unsafe_allow_html=True,
                     )
@@ -593,7 +579,7 @@ with tab_perf:
                 height=360,
                 hovermode="x unified",
             )
-            st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG)
 
             # ── KPIs ──────────────────────────────────────────────────────
             port_total  = round(float(pf["strat_cum"].iloc[-1]), 2)
@@ -653,7 +639,7 @@ with tab_perf:
                 line=dict(color="#c45454", width=1.5), name="Drawdown",
             ))
             fig_dd.update_layout(**PLOTLY_DARK, xaxis=_XAXIS, yaxis={**_YAXIS, "ticksuffix": "%"}, height=220, showlegend=False)
-            st.plotly_chart(fig_dd, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_dd, use_container_width=True, config=PLOTLY_CONFIG)
 
             # ── Monthly returns heatmap ───────────────────────────────────
             if len(pf) >= 12:
@@ -686,7 +672,7 @@ with tab_perf:
                     yaxis=dict(autorange="reversed"),
                     margin=dict(l=10, r=10, t=30, b=10),
                 )
-                st.plotly_chart(fig_hm, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig_hm, use_container_width=True, config=PLOTLY_CONFIG)
 
     st.caption(f"Source: Strategy_Returns.xlsx • Quarterly returns • Updated manually")
 
@@ -805,7 +791,7 @@ with tab_divs:
                     height=max(300, len(yield_df) * 28 + 80),
                     showlegend=False,
                 )
-                st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
 
             # Growth chart
             st.divider()
@@ -836,7 +822,7 @@ with tab_divs:
                     height=max(300, len(growth_df) * 28 + 80),
                     showlegend=False,
                 )
-                st.plotly_chart(fig4, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig4, use_container_width=True, config=PLOTLY_CONFIG)
 
             st.caption(f"Dividend data via yfinance • {datetime.now().strftime('%I:%M %p')}")
 
@@ -858,7 +844,7 @@ with tab_divs:
             {"Ticker":"KO", "Ex-Date":"Mar 18","Amount":"$0.49","Yield":"2.98%","Consecutive Years":62,"Payout Ratio":"66%"},
             {"Ticker":"ABT","Ex-Date":"Mar 22","Amount":"$0.55","Yield":"1.92%","Consecutive Years":52,"Payout Ratio":"48%"},
             {"Ticker":"TXN","Ex-Date":"Apr 01","Amount":"$1.34","Yield":"2.67%","Consecutive Years":21,"Payout Ratio":"62%"},
-        ]), hide_index=True, use_container_width=True, config={"displayModeBar": False})
+        ]), hide_index=True, use_container_width=True, config=PLOTLY_CONFIG)
 
         holdings_df = get_holdings(active)
         if not holdings_df.empty and "div_yield" in holdings_df.columns:
@@ -870,7 +856,7 @@ with tab_divs:
                 title="Dividend Yield by Holding",
             )
             fig3.update_layout(**PLOTLY_DARK, xaxis={**_XAXIS, "ticksuffix": "%"}, yaxis=_YAXIS, height=320)
-            st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
 
 
 # ══════════════════════════════════════════════════════════════════════════
