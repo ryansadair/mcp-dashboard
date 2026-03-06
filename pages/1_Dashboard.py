@@ -34,6 +34,13 @@ try:
 except ImportError:
     WATCHLIST_AVAILABLE = False
 
+# Dividend Announcement Calendar (from weekly dividend_calendar.py output)
+try:
+    from data.dividend_calendar_tab import render_dividend_calendar
+    DIV_CALENDAR_AVAILABLE = True
+except ImportError:
+    DIV_CALENDAR_AVAILABLE = False
+
 # Monthly YTD returns from Tamarac (separate file Ryan updates)
 try:
     from data.monthly_returns import STRATEGY_YTD, AS_OF_DATE
@@ -783,45 +790,13 @@ with tab_divs:
             with d4: st.metric("Avg 5Y Div Growth", f"{avg_growth_5y:+.1f}%")
             with d5: st.metric("Avg Consec. Years", f"{int(avg_consec)}")
 
-            # Upcoming ex-dates
-            st.markdown("**Upcoming Ex-Dividend Dates**")
-            ex_rows = []
-            today = datetime.now()
-            for _, row in tam_df.iterrows():
-                sym = row["symbol"]
-                dd = div_data.get(sym, {})
-                ex_str = dd.get("ex_dividend_date", "")
-                if ex_str:
-                    try:
-                        ex_dt = datetime.strptime(ex_str, "%Y-%m-%d")
-                        days = (ex_dt - today).days
-                        ex_rows.append({
-                            "Symbol": sym,
-                            "Company": row["description"],
-                            "Ex-Date": ex_str,
-                            "Days Until": days,
-                            "Div Rate": f"${dd.get('dividend_rate', 0):.2f}",
-                            "Yield %": dd.get("dividend_yield", 0),
-                            "Consec Yrs": dd.get("consecutive_years", 0),
-                            "Payout %": dd.get("payout_ratio", 0),
-                        })
-                    except ValueError:
-                        pass
-
-            if ex_rows:
-                ex_df = pd.DataFrame(ex_rows).sort_values("Days Until")
-                upcoming = ex_df[(ex_df["Days Until"] >= -7) & (ex_df["Days Until"] <= 90)]
-                if len(upcoming) > 0:
-                    st.dataframe(upcoming, use_container_width=True, hide_index=True,
-                        height=42 + len(upcoming) * 36,
-                        column_config={
-                            "Yield %": st.column_config.NumberColumn(format="%.2f%%"),
-                            "Payout %": st.column_config.NumberColumn(format="%.1f%%"),
-                        })
-                else:
-                    st.info("No upcoming ex-dates in the next 90 days.")
+            # Dividend Announcement Calendar (replaces old ex-dates table)
+            st.divider()
+            st.markdown("**Estimated Dividend Increase Announcements**")
+            if DIV_CALENDAR_AVAILABLE:
+                render_dividend_calendar()
             else:
-                st.info("No ex-dividend date data available.")
+                st.info("Dividend calendar module not found. Ensure `data/dividend_calendar_tab.py` is in the data folder.")
 
             # Yield chart
             st.divider()
@@ -900,14 +875,11 @@ with tab_divs:
         with d3: st.metric("5Y Div CAGR", "7.2%")
         with d4: st.metric("Annual Income Est.", "$1.32M")
 
-        st.markdown("**Upcoming Ex-Dividend Dates**")
-        st.dataframe(pd.DataFrame([
-            {"Ticker":"JNJ","Ex-Date":"Mar 10","Amount":"$1.24","Yield":"3.01%","Consecutive Years":62,"Payout Ratio":"44%"},
-            {"Ticker":"PG", "Ex-Date":"Mar 15","Amount":"$1.01","Yield":"2.45%","Consecutive Years":68,"Payout Ratio":"59%"},
-            {"Ticker":"KO", "Ex-Date":"Mar 18","Amount":"$0.49","Yield":"2.98%","Consecutive Years":62,"Payout Ratio":"66%"},
-            {"Ticker":"ABT","Ex-Date":"Mar 22","Amount":"$0.55","Yield":"1.92%","Consecutive Years":52,"Payout Ratio":"48%"},
-            {"Ticker":"TXN","Ex-Date":"Apr 01","Amount":"$1.34","Yield":"2.67%","Consecutive Years":21,"Payout Ratio":"62%"},
-        ]), hide_index=True, use_container_width=True, config=PLOTLY_CONFIG)
+        st.markdown("**Estimated Dividend Increase Announcements**")
+        if DIV_CALENDAR_AVAILABLE:
+            render_dividend_calendar()
+        else:
+            st.info("Dividend calendar not yet available. Run `dividend_calendar.py` to generate data.")
 
         holdings_df = get_holdings(active)
         if not holdings_df.empty and "div_yield" in holdings_df.columns:
