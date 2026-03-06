@@ -446,6 +446,12 @@ with tab_holdings:
 
             # Build merged table
             rows = []
+
+            # DEBUG — remove after confirming YoC works
+            _sample = tam_df.head(1).iloc[0]
+            _yoc_cols = [c for c in tam_df.columns if "yield" in c.lower() or "cost" in c.lower()]
+            st.caption(f"DEBUG: columns with yield/cost: {_yoc_cols} | sample yield_at_cost={repr(_sample.get('yield_at_cost', 'MISSING'))}")
+
             for _, h in tam_df.iterrows():
                 sym = h["symbol"]
                 mkt = price_data.get(sym, {})
