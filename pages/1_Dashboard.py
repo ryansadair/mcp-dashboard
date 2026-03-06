@@ -41,6 +41,13 @@ try:
 except ImportError:
     DIV_CALENDAR_AVAILABLE = False
 
+# Macro Environment tab
+try:
+    from data.macro_tab import render_macro_tab
+    MACRO_AVAILABLE = True
+except ImportError:
+    MACRO_AVAILABLE = False
+
 # Monthly YTD returns from Tamarac (separate file Ryan updates)
 try:
     from data.monthly_returns import STRATEGY_YTD, AS_OF_DATE
@@ -188,8 +195,8 @@ render_kpi_cards(active, kpis, bench_ytd)
 st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 # ── Tabs ───────────────────────────────────────────────────────────────────
-tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist = st.tabs([
-    "📊 Overview", "📋 Holdings", "📈 Performance", "💰 Dividends", "🔍 Watchlist"
+tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro = st.tabs([
+    "📊 Overview", "📋 Holdings", "📈 Performance", "💰 Dividends", "🔍 Watchlist", "🌐 Macro"
 ])
 
 # ── Plotly dark theme (reused across tabs) ─────────────────────────────────
@@ -902,6 +909,25 @@ with tab_watchlist:
         render_watchlist_tab()
     else:
         st.info("Watchlist module not found. Ensure `data/watchlist.py` and `data/watchlist_tab.py` are in the data folder.")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# MACRO
+# ══════════════════════════════════════════════════════════════════════════
+with tab_macro:
+    if MACRO_AVAILABLE:
+        # Pass QDVD yield so the context box can show it
+        qdvd_yield = None
+        if SPRINT2_AVAILABLE and tamarac_parsed and "QDVD" in tamarac_parsed:
+            from data.dividends import compute_weighted_yield as _cwy
+            _qdvd_tam = get_holdings_for_strategy(tamarac_parsed, "QDVD")
+            if not _qdvd_tam.empty:
+                _qdvd_tickers = tuple(_qdvd_tam["symbol"].tolist())
+                _qdvd_div = get_batch_dividend_details(_qdvd_tickers)
+                qdvd_yield = _cwy(_qdvd_tam, _qdvd_div)
+        render_macro_tab(qdvd_yield=qdvd_yield)
+    else:
+        st.info("Macro module not found. Ensure `data/macro_tab.py` is in the data folder.")
 
 
 # ── Footer ─────────────────────────────────────────────────────────────────
