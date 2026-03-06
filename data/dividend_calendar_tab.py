@@ -11,8 +11,13 @@ from datetime import datetime, date
 
 
 # ── Paths to check ─────────────────────────────────────────────────────────
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(_THIS_DIR)
+
 CALENDAR_PATHS = [
-    "data/dividend_calendar.xlsx",
+    os.path.join(_THIS_DIR, "dividend_calendar.xlsx"),       # data/ folder (same dir as this script)
+    os.path.join(_PROJECT_ROOT, "data", "dividend_calendar.xlsx"),  # from project root
+    "data/dividend_calendar.xlsx",                            # relative to cwd
     "dividend_calendar.xlsx",
 ]
 
