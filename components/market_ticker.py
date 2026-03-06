@@ -21,6 +21,7 @@ def render_market_ticker():
         ("GC=F",     "Gold",        "$"),
         ("CL=F",     "Crude Oil",   "$"),
         ("DX-Y.NYB", "US Dollar",   ""),
+        ("BTC-USD",  "Bitcoin",     "$"),
     ]
 
     items_html = ""

@@ -250,6 +250,8 @@ def get_index_data():
             "^VIX":     "VIX",
             "DX-Y.NYB": "US Dollar",
             "CL=F":     "Crude Oil",
+            "GC=F":     "Gold",
+            "BTC-USD":  "Bitcoin",
         }
 
         results = {}
