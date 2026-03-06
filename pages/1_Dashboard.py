@@ -446,10 +446,6 @@ with tab_holdings:
 
             # Build merged table
             rows = []
-
-            # DEBUG — remove after confirming YoC works
-            st.caption(f"DEBUG: ALL columns: {list(tam_df.columns)}")
-
             for _, h in tam_df.iterrows():
                 sym = h["symbol"]
                 mkt = price_data.get(sym, {})
