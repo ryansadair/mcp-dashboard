@@ -46,6 +46,10 @@ except ImportError:
 if not check_password():
     st.stop()
 
+# ── Auto-refresh every 15 minutes to stay in sync with Task Scheduler ────
+from streamlit_autorefresh import st_autorefresh
+st_autorefresh(interval=15 * 60 * 1000, key="data_refresh")
+
 inject_global_css()
 
 render_header()
