@@ -82,7 +82,7 @@ if SPRINT2_AVAILABLE:
     for p in TAMARAC_PATHS:
         if os.path.exists(p):
             @st.cache_data(ttl=300)
-            def _load_tamarac(path):
+            def _load_tamarac(path, _v=2):
                 return parse_tamarac_excel(path)
             tamarac_parsed = _load_tamarac(p)
             break
