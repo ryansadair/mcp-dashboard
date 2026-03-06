@@ -225,6 +225,13 @@ def render_macro_tab(qdvd_yield=None):
         QDVD weighted avg dividend yield (passed from main dashboard).
     """
 
+    # Initialize variables used across sections
+    ten_y = None
+    spread_bp = None
+    fwd_pe = None
+    sp_div_pct = None
+    sp_div = None
+
     st.markdown(
         '<div style="font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:16px">'
         'Rates, economic indicators & market context for dividend strategies'
@@ -290,26 +297,28 @@ def render_macro_tab(qdvd_yield=None):
                     "direction": direction,
                 })
 
-    # Render rate cards as HTML
-    cards_html = ['<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px">']
-    for r in rates_display:
+    # Extract key rates for use in later sections
+    ten_y = next((r["raw"] for r in rates_display if "10-Year" in r["name"]), None)
+
+    # Render rate cards — one st.markdown per card to avoid HTML size limits
+    cols = st.columns(len(rates_display))
+    for i, r in enumerate(rates_display):
         arrow_color = "#c45454" if r["direction"] == "up" else "#569542" if r["direction"] == "down" else "rgba(255,255,255,0.3)"
         arrow = "▲" if r["direction"] == "up" else "▼" if r["direction"] == "down" else "◆"
-        cards_html.append(f'''
-        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
-                    border-radius:10px;padding:14px 14px 10px">
-            <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
-                        letter-spacing:0.06em;margin-bottom:6px">{r["name"]}</div>
-            <div style="font-size:20px;font-weight:700;font-family:'DM Serif Display',serif;
-                        color:rgba(255,255,255,0.95);line-height:1.1">{r["value"]}</div>
-            <div style="display:flex;align-items:center;margin-top:8px;gap:4px">
-                <span style="color:{arrow_color};font-size:12px">{arrow}</span>
-                <span style="color:{arrow_color};font-size:11px">{r["chg"]}</span>
+        with cols[i]:
+            st.markdown(f'''
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+                        border-radius:10px;padding:14px 14px 10px">
+                <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
+                            letter-spacing:0.06em;margin-bottom:6px">{r["name"]}</div>
+                <div style="font-size:20px;font-weight:700;font-family:'DM Serif Display',serif;
+                            color:rgba(255,255,255,0.95);line-height:1.1">{r["value"]}</div>
+                <div style="display:flex;align-items:center;margin-top:8px;gap:4px">
+                    <span style="color:{arrow_color};font-size:12px">{arrow}</span>
+                    <span style="color:{arrow_color};font-size:11px">{r["chg"]}</span>
+                </div>
             </div>
-        </div>
-        ''')
-    cards_html.append('</div>')
-    st.markdown("".join(cards_html), unsafe_allow_html=True)
+            ''', unsafe_allow_html=True)
 
     # ── Yield Curve Chart + Fed Calendar ───────────────────────────────────
     col_chart, col_fed = st.columns([3, 1])
@@ -475,51 +484,42 @@ def render_macro_tab(qdvd_yield=None):
 
             econ_rows.append((name, display_val, display_prev, trend, date_label, signal))
 
-    # Render as HTML table
-    econ_html = ['''
-    <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
-    <thead><tr>
-        <th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:600;
-            color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;
-            border-bottom:1px solid rgba(255,255,255,0.06)">Indicator</th>
-        <th style="text-align:right;padding:8px 10px;font-size:10px;font-weight:600;
-            color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;
-            border-bottom:1px solid rgba(255,255,255,0.06)">Latest</th>
-        <th style="text-align:right;padding:8px 10px;font-size:10px;font-weight:600;
-            color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;
-            border-bottom:1px solid rgba(255,255,255,0.06)">Previous</th>
-        <th style="text-align:right;padding:8px 10px;font-size:10px;font-weight:600;
-            color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;
-            border-bottom:1px solid rgba(255,255,255,0.06)">Trend</th>
-        <th style="text-align:right;padding:8px 10px;font-size:10px;font-weight:600;
-            color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;
-            border-bottom:1px solid rgba(255,255,255,0.06)">Release</th>
-        <th style="text-align:right;padding:8px 10px;font-size:10px;font-weight:600;
-            color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;
-            border-bottom:1px solid rgba(255,255,255,0.06)">Signal</th>
-    </tr></thead><tbody>
-    ''']
+    # Render header row
+    _th = ("text-align:{a};padding:8px 10px;font-size:10px;font-weight:600;"
+           "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
+           "border-bottom:1px solid rgba(255,255,255,0.06)")
+    st.markdown(
+        '<table style="width:100%;border-collapse:collapse"><thead><tr>'
+        f'<th style="{_th.format(a="left")}">Indicator</th>'
+        f'<th style="{_th.format(a="right")}">Latest</th>'
+        f'<th style="{_th.format(a="right")}">Previous</th>'
+        f'<th style="{_th.format(a="right")}">Trend</th>'
+        f'<th style="{_th.format(a="right")}">Release</th>'
+        f'<th style="{_th.format(a="right")}">Signal</th>'
+        '</tr></thead></table>',
+        unsafe_allow_html=True,
+    )
 
+    # Render each row individually to avoid HTML size limits
     for name, val, prev, trend, date_label, signal in econ_rows:
         arrow = _trend_arrow(trend)
         badge = _signal_badge(signal)
-        econ_html.append(f'''
-        <tr style="border-bottom:1px solid rgba(255,255,255,0.03)">
-            <td style="text-align:left;padding:10px 10px;font-size:13px;font-weight:600;
-                color:rgba(255,255,255,0.8)">{name}</td>
-            <td style="text-align:right;padding:10px 10px;font-size:15px;font-weight:700;
-                font-family:'DM Serif Display',serif;color:rgba(255,255,255,0.9)">{val}</td>
-            <td style="text-align:right;padding:10px 10px;font-size:13px;
-                color:rgba(255,255,255,0.35)">{prev}</td>
-            <td style="text-align:right;padding:10px 10px">{arrow}</td>
-            <td style="text-align:right;padding:10px 10px;font-size:11px;
-                color:rgba(255,255,255,0.3)">{date_label}</td>
-            <td style="text-align:right;padding:10px 10px">{badge}</td>
-        </tr>
-        ''')
-
-    econ_html.append('</tbody></table>')
-    st.markdown("".join(econ_html), unsafe_allow_html=True)
+        st.markdown(
+            '<table style="width:100%;border-collapse:collapse"><tbody>'
+            f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03)">'
+            f'<td style="text-align:left;padding:10px 10px;font-size:13px;font-weight:600;'
+            f'color:rgba(255,255,255,0.8)">{name}</td>'
+            f'<td style="text-align:right;padding:10px 10px;font-size:15px;font-weight:700;'
+            f'font-family:\'DM Serif Display\',serif;color:rgba(255,255,255,0.9)">{val}</td>'
+            f'<td style="text-align:right;padding:10px 10px;font-size:13px;'
+            f'color:rgba(255,255,255,0.35)">{prev}</td>'
+            f'<td style="text-align:right;padding:10px 10px">{arrow}</td>'
+            f'<td style="text-align:right;padding:10px 10px;font-size:11px;'
+            f'color:rgba(255,255,255,0.3)">{date_label}</td>'
+            f'<td style="text-align:right;padding:10px 10px">{badge}</td>'
+            f'</tr></tbody></table>',
+            unsafe_allow_html=True,
+        )
 
     # ── Valuation & Sentiment ──────────────────────────────────────────────
     col_val, col_sent = st.columns([3, 1])
@@ -535,7 +535,6 @@ def render_macro_tab(qdvd_yield=None):
 
         # Build valuation data
         spy_data = _yf_sp500_metrics()
-        ten_y = next((r["raw"] for r in rates_display if "10-Year" in r["name"]), None) if rates_display else None
 
         val_rows = []
 
@@ -573,41 +572,35 @@ def render_macro_tab(qdvd_yield=None):
                 avg_label = "Hist avg ~450bp" if "HY" in name else "Hist avg ~130bp"
                 val_rows.append((name, f"{latest:.0f}bp", avg_label, status))
 
-        # Render valuation table
-        val_html = ['''
-        <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
-        <thead><tr>
-            <th style="text-align:left;padding:8px 10px;font-size:10px;font-weight:600;
-                color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;
-                border-bottom:1px solid rgba(255,255,255,0.06)">Metric</th>
-            <th style="text-align:right;padding:8px 10px;font-size:10px;font-weight:600;
-                color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;
-                border-bottom:1px solid rgba(255,255,255,0.06)">Current</th>
-            <th style="text-align:right;padding:8px 10px;font-size:10px;font-weight:600;
-                color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;
-                border-bottom:1px solid rgba(255,255,255,0.06)">Context</th>
-            <th style="text-align:right;padding:8px 10px;font-size:10px;font-weight:600;
-                color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;
-                border-bottom:1px solid rgba(255,255,255,0.06)">Signal</th>
-        </tr></thead><tbody>
-        ''']
+        # Render valuation table — header then individual rows
+        _vth = ("text-align:{a};padding:8px 10px;font-size:10px;font-weight:600;"
+                "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
+                "border-bottom:1px solid rgba(255,255,255,0.06)")
+        st.markdown(
+            '<table style="width:100%;border-collapse:collapse"><thead><tr>'
+            f'<th style="{_vth.format(a="left")}">Metric</th>'
+            f'<th style="{_vth.format(a="right")}">Current</th>'
+            f'<th style="{_vth.format(a="right")}">Context</th>'
+            f'<th style="{_vth.format(a="right")}">Signal</th>'
+            '</tr></thead></table>',
+            unsafe_allow_html=True,
+        )
 
         for name, val, note, status in val_rows:
             badge = _signal_badge(status)
-            val_html.append(f'''
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.03)">
-                <td style="text-align:left;padding:10px 10px;font-size:13px;font-weight:500;
-                    color:rgba(255,255,255,0.7)">{name}</td>
-                <td style="text-align:right;padding:10px 10px;font-size:15px;font-weight:700;
-                    font-family:'DM Serif Display',serif;color:rgba(255,255,255,0.9)">{val}</td>
-                <td style="text-align:right;padding:10px 10px;font-size:12px;
-                    color:rgba(255,255,255,0.35)">{note}</td>
-                <td style="text-align:right;padding:10px 10px">{badge}</td>
-            </tr>
-            ''')
-
-        val_html.append('</tbody></table>')
-        st.markdown("".join(val_html), unsafe_allow_html=True)
+            st.markdown(
+                '<table style="width:100%;border-collapse:collapse"><tbody>'
+                f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03)">'
+                f'<td style="text-align:left;padding:10px 10px;font-size:13px;font-weight:500;'
+                f'color:rgba(255,255,255,0.7)">{name}</td>'
+                f'<td style="text-align:right;padding:10px 10px;font-size:15px;font-weight:700;'
+                f'font-family:\'DM Serif Display\',serif;color:rgba(255,255,255,0.9)">{val}</td>'
+                f'<td style="text-align:right;padding:10px 10px;font-size:12px;'
+                f'color:rgba(255,255,255,0.35)">{note}</td>'
+                f'<td style="text-align:right;padding:10px 10px">{badge}</td>'
+                f'</tr></tbody></table>',
+                unsafe_allow_html=True,
+            )
 
     with col_sent:
         st.markdown(
@@ -640,18 +633,16 @@ def render_macro_tab(qdvd_yield=None):
             curve_color = "#569542" if spread_bp > 0 else "#c45454"
             sentiment_items.append(("Yield Curve", f"{curve_label} ({spread_bp:+d}bp)", curve_color))
 
-        sent_html = ['<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:12px;padding:16px 20px">']
         for name, val, color in sentiment_items:
-            sent_html.append(f'''
-            <div style="display:flex;justify-content:space-between;align-items:center;
-                        padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+            st.markdown(f'''
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+                        border-radius:8px;padding:12px 16px;margin-bottom:6px;
+                        display:flex;justify-content:space-between;align-items:center">
                 <span style="font-size:13px;color:rgba(255,255,255,0.6)">{name}</span>
                 <span style="font-size:16px;font-weight:700;font-family:'DM Serif Display',serif;
                              color:{color}">{val}</span>
             </div>
-            ''')
-        sent_html.append('</div>')
-        st.markdown("".join(sent_html), unsafe_allow_html=True)
+            ''', unsafe_allow_html=True)
 
     # ── Dividend Strategy Context ──────────────────────────────────────────
     st.markdown(
@@ -664,7 +655,7 @@ def render_macro_tab(qdvd_yield=None):
 
     # Build context values
     ten_y_str = f"{ten_y:.2f}%" if ten_y else "—"
-    sp_yield_str = f"{sp_div_pct:.2f}%" if sp_div else "—"
+    sp_yield_str = f"{sp_div_pct:.2f}%" if sp_div_pct else "—"
     qdvd_str = f"{qdvd_yield:.2f}%" if qdvd_yield else "—"
 
     erp_val = ""
