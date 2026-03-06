@@ -484,28 +484,35 @@ def render_macro_tab(qdvd_yield=None):
 
             econ_rows.append((name, display_val, display_prev, trend, date_label, signal))
 
-    # Render header row
-    _th = ("text-align:{a};padding:8px 10px;font-size:10px;font-weight:600;"
+    # Render header row — fixed widths so separate tables align
+    _tw = "width:100%;border-collapse:collapse;table-layout:fixed"
+    _th = ("padding:8px 10px;font-size:10px;font-weight:600;"
            "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
            "border-bottom:1px solid rgba(255,255,255,0.06)")
     st.markdown(
-        '<table style="width:100%;border-collapse:collapse"><thead><tr>'
-        f'<th style="{_th.format(a="left")}">Indicator</th>'
-        f'<th style="{_th.format(a="right")}">Latest</th>'
-        f'<th style="{_th.format(a="right")}">Previous</th>'
-        f'<th style="{_th.format(a="right")}">Trend</th>'
-        f'<th style="{_th.format(a="right")}">Release</th>'
-        f'<th style="{_th.format(a="right")}">Signal</th>'
+        f'<table style="{_tw}"><colgroup>'
+        '<col style="width:25%"><col style="width:15%"><col style="width:15%">'
+        '<col style="width:10%"><col style="width:18%"><col style="width:17%">'
+        '</colgroup><thead><tr>'
+        f'<th style="text-align:left;{_th}">Indicator</th>'
+        f'<th style="text-align:right;{_th}">Latest</th>'
+        f'<th style="text-align:right;{_th}">Previous</th>'
+        f'<th style="text-align:right;{_th}">Trend</th>'
+        f'<th style="text-align:right;{_th}">Release</th>'
+        f'<th style="text-align:right;{_th}">Signal</th>'
         '</tr></thead></table>',
         unsafe_allow_html=True,
     )
 
-    # Render each row individually to avoid HTML size limits
+    # Render each row individually — same fixed widths
     for name, val, prev, trend, date_label, signal in econ_rows:
         arrow = _trend_arrow(trend)
         badge = _signal_badge(signal)
         st.markdown(
-            '<table style="width:100%;border-collapse:collapse"><tbody>'
+            f'<table style="{_tw}"><colgroup>'
+            '<col style="width:25%"><col style="width:15%"><col style="width:15%">'
+            '<col style="width:10%"><col style="width:18%"><col style="width:17%">'
+            '</colgroup><tbody>'
             f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03)">'
             f'<td style="text-align:left;padding:10px 10px;font-size:13px;font-weight:600;'
             f'color:rgba(255,255,255,0.8)">{name}</td>'
@@ -572,16 +579,19 @@ def render_macro_tab(qdvd_yield=None):
                 avg_label = "Hist avg ~450bp" if "HY" in name else "Hist avg ~130bp"
                 val_rows.append((name, f"{latest:.0f}bp", avg_label, status))
 
-        # Render valuation table — header then individual rows
-        _vth = ("text-align:{a};padding:8px 10px;font-size:10px;font-weight:600;"
+        # Render valuation table — fixed widths for alignment
+        _vtw = "width:100%;border-collapse:collapse;table-layout:fixed"
+        _vth = ("padding:8px 10px;font-size:10px;font-weight:600;"
                 "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
                 "border-bottom:1px solid rgba(255,255,255,0.06)")
+        _vcols = ('<colgroup><col style="width:35%"><col style="width:20%">'
+                  '<col style="width:28%"><col style="width:17%"></colgroup>')
         st.markdown(
-            '<table style="width:100%;border-collapse:collapse"><thead><tr>'
-            f'<th style="{_vth.format(a="left")}">Metric</th>'
-            f'<th style="{_vth.format(a="right")}">Current</th>'
-            f'<th style="{_vth.format(a="right")}">Context</th>'
-            f'<th style="{_vth.format(a="right")}">Signal</th>'
+            f'<table style="{_vtw}">{_vcols}<thead><tr>'
+            f'<th style="text-align:left;{_vth}">Metric</th>'
+            f'<th style="text-align:right;{_vth}">Current</th>'
+            f'<th style="text-align:right;{_vth}">Context</th>'
+            f'<th style="text-align:right;{_vth}">Signal</th>'
             '</tr></thead></table>',
             unsafe_allow_html=True,
         )
@@ -589,7 +599,7 @@ def render_macro_tab(qdvd_yield=None):
         for name, val, note, status in val_rows:
             badge = _signal_badge(status)
             st.markdown(
-                '<table style="width:100%;border-collapse:collapse"><tbody>'
+                f'<table style="{_vtw}">{_vcols}<tbody>'
                 f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03)">'
                 f'<td style="text-align:left;padding:10px 10px;font-size:13px;font-weight:500;'
                 f'color:rgba(255,255,255,0.7)">{name}</td>'
