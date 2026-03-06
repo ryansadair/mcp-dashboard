@@ -78,12 +78,21 @@ def parse_tamarac_excel(filepath):
                     record[col] = val if isinstance(val, datetime) else None
                 elif col == "weight":
                     try:
-                        record[col] = float(val) if val else 0.0
+                        str_val = str(val).strip() if val else ""
+                        if str_val.endswith("%"):
+                            record[col] = float(str_val.rstrip("%")) / 100
+                        else:
+                            record[col] = float(val) if val else 0.0
                     except (ValueError, TypeError):
                         record[col] = 0.0
                 elif col in ("quantity", "yield_at_cost", "current_yield", "unit_cost", "cost_basis", "value", "annual_income", "cumulative_income"):
                     try:
-                        record[col] = float(val) if val else 0.0
+                        # Handle percentage strings like "5.58%" from Tamarac
+                        str_val = str(val).strip() if val else ""
+                        if str_val.endswith("%"):
+                            record[col] = float(str_val.rstrip("%")) / 100
+                        else:
+                            record[col] = float(val) if val else 0.0
                     except (ValueError, TypeError):
                         record[col] = 0.0
                 else:

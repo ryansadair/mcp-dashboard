@@ -451,6 +451,8 @@ with tab_holdings:
                 mkt = price_data.get(sym, {})
                 chg_val = mkt.get("change_1d_pct", 0) or 0
                 yoc = h.get("yield_at_cost", 0) or 0
+                # yoc may be decimal (0.0558) or already percentage (5.58)
+                yoc_pct = float(yoc) * 100 if 0 < float(yoc) < 1 else float(yoc)
                 rows.append({
                     "Company": h["description"],
                     "Symbol": sym,
@@ -458,7 +460,7 @@ with tab_holdings:
                     "Weight %": round(h["weight_pct"], 2),
                     "1D Chg %": chg_val,
                     "Price": mkt.get("price", 0),
-                    "Yield on Cost %": round(float(yoc) * 100, 2) if yoc else 0.0,
+                    "Yield on Cost %": round(yoc_pct, 2),
                     "Div Yield %": mkt.get("dividend_yield", 0),
                     "P/E": round(mkt.get("pe_ratio", 0), 1) if mkt.get("pe_ratio") else "—",
                     "52W High": mkt.get("52w_high", 0),
