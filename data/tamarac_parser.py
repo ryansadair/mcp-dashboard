@@ -85,7 +85,7 @@ def parse_tamarac_excel(filepath):
                             record[col] = float(val) if val else 0.0
                     except (ValueError, TypeError):
                         record[col] = 0.0
-                elif col in ("quantity", "yield_at_cost", "current_yield", "unit_cost", "cost_basis", "value", "annual_income", "cumulative_income"):
+                elif col in ("quantity", "yield_at_cost", "current_yield", "unit_cost", "cost_basis", "value", "price", "annual_income", "cumulative_income"):
                     try:
                         # Handle percentage strings like "5.58%" from Tamarac
                         str_val = str(val).strip() if val else ""
@@ -110,6 +110,9 @@ def parse_tamarac_excel(filepath):
             "cusip": "cusip",
             "description": "description",
             "quantity": "quantity",
+            "open_date": "open_date",
+            "value": "value",
+            "price": "price",
             "unit_cost": "unit_cost",
             "cost_basis": "cost_basis",
             "annual_income": "annual_income",

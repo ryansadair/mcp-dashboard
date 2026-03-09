@@ -41,6 +41,13 @@ try:
 except ImportError:
     DIV_CALENDAR_AVAILABLE = False
 
+# Dividend Intelligence sub-tabs (Sprint 4)
+try:
+    from data.dividends_tab import render_dividends_tab
+    DIV_TAB_AVAILABLE = True
+except ImportError:
+    DIV_TAB_AVAILABLE = False
+
 # Macro Environment tab
 try:
     from data.macro_tab import render_macro_tab
@@ -757,150 +764,47 @@ with tab_perf:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# DIVIDENDS — Sprint 2 upgrade: live dividend data from yfinance
+# DIVIDENDS — Sprint 4: full dividend intelligence with sub-tabs
 # ══════════════════════════════════════════════════════════════════════════
 with tab_divs:
 
-    if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
-        tam_df = get_holdings_for_strategy(tamarac_parsed, active)
-        strat_color = strat["color"]
+    if DIV_TAB_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
+        render_dividends_tab(tamarac_parsed, active, strat, kpis)
 
+    elif SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
+        # Fallback: Sprint 2 style (dividends_tab.py not available)
+        tam_df = get_holdings_for_strategy(tamarac_parsed, active)
         if not tam_df.empty:
             tickers = tuple(tam_df["symbol"].tolist())
-
             with st.spinner("Fetching dividend data..."):
                 price_data = fetch_batch_prices(tickers)
                 div_data = get_batch_dividend_details(tickers)
-
-            # KPIs
             wtd_yield = compute_weighted_yield(tam_df, div_data)
-
-            # Helper: compute average growth for a given period key, filtering bad data
-            def _avg_growth(key):
-                vals = [div_data[t].get(key, 0) for t in tickers
-                        if t in div_data
-                        and div_data[t].get(key, 0) != 0
-                        and -50 < div_data[t].get(key, 0) < 100]
-                return round(sum(vals) / len(vals), 1) if vals else 0
-
-            avg_growth_1y = _avg_growth("div_growth_1y")
-            avg_growth_3y = _avg_growth("div_growth_3y")
-            avg_growth_5y = _avg_growth("div_growth_5y")
-
-            # Avg consecutive years: only include tickers with meaningful history
-            consec = [div_data[t].get("consecutive_years", 0) for t in tickers
-                      if t in div_data and div_data[t].get("consecutive_years", 0) > 0]
-            avg_consec = round(sum(consec) / len(consec), 0) if consec else 0
-
-            d1, d2, d3, d4, d5 = st.columns(5)
+            d1, d2, d3 = st.columns(3)
             with d1: st.metric("Wtd Avg Yield", f"{wtd_yield}%")
-            with d2: st.metric("Avg 1Y Div Growth", f"{avg_growth_1y:+.1f}%")
-            with d3: st.metric("Avg 3Y Div Growth", f"{avg_growth_3y:+.1f}%")
-            with d4: st.metric("Avg 5Y Div Growth", f"{avg_growth_5y:+.1f}%")
-            with d5: st.metric("Avg Consec. Years", f"{int(avg_consec)}")
+            with d2: st.metric("Holdings", str(len(tam_df)))
+            with d3: st.metric("Strategy", STRATEGY_NAMES.get(active, active))
 
-            # Dividend Announcement Calendar (replaces old ex-dates table)
-            st.divider()
-            st.markdown("**Estimated Dividend Increase Announcements**")
             if DIV_CALENDAR_AVAILABLE:
+                st.divider()
+                st.markdown("**Estimated Dividend Increase Announcements**")
                 render_dividend_calendar()
-            else:
-                st.info("Dividend calendar module not found. Ensure `data/dividend_calendar_tab.py` is in the data folder.")
-
-            # Yield chart
-            st.divider()
-            st.markdown("**Dividend Yield by Holding**")
-            yield_rows = []
-            for _, row in tam_df.iterrows():
-                sym = row["symbol"]
-                dd = div_data.get(sym, {})
-                yld = dd.get("dividend_yield", 0)
-                if yld > 0:
-                    yield_rows.append({"symbol": sym, "yield": yld})
-            if yield_rows:
-                yield_df = pd.DataFrame(yield_rows).sort_values("yield", ascending=True)
-                fig3 = go.Figure()
-                fig3.add_trace(go.Bar(
-                    x=yield_df["yield"], y=yield_df["symbol"], orientation="h",
-                    marker=dict(
-                        color=yield_df["yield"],
-                        colorscale=[[0, "#07415A"], [0.5, "#C9A84C"], [1, "#569542"]],
-                    ),
-                    text=[f"{y:.2f}%" for y in yield_df["yield"]],
-                    textposition="outside",
-                    textfont=dict(size=11, color="rgba(255,255,255,0.6)"),
-                ))
-                fig3.update_layout(
-                    **PLOTLY_DARK,
-                    title="Current Dividend Yield (%)",
-                    xaxis={**_XAXIS, "title": "Yield %"},
-                    yaxis=_YAXIS,
-                    height=max(300, len(yield_df) * 28 + 80),
-                    showlegend=False,
-                )
-                st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
-
-            # Growth chart
-            st.divider()
-            st.markdown("**5-Year Dividend Growth Rate**")
-            growth_rows = []
-            for _, row in tam_df.iterrows():
-                sym = row["symbol"]
-                dd = div_data.get(sym, {})
-                gr = dd.get("div_growth_5y", 0)
-                if gr != 0:
-                    growth_rows.append({"symbol": sym, "growth": gr})
-            if growth_rows:
-                growth_df = pd.DataFrame(growth_rows).sort_values("growth", ascending=True)
-                colors = ["#569542" if g >= 0 else "#c45454" for g in growth_df["growth"]]
-                fig4 = go.Figure()
-                fig4.add_trace(go.Bar(
-                    x=growth_df["growth"], y=growth_df["symbol"], orientation="h",
-                    marker=dict(color=colors),
-                    text=[f"{g:+.1f}%" for g in growth_df["growth"]],
-                    textposition="outside",
-                    textfont=dict(size=11, color="rgba(255,255,255,0.6)"),
-                ))
-                fig4.update_layout(
-                    **PLOTLY_DARK,
-                    title="5-Year Dividend CAGR (%)",
-                    xaxis=_XAXIS,
-                    yaxis=_YAXIS,
-                    height=max(300, len(growth_df) * 28 + 80),
-                    showlegend=False,
-                )
-                st.plotly_chart(fig4, use_container_width=True, config=PLOTLY_CONFIG)
-
-            st.caption(f"Dividend data via yfinance • {datetime.now().strftime('%I:%M %p')}")
-
         else:
             st.info("No holdings for this strategy in Tamarac file.")
 
-    # ── Sprint 1 fallback ─────────────────────────────────────────────────
     else:
+        # Sprint 1 fallback
         d1, d2, d3, d4 = st.columns(4)
         with d1: st.metric("Wtd Avg Yield", f"{float(kpis.get('div_yield', 0)):.2f}%")
-        with d2: st.metric("Yield on Cost", "3.67%")
-        with d3: st.metric("5Y Div CAGR", "7.2%")
-        with d4: st.metric("Annual Income Est.", "$1.32M")
+        with d2: st.metric("Yield on Cost", "—")
+        with d3: st.metric("5Y Div CAGR", "—")
+        with d4: st.metric("Annual Income Est.", "—")
 
         st.markdown("**Estimated Dividend Increase Announcements**")
         if DIV_CALENDAR_AVAILABLE:
             render_dividend_calendar()
         else:
             st.info("Dividend calendar not yet available. Run `dividend_calendar.py` to generate data.")
-
-        holdings_df = get_holdings(active)
-        if not holdings_df.empty and "div_yield" in holdings_df.columns:
-            chart_df = holdings_df.sort_values("div_yield", ascending=True).tail(12)
-            fig3 = px.bar(
-                chart_df, x="div_yield", y="ticker", orientation="h",
-                color_discrete_sequence=[BRAND["gold"]],
-                labels={"div_yield": "Dividend Yield (%)", "ticker": ""},
-                title="Dividend Yield by Holding",
-            )
-            fig3.update_layout(**PLOTLY_DARK, xaxis={**_XAXIS, "ticksuffix": "%"}, yaxis=_YAXIS, height=320)
-            st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
 
 
 # ══════════════════════════════════════════════════════════════════════════
