@@ -42,6 +42,13 @@ try:
 except ImportError:
     _CALENDAR_AVAILABLE = False
 
+# Authoritative streak data (CCC list-sourced)
+try:
+    from data.dividend_streaks import get_streak
+    _STREAKS_AVAILABLE = True
+except ImportError:
+    _STREAKS_AVAILABLE = False
+
 # ── Plotly theme (matches 1_Dashboard.py) ──────────────────────────────────
 PLOTLY_DARK = dict(
     paper_bgcolor="rgba(255,255,255,0.02)",
@@ -103,11 +110,17 @@ def _build_enriched_df(tam_df, price_data, div_data):
         div_yield    = dd.get("dividend_yield", 0) or 0
         div_rate     = dd.get("dividend_rate", 0) or 0
         payout_ratio = dd.get("payout_ratio", 0) or 0
-        consec_years = dd.get("consecutive_years", 0) or 0
         growth_1y    = dd.get("div_growth_1y", 0) or 0
         growth_3y    = dd.get("div_growth_3y", 0) or 0
         growth_5y    = dd.get("div_growth_5y", 0) or 0
         ex_date      = dd.get("ex_dividend_date", "")
+
+        # Consecutive years: prefer CCC list lookup, fallback to yfinance
+        if _STREAKS_AVAILABLE:
+            ccc_years, _ = get_streak(sym)
+            consec_years = ccc_years if ccc_years > 0 else (dd.get("consecutive_years", 0) or 0)
+        else:
+            consec_years = dd.get("consecutive_years", 0) or 0
 
         # Market data
         price  = mkt.get("price", 0) or 0
