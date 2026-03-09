@@ -244,6 +244,17 @@ def _streak_tier(years):
         return ("—", "rgba(255,255,255,0.3)")
 
 
+# ── Shared style helpers (used by both detail and safety sub-tabs) ─────────
+
+def _color_safety(val):
+    """Styler function for safety grade cells."""
+    if "A" in str(val):
+        return f"color: {GREEN}; font-weight: 700"
+    elif "B" in str(val):
+        return f"color: {GOLD}; font-weight: 700"
+    return f"color: {RED}; font-weight: 700"
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # MAIN RENDER FUNCTION — called from 1_Dashboard.py inside tab_divs
 # ═══════════════════════════════════════════════════════════════════════════
@@ -562,13 +573,6 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
         except (ValueError, TypeError):
             pass
         return ""
-
-    def _color_safety(val):
-        if "A" in str(val):
-            return f"color: {GREEN}; font-weight: 700"
-        elif "B" in str(val):
-            return f"color: {GOLD}; font-weight: 700"
-        return f"color: {RED}; font-weight: 700"
 
     styled = (
         detail_df.style
