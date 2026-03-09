@@ -195,8 +195,8 @@ def _write_streaks_py(mcp_streaks, all_streaks):
         if tier != current_tier:
             current_tier = tier
             tier_label = {
-                "King": "Kings (50+)", "Champion": "Champions (25–49)",
-                "Contender": "Contenders (10–24)", "Challenger": "Challengers (5–9)",
+                "King": "Kings (50+)", "Champion": "Champions (25-49)",
+                "Contender": "Contenders (10-24)", "Challenger": "Challengers (5-9)",
                 "—": "Non-US / ETFs / No CCC Data",
             }.get(tier, tier)
             lines.append(f"    # ── {tier_label} {'─' * (60 - len(tier_label))}")
@@ -228,7 +228,7 @@ def _write_streaks_py(mcp_streaks, all_streaks):
     lines.append("    return {t: {'years': get_streak_years(t), 'tier': get_streak_tier(t)} for t in tickers}")
     lines.append("")
 
-    with open(STREAKS_PY, "w") as f:
+    with open(STREAKS_PY, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
     print(f"\n✅ Wrote {STREAKS_PY} with {len(mcp_streaks)} tickers")
@@ -237,7 +237,7 @@ def _write_streaks_py(mcp_streaks, all_streaks):
 def _write_csv_backup(mcp_streaks):
     """Write a CSV backup of streak data."""
     os.makedirs(STREAKS_CSV.parent, exist_ok=True)
-    with open(STREAKS_CSV, "w") as f:
+    with open(STREAKS_CSV, "w", encoding="utf-8") as f:
         f.write("ticker,consecutive_years,tier,updated\n")
         now = datetime.now().strftime("%Y-%m-%d")
         for ticker, (years, tier) in sorted(mcp_streaks.items()):
