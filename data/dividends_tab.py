@@ -187,8 +187,10 @@ def _safety_grade(payout, growth_5y, consec):
     else:
         score += 0
 
-    # Streak component
-    if consec >= 25:
+    # Streak component (0 = no data available, treat as neutral)
+    if consec == 0:
+        score += 3  # neutral — no CCC data (ADR/ETF/non-US)
+    elif consec >= 25:
         score += 5
     elif consec >= 15:
         score += 4
@@ -321,8 +323,7 @@ def render_dividends_tab(tamarac_parsed, active_strategy, strat_config, kpis):
                     and -50 < div_data[t].get(key, 0) < 100]
             return round(sum(vals) / len(vals), 1) if vals else 0
 
-        consec = [div_data[t].get("consecutive_years", 0) for t in tickers
-                  if t in div_data and div_data[t].get("consecutive_years", 0) > 0]
+        consec = edf[edf["consec_years"] > 0]["consec_years"].tolist()
         avg_consec = round(sum(consec) / len(consec), 0) if consec else 0
 
         d1, d2, d3, d4, d5 = st.columns(5)
@@ -553,7 +554,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "1Y Growth":      r["growth_1y"],
             "3Y Growth":      r["growth_3y"],
             "5Y Growth":      r["growth_5y"],
-            "Streak":         r["consec_years"],
+            "Streak":         r["consec_years"] if r["consec_years"] > 0 else "N/A",
             "Payout %":       r["payout_ratio"],
             "Ann. Income":    r["annual_income"],
             "Safety":         r["safety"],
@@ -601,7 +602,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "1Y Growth":      "{:+.1f}%",
             "3Y Growth":      "{:+.1f}%",
             "5Y Growth":      "{:+.1f}%",
-            "Streak":         "{:.0f}y",
+            "Streak":         lambda v: f"{v:.0f}y" if isinstance(v, (int, float)) else str(v),
             "Payout %":       "{:.0f}%",
             "Ann. Income":    "${:,.0f}",
         })
@@ -620,7 +621,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "1Y Growth":     st.column_config.NumberColumn("1Y Gr", format="%+.1f%%"),
             "3Y Growth":     st.column_config.NumberColumn("3Y Gr", format="%+.1f%%"),
             "5Y Growth":     st.column_config.NumberColumn("5Y Gr", format="%+.1f%%"),
-            "Streak":        st.column_config.NumberColumn("Streak", format="%.0fy"),
+            "Streak":        st.column_config.TextColumn("Streak", width="small"),
             "Payout %":      st.column_config.NumberColumn("Payout", format="%.0f%%"),
             "Ann. Income":   st.column_config.NumberColumn("Income", format="$%.0f"),
             "Safety":        st.column_config.TextColumn("Safety", width="small"),
@@ -864,7 +865,7 @@ def _render_safety_growth(edf, active_strategy, strat_color):
                 "Safety":    r["safety"],
                 "Payout":    r["payout_ratio"],
                 "5Y Growth": r["growth_5y"],
-                "Streak":    r["consec_years"],
+                "Streak":    r["consec_years"] if r["consec_years"] > 0 else "N/A",
                 "Concern":   " · ".join(concerns),
             })
 
@@ -881,7 +882,7 @@ def _render_safety_growth(edf, active_strategy, strat_color):
             .format({
                 "Payout": "{:.0f}%",
                 "5Y Growth": "{:+.1f}%",
-                "Streak": "{:.0f}y",
+                "Streak": lambda v: f"{v:.0f}y" if isinstance(v, (int, float)) else str(v),
             })
         )
         st.dataframe(
@@ -893,7 +894,7 @@ def _render_safety_growth(edf, active_strategy, strat_color):
                 "Safety":    st.column_config.TextColumn("Safety", width="small"),
                 "Payout":    st.column_config.NumberColumn("Payout", format="%.0f%%"),
                 "5Y Growth": st.column_config.NumberColumn("5Y Gr", format="%+.1f%%"),
-                "Streak":    st.column_config.NumberColumn("Streak", format="%.0fy"),
+                "Streak":    st.column_config.TextColumn("Streak", width="small"),
                 "Concern":   st.column_config.TextColumn("Concern", width="large"),
             },
         )
