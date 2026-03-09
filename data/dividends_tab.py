@@ -419,17 +419,17 @@ def _render_income_dashboard(edf, tam_df, div_data, active_strategy, strat_color
         ))
         _yoc_layout = {**PLOTLY_DARK}
         _yoc_layout["margin"] = dict(l=10, r=60, t=30, b=10)
+        _yoc_layout["legend"] = dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+            font=dict(size=10, color="rgba(255,255,255,0.5)"),
+            bgcolor="rgba(0,0,0,0)",
+        )
         fig_yoc.update_layout(
             **_yoc_layout,
             barmode="group",
             height=max(300, len(yoc_df) * 28 + 80),
             xaxis={**_XAXIS, "ticksuffix": "%"},
             yaxis={**_YAXIS, "tickfont": dict(size=10)},
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-                font=dict(size=10, color="rgba(255,255,255,0.5)"),
-                bgcolor="rgba(0,0,0,0)",
-            ),
             showlegend=True,
         )
         st.plotly_chart(fig_yoc, use_container_width=True, config=PLOTLY_CONFIG)
