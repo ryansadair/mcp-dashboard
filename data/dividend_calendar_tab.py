@@ -150,29 +150,15 @@ def render_dividend_calendar():
     # Group by month
     valid["_month_key"] = valid["_announce_dt"].dt.to_period("M")
 
-    # ── KPI summary row ────────────────────────────────────────────────────
-    today = date.today()
-    next_30 = valid[valid["_announce_dt"].dt.date <= (pd.Timestamp(today) + pd.Timedelta(days=30)).date()]
-    notion_count = 0
-    if "source" in col_map:
-        notion_count = valid[col_map["source"]].astype(str).str.contains("Notion", case=False, na=False).sum()
-
-    k1, k2, k3, k4 = st.columns(4)
-    with k1:
-        st.metric("Total Tracked", f"{len(valid)}")
-    with k2:
-        st.metric("Next 30 Days", f"{len(next_30)}")
-    with k3:
-        st.metric("Notion-Verified", f"{notion_count}")
-    with k4:
-        # File freshness
-        if file_mtime:
-            updated = datetime.fromtimestamp(file_mtime)
-            st.metric("Last Updated", updated.strftime("%b %d"))
-        else:
-            st.metric("Last Updated", "—")
-
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    # ── Last updated note (shown after the section header in dividends_tab.py) ──
+    if file_mtime:
+        updated = datetime.fromtimestamp(file_mtime)
+        st.markdown(
+            f"<div style='font-size:11px;color:rgba(255,255,255,0.3);margin-bottom:12px;'>"
+            f"Last updated: {updated.strftime('%B %d, %Y')}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
     # ── Grouped HTML table ─────────────────────────────────────────────────
     html_parts = []
