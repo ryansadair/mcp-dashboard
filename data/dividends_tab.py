@@ -582,7 +582,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Wt%":            r["weight_pct"],
             "Curr Yield":     r["current_yield"],
             "Yield on Cost":  r["yield_on_cost"],
-            "Div Rate":       r["div_rate"],
+            "Div Amount":     r["div_rate"],
             "1Y Growth":      r["growth_1y"],
             "3Y Growth":      r["growth_3y"],
             "5Y Growth":      r["growth_5y"],
@@ -591,7 +591,6 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Began":          began_str,
             "Recessions":     r["recessions"] if r["consec_years"] > 0 else "N/A",
             "Payout %":       r["payout_ratio"],
-            "Ann. Income":    r["annual_income"],
             "Safety":         r["safety"],
             "Sector":         r["sector"],
         })
@@ -633,7 +632,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Wt%":            "{:.2f}%",
             "Curr Yield":     "{:.2f}%",
             "Yield on Cost":  "{:.2f}%",
-            "Div Rate":       "${:.2f}",
+            "Div Amount":     "${:.2f}",
             "1Y Growth":      "{:+.1f}%",
             "3Y Growth":      "{:+.1f}%",
             "5Y Growth":      "{:+.1f}%",
@@ -641,7 +640,6 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Streak":         lambda v: f"{v:.0f}y" if isinstance(v, (int, float)) else str(v),
             "Recessions":     lambda v: str(v) if isinstance(v, (int, float)) else str(v),
             "Payout %":       "{:.0f}%",
-            "Ann. Income":    "${:,.0f}",
         })
     )
 
@@ -654,7 +652,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Wt%":           st.column_config.NumberColumn("Wt%", format="%.2f%%"),
             "Curr Yield":    st.column_config.NumberColumn("Yield", format="%.2f%%"),
             "Yield on Cost": st.column_config.NumberColumn("YoC", format="%.2f%%"),
-            "Div Rate":      st.column_config.NumberColumn("Rate", format="$%.2f"),
+            "Div Amount":    st.column_config.NumberColumn("Div Amt", format="$%.2f"),
             "1Y Growth":     st.column_config.NumberColumn("1Y Gr", format="%+.1f%%"),
             "3Y Growth":     st.column_config.NumberColumn("3Y Gr", format="%+.1f%%"),
             "5Y Growth":     st.column_config.NumberColumn("5Y Gr", format="%+.1f%%"),
@@ -663,7 +661,6 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Began":         st.column_config.TextColumn("Began", width="small"),
             "Recessions":    st.column_config.TextColumn("Recess.", width="small"),
             "Payout %":      st.column_config.NumberColumn("Payout", format="%.0f%%"),
-            "Ann. Income":   st.column_config.NumberColumn("Income", format="$%.0f"),
             "Safety":        st.column_config.TextColumn("Safety", width="small"),
             "Sector":        st.column_config.TextColumn("Sector", width="medium"),
         },
@@ -720,125 +717,65 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
     # ── Dividend History (from Fish Historical sheet) ──────────────────────
     st.divider()
     st.markdown("**Dividend Per Share History** (from CCC Historical Data)")
-    st.markdown(
-        "<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
-        "Annual dividend per share going back up to 27 years - sourced from Fish/IREIT CCC spreadsheet"
-        "</div>",
-        unsafe_allow_html=True,
-    )
 
-    # Build history chart for top holdings by weight that have Fish data
-    holdings_with_history = edf[edf["div_history"].apply(lambda d: len(d) > 3)].head(12)
+    # Individual holding selector for detailed history
+    hist_tickers = edf[edf["div_history"].apply(lambda d: len(d) > 0)]["symbol"].tolist()
+    if hist_tickers:
+        selected_hist = st.selectbox(
+            "View individual dividend history",
+            options=["Select a ticker..."] + hist_tickers,
+            key="div_hist_select",
+        )
+        if selected_hist and selected_hist != "Select a ticker...":
+            row_data = edf[edf["symbol"] == selected_hist].iloc[0]
+            hist = row_data["div_history"]
+            if hist:
+                years_sorted = sorted(hist.keys())
+                amounts = [hist[y] for y in years_sorted]
 
-    if not holdings_with_history.empty:
-        # Find the common year range across all selected holdings
-        all_years = set()
-        for _, r in holdings_with_history.iterrows():
-            all_years.update(r["div_history"].keys())
-        year_range = sorted(all_years)
-
-        # Use last 15 years for readability
-        if len(year_range) > 15:
-            year_range = year_range[-15:]
-
-        fig_hist = go.Figure()
-        # Color cycle matching brand
-        hist_colors = [GREEN, GOLD, BLUE, "#6aad56", "#e8a838", "#8cc47a",
-                       "#3a7a5c", "#C9A84C", "#0a5a7a", "#569542", "#07415A", "#C45454"]
-
-        for idx, (_, r) in enumerate(holdings_with_history.iterrows()):
-            hist = r["div_history"]
-            years = [y for y in year_range if y in hist]
-            amounts = [hist[y] for y in years]
-            if years:
-                fig_hist.add_trace(go.Scatter(
-                    x=years, y=amounts,
-                    name=r["symbol"],
-                    mode="lines+markers",
-                    line=dict(color=hist_colors[idx % len(hist_colors)], width=2),
-                    marker=dict(size=4),
-                    hovertemplate="%{x}: $%{y:.2f}<extra>" + r["symbol"] + "</extra>",
+                # Bar chart
+                fig_single = go.Figure()
+                bar_colors = [GREEN if (i == 0 or amounts[i] >= amounts[i-1]) else RED
+                              for i in range(len(amounts))]
+                fig_single.add_trace(go.Bar(
+                    x=years_sorted, y=amounts,
+                    marker=dict(color=bar_colors, opacity=0.8),
+                    text=[f"${a:.2f}" for a in amounts],
+                    textposition="outside",
+                    textfont=dict(size=9, color="rgba(255,255,255,0.6)"),
                 ))
+                _single_layout = {**PLOTLY_DARK}
+                _single_layout["margin"] = dict(l=10, r=10, t=40, b=10)
+                fig_single.update_layout(
+                    **_single_layout,
+                    title=f"{selected_hist} - Annual Dividend Per Share",
+                    height=300,
+                    xaxis={**_XAXIS, "dtick": 1},
+                    yaxis={**_YAXIS, "tickprefix": "$"},
+                    showlegend=False,
+                )
+                st.plotly_chart(fig_single, use_container_width=True, config=PLOTLY_CONFIG)
 
-        _hist_layout = {**PLOTLY_DARK}
-        _hist_layout["margin"] = dict(l=10, r=10, t=30, b=10)
-        _hist_layout["legend"] = dict(
-            orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-            font=dict(size=10, color="rgba(255,255,255,0.5)"),
-            bgcolor="rgba(0,0,0,0)",
-        )
-        fig_hist.update_layout(
-            **_hist_layout,
-            height=400,
-            xaxis={**_XAXIS, "dtick": 1, "fixedrange": True},
-            yaxis={**_YAXIS, "tickprefix": "$", "fixedrange": True},
-            hovermode="x unified",
-            showlegend=True,
-        )
-        st.plotly_chart(fig_hist, use_container_width=True, config=PLOTLY_CONFIG_HOVER)
-
-        # Individual holding selector for detailed history
-        hist_tickers = edf[edf["div_history"].apply(lambda d: len(d) > 0)]["symbol"].tolist()
-        if hist_tickers:
-            selected_hist = st.selectbox(
-                "View individual dividend history",
-                options=["Select a ticker..."] + hist_tickers,
-                key="div_hist_select",
-            )
-            if selected_hist and selected_hist != "Select a ticker...":
-                row_data = edf[edf["symbol"] == selected_hist].iloc[0]
-                hist = row_data["div_history"]
-                if hist:
-                    years_sorted = sorted(hist.keys())
-                    amounts = [hist[y] for y in years_sorted]
-
-                    # Calculate YoY growth
-                    yoy_growth = []
-                    for i in range(1, len(amounts)):
+                # YoY growth table — newest to oldest, full height
+                if len(amounts) >= 2:
+                    st.markdown(f"**Year-over-Year Dividend Growth for {selected_hist}**")
+                    growth_data = []
+                    for i in range(len(amounts) - 1, 0, -1):
                         if amounts[i-1] > 0:
                             pct = ((amounts[i] - amounts[i-1]) / amounts[i-1]) * 100
-                            yoy_growth.append(round(pct, 1))
                         else:
-                            yoy_growth.append(0)
-
-                    fig_single = go.Figure()
-                    bar_colors = [GREEN if (i == 0 or amounts[i] >= amounts[i-1]) else RED
-                                  for i in range(len(amounts))]
-                    fig_single.add_trace(go.Bar(
-                        x=years_sorted, y=amounts,
-                        marker=dict(color=bar_colors, opacity=0.8),
-                        text=[f"${a:.2f}" for a in amounts],
-                        textposition="outside",
-                        textfont=dict(size=9, color="rgba(255,255,255,0.6)"),
-                    ))
-                    _single_layout = {**PLOTLY_DARK}
-                    _single_layout["margin"] = dict(l=10, r=10, t=40, b=10)
-                    fig_single.update_layout(
-                        **_single_layout,
-                        title=f"{selected_hist} - Annual Dividend Per Share",
-                        height=300,
-                        xaxis={**_XAXIS, "dtick": 1},
-                        yaxis={**_YAXIS, "tickprefix": "$"},
-                        showlegend=False,
+                            pct = 0
+                        growth_data.append({
+                            "Year": f"{years_sorted[i-1]}-{years_sorted[i]}",
+                            "From": f"${amounts[i-1]:.2f}",
+                            "To": f"${amounts[i]:.2f}",
+                            "Growth": f"{pct:+.1f}%",
+                        })
+                    st.dataframe(
+                        pd.DataFrame(growth_data),
+                        use_container_width=True, hide_index=True,
+                        height=(42 + len(growth_data) * 36),
                     )
-                    st.plotly_chart(fig_single, use_container_width=True, config=PLOTLY_CONFIG)
-
-                    # Show YoY growth below
-                    if yoy_growth:
-                        st.markdown(f"**Year-over-Year Dividend Growth for {selected_hist}**")
-                        growth_data = []
-                        for i, g in enumerate(yoy_growth):
-                            growth_data.append({
-                                "Year": f"{years_sorted[i]}-{years_sorted[i+1]}",
-                                "From": f"${amounts[i]:.2f}",
-                                "To": f"${amounts[i+1]:.2f}",
-                                "Growth": f"{g:+.1f}%",
-                            })
-                        st.dataframe(
-                            pd.DataFrame(growth_data),
-                            use_container_width=True, hide_index=True,
-                            height=min(400, 42 + len(growth_data) * 36),
-                        )
     else:
         st.info("No dividend history data available. Ensure the Fish/IREIT CCC spreadsheet is in the data folder.")
 
