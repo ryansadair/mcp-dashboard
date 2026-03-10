@@ -555,7 +555,7 @@ else:
 # 3. DIVIDEND HISTORY
 # ══════════════════════════════════════════════════════════════════════════
 st.markdown("---")
-st.markdown("#### 💰 Dividend History")
+st.markdown(f"#### 💰 Dividend History — {ticker_input}")
 
 # ── Try Fish CCC data first (authoritative, up to 27 years) ──────────────
 fish_data = {}
@@ -571,7 +571,6 @@ annual_divs = None
 data_source = ""
 
 if fish_hist and len(fish_hist) >= 2:
-    # Use Fish Historical data (sorted by year)
     years_sorted = sorted(fish_hist.keys())
     annual_divs = pd.DataFrame({
         "Year": years_sorted,
@@ -580,7 +579,6 @@ if fish_hist and len(fish_hist) >= 2:
     data_source = "Fish/IREIT CCC"
 
 elif not divs.empty and len(divs) >= 2:
-    # Fallback to Supabase/yfinance dividend data
     div_df = divs.reset_index()
     div_df.columns = ["date", "amount"]
     div_df["year"] = pd.to_datetime(div_df["date"]).dt.year
@@ -589,109 +587,88 @@ elif not divs.empty and len(divs) >= 2:
     data_source = "Supabase/yfinance"
 
 if annual_divs is not None and len(annual_divs) >= 2:
-    col_div_chart, col_div_stats = st.columns([2, 1])
 
-    with col_div_chart:
-        # Annual dividend bar chart
-        colors = [GREEN if i == len(annual_divs) - 1 else BLUE for i in range(len(annual_divs))]
-        fig_div = go.Figure()
-        fig_div.add_trace(go.Bar(
-            x=annual_divs["Year"],
-            y=annual_divs["Annual Dividend"],
-            marker_color=colors,
-            text=[f"${d:.2f}" for d in annual_divs["Annual Dividend"]],
-            textposition="outside",
-            textfont=dict(size=10, color="rgba(255,255,255,0.5)"),
-        ))
-        fig_div.update_layout(
-            **PLOTLY_DARK,
-            height=300,
-            title="Annual Dividends Per Share",
-            yaxis_title="$/Share",
-            showlegend=False,
-        )
-        st.plotly_chart(fig_div, use_container_width=True, config=PLOTLY_CONFIG)
+    # ── KPI Cards — two horizontal rows of 4 ─────────────────────────────
+    if fish_metrics:
+        div_amt = fish_metrics.get("div_amount", 0)
+        dgr_1y = fish_metrics.get("dgr_1y", 0)
+        dgr_3y = fish_metrics.get("dgr_3y", 0)
+        dgr_5y = fish_metrics.get("dgr_5y", 0)
+        dgr_10y = fish_metrics.get("dgr_10y", 0)
+        consec = fish_data.get("years", 0)
+        streak_began = fish_metrics.get("streak_began", None)
+        recessions = fish_metrics.get("recessions", 0)
 
-    with col_div_stats:
-        # Use Fish metrics if available (more reliable than computing from history)
-        if fish_metrics:
-            div_amt = fish_metrics.get("div_amount", 0)
-            if div_amt:
-                st.metric("Latest Annual Div", f"${div_amt:.2f}")
+        # Row 1
+        k1, k2, k3, k4 = st.columns(4)
+        with k1: st.metric("Latest Annual Div", f"${div_amt:.2f}" if div_amt else "—")
+        with k2: st.metric("1Y Growth", f"{dgr_1y:+.1f}%" if dgr_1y else "—")
+        with k3: st.metric("3Y CAGR", f"{dgr_3y:+.1f}%" if dgr_3y else "—")
+        with k4: st.metric("5Y CAGR", f"{dgr_5y:+.1f}%" if dgr_5y else "—")
 
-            dgr_1y = fish_metrics.get("dgr_1y", 0)
-            if dgr_1y:
-                st.metric("YoY Growth", f"{dgr_1y:+.1f}%")
-
-            dgr_3y = fish_metrics.get("dgr_3y", 0)
-            if dgr_3y:
-                st.metric("3Y CAGR", f"{dgr_3y:+.1f}%")
-
-            dgr_5y = fish_metrics.get("dgr_5y", 0)
-            if dgr_5y:
-                st.metric("5Y CAGR", f"{dgr_5y:+.1f}%")
-
-            consec = fish_data.get("years", 0)
-            if consec > 0:
-                st.metric("Consec. Increases", f"{consec} yrs")
-
-            streak_began = fish_metrics.get("streak_began", None)
-            if streak_began:
-                try:
-                    st.metric("Streak Began", str(int(float(str(streak_began)))))
-                except (ValueError, TypeError):
-                    pass
-
-            recessions = fish_metrics.get("recessions", 0)
-            if recessions > 0:
-                st.metric("Recessions Survived", str(recessions))
-
-        else:
-            # Fallback: compute stats from annual_divs
-            current_year = datetime.now().year
-            completed = annual_divs[annual_divs["Year"] < current_year]
-
-            if len(completed) >= 2:
-                latest = completed.iloc[-1]["Annual Dividend"]
-                prev = completed.iloc[-2]["Annual Dividend"]
-                yoy = ((latest / prev) - 1) * 100 if prev > 0 else 0
-                st.metric("Latest Annual Div", f"${latest:.2f}")
-                st.metric("YoY Growth", f"{yoy:+.1f}%")
-
-            if len(completed) >= 4:
-                y3 = completed.iloc[-4]["Annual Dividend"]
-                cagr3 = ((completed.iloc[-1]["Annual Dividend"] / y3) ** (1/3) - 1) * 100 if y3 > 0 else 0
-                st.metric("3Y CAGR", f"{cagr3:+.1f}%")
-
-            if len(completed) >= 6:
-                y5 = completed.iloc[-6]["Annual Dividend"]
-                cagr5 = ((completed.iloc[-1]["Annual Dividend"] / y5) ** (1/5) - 1) * 100 if y5 > 0 else 0
-                st.metric("5Y CAGR", f"{cagr5:+.1f}%")
-
-            if len(completed) >= 2:
-                consec = 0
-                for i in range(len(completed) - 1, 0, -1):
-                    if completed.iloc[i]["Annual Dividend"] > completed.iloc[i-1]["Annual Dividend"] * 0.99:
-                        consec += 1
-                    else:
-                        break
-                st.metric("Consec. Increases", f"{consec} yrs")
-
-        # Ex-date (always from Supabase/yfinance info)
-        ex_str = ""
-        ex_div = info.get("exDividendDate")
-        if ex_div and isinstance(ex_div, (int, float)):
+        # Row 2
+        k5, k6, k7, k8 = st.columns(4)
+        with k5: st.metric("10Y CAGR", f"{dgr_10y:+.1f}%" if dgr_10y else "—")
+        with k6: st.metric("Consec. Increases", f"{consec} yrs" if consec > 0 else "—")
+        with k7:
             try:
-                ex_str = datetime.fromtimestamp(ex_div).strftime("%b %d, %Y")
-            except Exception:
-                pass
-        elif ex_div and isinstance(ex_div, str) and ex_div:
-            try:
-                ex_str = datetime.strptime(ex_div, "%Y-%m-%d").strftime("%b %d, %Y")
-            except Exception:
-                ex_str = ex_div
-        if ex_str:
-            st.metric("Next Ex-Date", ex_str)
+                began_str = str(int(float(str(streak_began)))) if streak_began and str(streak_began).strip() not in ("", "0", "None", "nan") else "—"
+            except (ValueError, TypeError):
+                began_str = "—"
+            st.metric("Streak Began", began_str)
+        with k8: st.metric("Recessions Survived", str(recessions) if recessions > 0 else "—")
+
+    else:
+        # Fallback: compute what we can from annual_divs
+        current_year = datetime.now().year
+        completed = annual_divs[annual_divs["Year"] < current_year]
+
+        latest_val = completed.iloc[-1]["Annual Dividend"] if len(completed) >= 1 else 0
+        yoy_val = ((completed.iloc[-1]["Annual Dividend"] / completed.iloc[-2]["Annual Dividend"]) - 1) * 100 if len(completed) >= 2 and completed.iloc[-2]["Annual Dividend"] > 0 else 0
+        cagr3_val = ((completed.iloc[-1]["Annual Dividend"] / completed.iloc[-4]["Annual Dividend"]) ** (1/3) - 1) * 100 if len(completed) >= 4 and completed.iloc[-4]["Annual Dividend"] > 0 else 0
+        cagr5_val = ((completed.iloc[-1]["Annual Dividend"] / completed.iloc[-6]["Annual Dividend"]) ** (1/5) - 1) * 100 if len(completed) >= 6 and completed.iloc[-6]["Annual Dividend"] > 0 else 0
+
+        consec = 0
+        if len(completed) >= 2:
+            for i in range(len(completed) - 1, 0, -1):
+                if completed.iloc[i]["Annual Dividend"] > completed.iloc[i-1]["Annual Dividend"] * 0.99:
+                    consec += 1
+                else:
+                    break
+
+        k1, k2, k3, k4 = st.columns(4)
+        with k1: st.metric("Latest Annual Div", f"${latest_val:.2f}" if latest_val else "—")
+        with k2: st.metric("1Y Growth", f"{yoy_val:+.1f}%" if yoy_val else "—")
+        with k3: st.metric("3Y CAGR", f"{cagr3_val:+.1f}%" if cagr3_val else "—")
+        with k4: st.metric("5Y CAGR", f"{cagr5_val:+.1f}%" if cagr5_val else "—")
+
+        k5, k6, k7, k8 = st.columns(4)
+        with k5: st.metric("10Y CAGR", "—")
+        with k6: st.metric("Consec. Increases", f"{consec} yrs" if consec > 0 else "—")
+        with k7: st.metric("Streak Began", "—")
+        with k8: st.metric("Recessions Survived", "—")
+
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    # ── Annual Dividend Bar Chart ─────────────────────────────────────────
+    colors = [GREEN if i == len(annual_divs) - 1 else BLUE for i in range(len(annual_divs))]
+    fig_div = go.Figure()
+    fig_div.add_trace(go.Bar(
+        x=annual_divs["Year"],
+        y=annual_divs["Annual Dividend"],
+        marker_color=colors,
+        text=[f"${d:.2f}" for d in annual_divs["Annual Dividend"]],
+        textposition="outside",
+        textfont=dict(size=10, color="rgba(255,255,255,0.5)"),
+    ))
+    fig_div.update_layout(
+        **PLOTLY_DARK,
+        height=320,
+        title="Annual Dividends Per Share",
+        yaxis_title="$/Share",
+        showlegend=False,
+    )
+    st.plotly_chart(fig_div, use_container_width=True, config=PLOTLY_CONFIG)
 
     # ── Year-over-Year Growth Table (newest to oldest) ────────────────────
     if len(annual_divs) >= 3:
