@@ -511,8 +511,10 @@ with tab_holdings:
                     "Baseline": nm.get("div_baseline") if nm.get("div_baseline") is not None else "—",
                     "Style": nm.get("style_bucket", "—") or "—",
                     "P/E": round(mkt.get("pe_ratio", 0), 1) if mkt.get("pe_ratio") else "—",
-                    "52W High": mkt.get("52w_high", 0),
-                    "52W Low":  mkt.get("52w_low", 0),
+                    "Unit Cost": round(float(h.get("unit_cost", 0) or 0), 2),
+                    "% From 52W Hi": round(
+                        ((mkt.get("price", 0) - mkt.get("52w_high", 0)) / mkt.get("52w_high", 1)) * 100, 1
+                    ) if mkt.get("52w_high") else 0,
                 })
             display_df = pd.DataFrame(rows)
 
@@ -551,14 +553,16 @@ with tab_holdings:
                 except (ValueError, TypeError):
                     return ""
 
-            styled = filtered.style.map(_color_1d, subset=["1D Chg %"]).format({
+            styled = filtered.style.map(_color_1d, subset=["1D Chg %"]).map(
+                _color_1d, subset=["% From 52W Hi"]
+            ).format({
                 "Weight %": "{:.2f}",
                 "Price": "${:.2f}",
                 "1D Chg %": "{:+.2f}%",
                 "Yield on Cost %": "{:.2f}%",
                 "Div Yield %": "{:.2f}%",
-                "52W High": "${:.2f}",
-                "52W Low": "${:.2f}",
+                "Unit Cost": "${:.2f}",
+                "% From 52W Hi": "{:+.1f}%",
             })
 
             st.dataframe(
@@ -576,8 +580,8 @@ with tab_holdings:
                     "Baseline": st.column_config.TextColumn("Baseline", width="small"),
                     "Style": st.column_config.TextColumn("Style", width="small"),
                     "P/E": st.column_config.NumberColumn("P/E"),
-                    "52W High": st.column_config.NumberColumn("52W Hi", format="$%.2f"),
-                    "52W Low": st.column_config.NumberColumn("52W Lo", format="$%.2f"),
+                    "Unit Cost": st.column_config.NumberColumn("Unit Cost", format="$%.2f"),
+                    "% From 52W Hi": st.column_config.NumberColumn("% From Hi", format="%+.1f%%"),
                 },
             )
 
