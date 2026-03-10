@@ -1,28 +1,31 @@
 """
-Martin Capital Partners -- Dividend Streak Lookup
+Martin Capital Partners -- Dividend Streak & CCC Data Lookup
 data/dividend_streaks.py
 
-Reads consecutive dividend increase years from the David Fish / IREIT
-CCC spreadsheet (Fish_*.xlsx or CCC_*.xlsx).
+Reads comprehensive dividend data from the David Fish / IREIT CCC spreadsheet
+(Fish_*.xlsx). Ryan downloads this monthly from ireitinvestor.com.
 
-Ryan downloads this monthly from https://www.ireitinvestor.com/dividend-champions/
-and drops it in the data/ folder. The parser finds the newest Fish*.xlsx file
-and reads the "All CCC" sheet, matching tickers by column B (Symbol) and
-extracting years from column E (Yrs).
+Data extracted:
+  "All CCC" sheet:
+    - Consecutive years of increases (col 4)
+    - DGR 1/3/5/10-year (cols 18-21) -- replaces unreliable yfinance growth rates
+    - EPS Payout Ratio (col 25) -- replaces unreliable yfinance payout ratio
+    - Chowder Rule (col 41) -- yield + 5Y DGR
+    - Streak began year (col 56)
+    - Recessions survived (col 57)
 
-ETFs and non-US tickers not in the CCC list get 0.
+  "Historical" sheet:
+    - Annual dividend per share going back to 1999 (cols 2-30, years in row 5)
+    - Year-over-year pct increases (cols 32+)
 """
 
 import os
 import glob
 import streamlit as st
-import pandas as pd
 
-# -- Paths to search for the Fish CCC file --
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(_THIS_DIR)
 
-# Glob patterns to find the Fish file (newest wins)
 FISH_PATTERNS = [
     os.path.join(_THIS_DIR, "Fish_*.xlsx"),
     os.path.join(_THIS_DIR, "CCC_*.xlsx"),
@@ -33,28 +36,18 @@ FISH_PATTERNS = [
     "data/CCC_*.xlsx",
 ]
 
-# Also check for the manually-curated fallback
-MANUAL_PATHS = [
-    os.path.join(_THIS_DIR, "Dividend_Streaks.xlsx"),
-    os.path.join(_PROJECT_ROOT, "data", "Dividend_Streaks.xlsx"),
-    "data/Dividend_Streaks.xlsx",
-]
-
 
 def _find_newest_fish():
-    """Find the newest Fish/CCC xlsx file by modification time."""
     candidates = []
     for pattern in FISH_PATTERNS:
         candidates.extend(glob.glob(pattern))
     if not candidates:
         return None
-    # Sort by modification time, newest first
     candidates.sort(key=lambda p: os.path.getmtime(p), reverse=True)
     return candidates[0]
 
 
 def _classify_tier(years):
-    """Classify consecutive years into CCC tier."""
     if years >= 50:
         return "King"
     elif years >= 25:
@@ -66,91 +59,128 @@ def _classify_tier(years):
     return "--"
 
 
+def _sf(val):
+    """Safe float conversion."""
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return 0.0
+
+
 @st.cache_data(ttl=300, show_spinner=False)
-def _load_streaks():
+def _load_fish_data():
     """
-    Load streak data. Priority:
-    1. Fish/CCC spreadsheet (All CCC sheet, col B=Symbol, col E=Yrs)
-    2. Manual Dividend_Streaks.xlsx fallback
+    Load all CCC data from the Fish spreadsheet.
+    Returns dict: {
+        "streaks": {ticker: (years, tier)},
+        "metrics": {ticker: {dgr_1y, dgr_3y, dgr_5y, dgr_10y, payout_ratio,
+                             chowder, streak_began, recessions_survived}},
+        "history": {ticker: {year: dividend_per_share}},
+    }
     """
-    result = {}
+    result = {"streaks": {}, "metrics": {}, "history": {}}
 
-    # -- 1. Try Fish CCC file --
     fish_path = _find_newest_fish()
-    if fish_path:
-        try:
-            import openpyxl
-            wb = openpyxl.load_workbook(fish_path, read_only=True, data_only=True)
+    if not fish_path:
+        return result
 
-            # Try "All CCC" sheet first, then Champions/Contenders/Challengers
-            sheets_to_try = ["All CCC", "Champions", "Contenders", "Challengers"]
-            for sheet_name in sheets_to_try:
-                if sheet_name not in wb.sheetnames:
-                    continue
-                ws = wb[sheet_name]
-                rows = list(ws.iter_rows(values_only=True))
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(fish_path, read_only=True, data_only=True)
+    except Exception:
+        return result
 
-                # Find the header row (look for "Symbol" in column B area)
-                header_row = None
-                for i, row in enumerate(rows[:10]):
-                    if row and len(row) > 4:
-                        # Check if this row has "Symbol" or "Yrs" as headers
-                        row_strs = [str(v).strip().lower() if v else "" for v in row[:10]]
-                        if "symbol" in row_strs or "yrs" in row_strs:
-                            header_row = i
-                            break
+    # ── Parse "All CCC" sheet ──────────────────────────────────────────
+    if "All CCC" in wb.sheetnames:
+        ws = wb["All CCC"]
+        rows = list(ws.iter_rows(values_only=True))
 
-                if header_row is None:
-                    # Default: row 5 (0-indexed) based on known Fish format
-                    header_row = 5
-
-                # Data starts after header row
-                for row in rows[header_row + 1:]:
-                    if row and len(row) > 4:
-                        symbol = str(row[1]).strip() if row[1] else ""
-                        yrs_raw = row[4]
-                        if symbol and yrs_raw is not None:
-                            try:
-                                years = int(float(str(yrs_raw)))
-                                if years > 0 and symbol not in result:
-                                    result[symbol.upper()] = (years, _classify_tier(years))
-                            except (ValueError, TypeError):
-                                pass
-
-                # If we got data from "All CCC", no need to check individual sheets
-                if sheet_name == "All CCC" and result:
+        # Find header row (row with "Symbol" in it)
+        header_row = 5  # default for known Fish format
+        for i, row in enumerate(rows[:10]):
+            if row and len(row) > 4:
+                row_strs = [str(v).strip().lower() if v else "" for v in row[:10]]
+                if "symbol" in row_strs:
+                    header_row = i
                     break
 
-            wb.close()
+        for row in rows[header_row + 1:]:
+            if not row or len(row) < 5:
+                continue
+            symbol = str(row[1]).strip() if row[1] else ""
+            if not symbol:
+                continue
 
-            if result:
-                return result
-        except Exception:
-            pass
+            years = int(_sf(row[4])) if row[4] else 0
+            if years <= 0:
+                continue
 
-    # -- 2. Fallback: Dividend_Streaks.xlsx (manual file) --
-    for p in MANUAL_PATHS:
-        if os.path.exists(p):
-            try:
-                df = pd.read_excel(p, sheet_name="Dividend Streaks")
-                df.columns = [c.strip() for c in df.columns]
-                for _, row in df.iterrows():
-                    ticker = str(row.get("Ticker", "")).strip().upper()
-                    years = int(row.get("Consecutive Years", 0) or 0)
-                    tier = str(row.get("Tier", "--")).strip()
-                    if ticker and ticker not in result:
-                        result[ticker] = (years, tier)
-                return result
-            except Exception:
-                pass
+            sym = symbol.upper()
+            result["streaks"][sym] = (years, _classify_tier(years))
 
+            result["metrics"][sym] = {
+                "dgr_1y":       round(_sf(row[18]), 1) if len(row) > 18 else 0,
+                "dgr_3y":       round(_sf(row[19]), 1) if len(row) > 19 else 0,
+                "dgr_5y":       round(_sf(row[20]), 1) if len(row) > 20 else 0,
+                "dgr_10y":      round(_sf(row[21]), 1) if len(row) > 21 else 0,
+                "payout_ratio": round(_sf(row[25]), 1) if len(row) > 25 else 0,
+                "chowder":      round(_sf(row[41]), 1) if len(row) > 41 else 0,
+                "streak_began": row[56] if len(row) > 56 and row[56] else None,
+                "recessions":   int(_sf(row[57])) if len(row) > 57 else 0,
+            }
+
+    # ── Parse "Historical" sheet ───────────────────────────────────────
+    if "Historical" in wb.sheetnames:
+        ws_hist = wb["Historical"]
+        hist_rows = list(ws_hist.iter_rows(values_only=True))
+
+        # Row 5 has year headers: col 0=Name, col 1=Symbol, cols 2-30 = years
+        if len(hist_rows) > 5:
+            year_headers = hist_rows[5]
+
+            # Build year map: col_index -> year (int)
+            year_map = {}
+            for j in range(2, min(31, len(year_headers))):
+                yr = year_headers[j]
+                if yr is not None:
+                    yr_str = str(yr).strip()
+                    # Skip non-year columns like "#" or "RegDivs"
+                    try:
+                        yr_int = int(float(yr_str))
+                        if 1990 <= yr_int <= 2030:
+                            year_map[j] = yr_int
+                    except (ValueError, TypeError):
+                        pass
+
+            # Parse data rows (start after header row 5)
+            for row in hist_rows[6:]:
+                if not row or len(row) < 3:
+                    continue
+                symbol = str(row[1]).strip() if row[1] else ""
+                if not symbol:
+                    continue
+
+                sym = symbol.upper()
+                div_history = {}
+                for col_idx, year in year_map.items():
+                    if col_idx < len(row) and row[col_idx] is not None:
+                        val = _sf(row[col_idx])
+                        if val > 0:
+                            div_history[year] = round(val, 4)
+
+                if div_history:
+                    result["history"][sym] = div_history
+
+    wb.close()
     return result
 
 
+# ── Public API ─────────────────────────────────────────────────────────
+
 def get_streak(ticker):
     """Get (years, tier) for a ticker. Returns (0, "--") if not found."""
-    streaks = _load_streaks()
-    return streaks.get(ticker.upper(), (0, "--"))
+    data = _load_fish_data()
+    return data["streaks"].get(ticker.upper(), (0, "--"))
 
 
 def get_streak_years(ticker):
@@ -165,13 +195,51 @@ def get_streak_tier(ticker):
     return tier
 
 
+def get_fish_metrics(ticker):
+    """
+    Get all CCC metrics for a ticker.
+    Returns dict with keys: dgr_1y, dgr_3y, dgr_5y, dgr_10y,
+    payout_ratio, chowder, streak_began, recessions
+    Returns empty dict if not found.
+    """
+    data = _load_fish_data()
+    return data["metrics"].get(ticker.upper(), {})
+
+
+def get_dividend_history(ticker):
+    """
+    Get annual dividend-per-share history from the Historical sheet.
+    Returns dict: {year: amount} sorted by year, e.g. {1999: 0.545, 2000: 0.62, ...}
+    Returns empty dict if not found.
+    """
+    data = _load_fish_data()
+    hist = data["history"].get(ticker.upper(), {})
+    return dict(sorted(hist.items()))
+
+
+def get_all_fish_data(ticker):
+    """
+    Get everything for a ticker: streak, metrics, and history.
+    Returns dict with keys: years, tier, metrics (dict), history (dict)
+    """
+    data = _load_fish_data()
+    sym = ticker.upper()
+    years, tier = data["streaks"].get(sym, (0, "--"))
+    return {
+        "years": years,
+        "tier": tier,
+        "metrics": data["metrics"].get(sym, {}),
+        "history": data["history"].get(sym, {}),
+    }
+
+
 def get_all_streaks_for_tickers(tickers):
     """Get streak data for a list of tickers."""
-    streaks = _load_streaks()
+    data = _load_fish_data()
     return {
         t: {
-            "years": streaks.get(t.upper(), (0, "--"))[0],
-            "tier": streaks.get(t.upper(), (0, "--"))[1],
+            "years": data["streaks"].get(t.upper(), (0, "--"))[0],
+            "tier": data["streaks"].get(t.upper(), (0, "--"))[1],
         }
         for t in tickers
     }

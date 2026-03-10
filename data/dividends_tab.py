@@ -42,9 +42,9 @@ try:
 except ImportError:
     _CALENDAR_AVAILABLE = False
 
-# Authoritative streak data (CCC list-sourced)
+# Authoritative CCC data (Fish/IREIT spreadsheet)
 try:
-    from data.dividend_streaks import get_streak
+    from data.dividend_streaks import get_streak, get_fish_metrics, get_dividend_history
     _STREAKS_AVAILABLE = True
 except ImportError:
     _STREAKS_AVAILABLE = False
@@ -60,6 +60,10 @@ PLOTLY_DARK = dict(
 PLOTLY_CONFIG = {
     "displayModeBar": False, "scrollZoom": False,
     "doubleClick": False, "showTips": False, "staticPlot": True,
+}
+PLOTLY_CONFIG_HOVER = {
+    "displayModeBar": False, "scrollZoom": False,
+    "doubleClick": False, "showTips": False, "staticPlot": False,
 }
 _XAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10))
 _YAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10))
@@ -106,21 +110,38 @@ def _build_enriched_df(tam_df, price_data, div_data):
         # Quantity from Tamarac
         qty = float(h.get("quantity", 0) or 0)
 
-        # Dividend data from Supabase/yfinance
+        # Dividend data: prefer Fish CCC spreadsheet, fallback to Supabase/yfinance
         div_yield    = dd.get("dividend_yield", 0) or 0
         div_rate     = dd.get("dividend_rate", 0) or 0
-        payout_ratio = dd.get("payout_ratio", 0) or 0
-        growth_1y    = dd.get("div_growth_1y", 0) or 0
-        growth_3y    = dd.get("div_growth_3y", 0) or 0
-        growth_5y    = dd.get("div_growth_5y", 0) or 0
         ex_date      = dd.get("ex_dividend_date", "")
 
-        # Consecutive years: prefer CCC list lookup, fallback to yfinance
+        # Fish CCC data (authoritative for growth rates, payout, streaks)
+        fish = {}
+        div_hist = {}
+        if _STREAKS_AVAILABLE:
+            fish = get_fish_metrics(sym)
+            div_hist = get_dividend_history(sym)
+
+        # Growth rates: Fish first, yfinance fallback
+        growth_1y  = fish.get("dgr_1y", 0) or (dd.get("div_growth_1y", 0) or 0)
+        growth_3y  = fish.get("dgr_3y", 0) or (dd.get("div_growth_3y", 0) or 0)
+        growth_5y  = fish.get("dgr_5y", 0) or (dd.get("div_growth_5y", 0) or 0)
+        growth_10y = fish.get("dgr_10y", 0)
+
+        # Payout ratio: Fish first, yfinance fallback
+        payout_ratio = fish.get("payout_ratio", 0) or (dd.get("payout_ratio", 0) or 0)
+
+        # Consecutive years: Fish first, yfinance fallback
         if _STREAKS_AVAILABLE:
             ccc_years, _ = get_streak(sym)
             consec_years = ccc_years if ccc_years > 0 else (dd.get("consecutive_years", 0) or 0)
         else:
             consec_years = dd.get("consecutive_years", 0) or 0
+
+        # New Fish-only fields
+        chowder        = fish.get("chowder", 0)
+        streak_began   = fish.get("streak_began", None)
+        recessions     = fish.get("recessions", 0)
 
         # Market data
         price  = mkt.get("price", 0) or 0
@@ -138,7 +159,7 @@ def _build_enriched_df(tam_df, price_data, div_data):
             "cost_basis":    cost_basis,
             "sector":        sector,
             "chg_1d":        chg_1d,
-            # Dividend metrics
+            # Dividend metrics (Fish CCC preferred, yfinance fallback)
             "yield_on_cost": round(yoc_pct, 2),
             "current_yield": round(cy_pct, 2),
             "div_yield":     round(div_yield, 2),
@@ -149,7 +170,13 @@ def _build_enriched_df(tam_df, price_data, div_data):
             "growth_1y":     round(growth_1y, 1),
             "growth_3y":     round(growth_3y, 1),
             "growth_5y":     round(growth_5y, 1),
+            "growth_10y":    round(growth_10y, 1),
             "ex_date":       ex_date,
+            # Fish-only fields
+            "chowder":       round(chowder, 1),
+            "streak_began":  streak_began,
+            "recessions":    int(recessions),
+            "div_history":   div_hist,
         })
 
     return pd.DataFrame(rows).sort_values("weight", ascending=False).reset_index(drop=True)
@@ -544,6 +571,8 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
     # Build display columns
     detail_rows = []
     for _, r in edf.iterrows():
+        began = r.get("streak_began", None)
+        began_str = str(int(began)) if began and began != 0 else "N/A"
         detail_rows.append({
             "Symbol":         r["symbol"],
             "Company":        r["description"],
@@ -554,7 +583,10 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "1Y Growth":      r["growth_1y"],
             "3Y Growth":      r["growth_3y"],
             "5Y Growth":      r["growth_5y"],
+            "10Y Growth":     r["growth_10y"],
             "Streak":         r["consec_years"] if r["consec_years"] > 0 else "N/A",
+            "Began":          began_str,
+            "Recessions":     r["recessions"] if r["consec_years"] > 0 else "N/A",
             "Payout %":       r["payout_ratio"],
             "Ann. Income":    r["annual_income"],
             "Safety":         r["safety"],
@@ -590,7 +622,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
 
     styled = (
         detail_df.style
-        .map(_color_growth, subset=["1Y Growth", "3Y Growth", "5Y Growth"])
+        .map(_color_growth, subset=["1Y Growth", "3Y Growth", "5Y Growth", "10Y Growth"])
         .map(_color_payout, subset=["Payout %"])
         .map(_color_yield, subset=["Curr Yield", "Yield on Cost"])
         .map(_color_safety, subset=["Safety"])
@@ -602,7 +634,9 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "1Y Growth":      "{:+.1f}%",
             "3Y Growth":      "{:+.1f}%",
             "5Y Growth":      "{:+.1f}%",
+            "10Y Growth":     lambda v: f"{v:+.1f}%" if isinstance(v, (int, float)) and v != 0 else "N/A",
             "Streak":         lambda v: f"{v:.0f}y" if isinstance(v, (int, float)) else str(v),
+            "Recessions":     lambda v: str(v) if isinstance(v, (int, float)) else str(v),
             "Payout %":       "{:.0f}%",
             "Ann. Income":    "${:,.0f}",
         })
@@ -621,7 +655,10 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "1Y Growth":     st.column_config.NumberColumn("1Y Gr", format="%+.1f%%"),
             "3Y Growth":     st.column_config.NumberColumn("3Y Gr", format="%+.1f%%"),
             "5Y Growth":     st.column_config.NumberColumn("5Y Gr", format="%+.1f%%"),
+            "10Y Growth":    st.column_config.TextColumn("10Y Gr", width="small"),
             "Streak":        st.column_config.TextColumn("Streak", width="small"),
+            "Began":         st.column_config.TextColumn("Began", width="small"),
+            "Recessions":    st.column_config.TextColumn("Recess.", width="small"),
             "Payout %":      st.column_config.NumberColumn("Payout", format="%.0f%%"),
             "Ann. Income":   st.column_config.NumberColumn("Income", format="$%.0f"),
             "Safety":        st.column_config.TextColumn("Safety", width="small"),
@@ -676,6 +713,131 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             showlegend=False,
         )
         st.plotly_chart(fig4, use_container_width=True, config=PLOTLY_CONFIG)
+
+    # ── Dividend History (from Fish Historical sheet) ──────────────────────
+    st.divider()
+    st.markdown("**Dividend Per Share History** (from CCC Historical Data)")
+    st.markdown(
+        "<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
+        "Annual dividend per share going back up to 27 years - sourced from Fish/IREIT CCC spreadsheet"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # Build history chart for top holdings by weight that have Fish data
+    holdings_with_history = edf[edf["div_history"].apply(lambda d: len(d) > 3)].head(12)
+
+    if not holdings_with_history.empty:
+        # Find the common year range across all selected holdings
+        all_years = set()
+        for _, r in holdings_with_history.iterrows():
+            all_years.update(r["div_history"].keys())
+        year_range = sorted(all_years)
+
+        # Use last 15 years for readability
+        if len(year_range) > 15:
+            year_range = year_range[-15:]
+
+        fig_hist = go.Figure()
+        # Color cycle matching brand
+        hist_colors = [GREEN, GOLD, BLUE, "#6aad56", "#e8a838", "#8cc47a",
+                       "#3a7a5c", "#C9A84C", "#0a5a7a", "#569542", "#07415A", "#C45454"]
+
+        for idx, (_, r) in enumerate(holdings_with_history.iterrows()):
+            hist = r["div_history"]
+            years = [y for y in year_range if y in hist]
+            amounts = [hist[y] for y in years]
+            if years:
+                fig_hist.add_trace(go.Scatter(
+                    x=years, y=amounts,
+                    name=r["symbol"],
+                    mode="lines+markers",
+                    line=dict(color=hist_colors[idx % len(hist_colors)], width=2),
+                    marker=dict(size=4),
+                    hovertemplate="%{x}: $%{y:.2f}<extra>" + r["symbol"] + "</extra>",
+                ))
+
+        _hist_layout = {**PLOTLY_DARK}
+        _hist_layout["margin"] = dict(l=10, r=10, t=30, b=10)
+        _hist_layout["legend"] = dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+            font=dict(size=10, color="rgba(255,255,255,0.5)"),
+            bgcolor="rgba(0,0,0,0)",
+        )
+        fig_hist.update_layout(
+            **_hist_layout,
+            height=400,
+            xaxis={**_XAXIS, "dtick": 1, "fixedrange": True},
+            yaxis={**_YAXIS, "tickprefix": "$", "fixedrange": True},
+            hovermode="x unified",
+            showlegend=True,
+        )
+        st.plotly_chart(fig_hist, use_container_width=True, config=PLOTLY_CONFIG_HOVER)
+
+        # Individual holding selector for detailed history
+        hist_tickers = edf[edf["div_history"].apply(lambda d: len(d) > 0)]["symbol"].tolist()
+        if hist_tickers:
+            selected_hist = st.selectbox(
+                "View individual dividend history",
+                options=["Select a ticker..."] + hist_tickers,
+                key="div_hist_select",
+            )
+            if selected_hist and selected_hist != "Select a ticker...":
+                row_data = edf[edf["symbol"] == selected_hist].iloc[0]
+                hist = row_data["div_history"]
+                if hist:
+                    years_sorted = sorted(hist.keys())
+                    amounts = [hist[y] for y in years_sorted]
+
+                    # Calculate YoY growth
+                    yoy_growth = []
+                    for i in range(1, len(amounts)):
+                        if amounts[i-1] > 0:
+                            pct = ((amounts[i] - amounts[i-1]) / amounts[i-1]) * 100
+                            yoy_growth.append(round(pct, 1))
+                        else:
+                            yoy_growth.append(0)
+
+                    fig_single = go.Figure()
+                    bar_colors = [GREEN if (i == 0 or amounts[i] >= amounts[i-1]) else RED
+                                  for i in range(len(amounts))]
+                    fig_single.add_trace(go.Bar(
+                        x=years_sorted, y=amounts,
+                        marker=dict(color=bar_colors, opacity=0.8),
+                        text=[f"${a:.2f}" for a in amounts],
+                        textposition="outside",
+                        textfont=dict(size=9, color="rgba(255,255,255,0.6)"),
+                    ))
+                    _single_layout = {**PLOTLY_DARK}
+                    _single_layout["margin"] = dict(l=10, r=10, t=40, b=10)
+                    fig_single.update_layout(
+                        **_single_layout,
+                        title=f"{selected_hist} - Annual Dividend Per Share",
+                        height=300,
+                        xaxis={**_XAXIS, "dtick": 1},
+                        yaxis={**_YAXIS, "tickprefix": "$"},
+                        showlegend=False,
+                    )
+                    st.plotly_chart(fig_single, use_container_width=True, config=PLOTLY_CONFIG)
+
+                    # Show YoY growth below
+                    if yoy_growth:
+                        st.markdown(f"**Year-over-Year Dividend Growth for {selected_hist}**")
+                        growth_data = []
+                        for i, g in enumerate(yoy_growth):
+                            growth_data.append({
+                                "Year": f"{years_sorted[i]}-{years_sorted[i+1]}",
+                                "From": f"${amounts[i]:.2f}",
+                                "To": f"${amounts[i+1]:.2f}",
+                                "Growth": f"{g:+.1f}%",
+                            })
+                        st.dataframe(
+                            pd.DataFrame(growth_data),
+                            use_container_width=True, hide_index=True,
+                            height=min(400, 42 + len(growth_data) * 36),
+                        )
+    else:
+        st.info("No dividend history data available. Ensure the Fish/IREIT CCC spreadsheet is in the data folder.")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
