@@ -120,9 +120,10 @@ if SPRINT2_AVAILABLE:
 
     if _tamarac_path:
         @st.cache_data(ttl=300)
-        def _load_tamarac(path, _v=3):
+        def _load_tamarac(path, _mtime=0):
             return parse_tamarac_excel(path)
-        tamarac_parsed = _load_tamarac(_tamarac_path)
+        _tam_mtime = os.path.getmtime(_tamarac_path)
+        tamarac_parsed = _load_tamarac(_tamarac_path, _mtime=_tam_mtime)
 
 # ── Strategy Selector ──────────────────────────────────────────────────────
 if "active_strategy" not in st.session_state:
