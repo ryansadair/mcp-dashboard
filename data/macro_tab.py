@@ -297,8 +297,12 @@ def render_macro_tab(qdvd_yield=None):
                     "direction": direction,
                 })
 
-    # Extract key rates for use in later sections
+    # Extract key rates for use in later sections — fall back to 30Y if 10Y unavailable
     ten_y = next((r["raw"] for r in rates_display if "10-Year" in r["name"]), None)
+    ten_y_label = "10Y"
+    if ten_y is None:
+        ten_y = next((r["raw"] for r in rates_display if "30-Year" in r["name"]), None)
+        ten_y_label = "30Y"
 
     # Render rate cards — one st.markdown per card to avoid HTML size limits
     cols = st.columns(len(rates_display))
@@ -356,7 +360,7 @@ def render_macro_tab(qdvd_yield=None):
         <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
                     border-radius:8px;padding:14px 16px;margin-bottom:8px">
             <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
-                        letter-spacing:0.06em;margin-bottom:6px">10Y vs S&P Div Yield vs QDVD</div>
+                        letter-spacing:0.06em;margin-bottom:6px">{ten_y_label} vs S&P Div Yield vs QDVD</div>
             <div style="font-size:18px;font-weight:700;font-family:'DM Serif Display',serif;
                         color:rgba(255,255,255,0.95)">
                 {ten_y_str} <span style="color:rgba(255,255,255,0.3)">vs</span> {sp_yield_str}
@@ -382,7 +386,7 @@ def render_macro_tab(qdvd_yield=None):
                 <div style="font-size:18px;font-weight:700;font-family:'DM Serif Display',serif;
                             color:{erp_color}">{erp_val if erp_val else "—"}</div>
                 <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:4px">
-                    Earnings yield − 10Y</div>
+                    Earnings yield − {ten_y_label}</div>
             </div>
             <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
                         border-radius:8px;padding:14px 16px">
@@ -581,7 +585,7 @@ def render_macro_tab(qdvd_yield=None):
     # Earnings yield
     if fwd_pe and fwd_pe > 0:
         ey = (1 / fwd_pe) * 100
-        note = f"vs {ten_y:.2f}% 10Y" if ten_y else ""
+        note = f"vs {ten_y:.2f}% {ten_y_label}" if ten_y else ""
         status = "tight" if ten_y and ey - ten_y < 1 else "neutral"
         val_rows.append(("S&P 500 Earnings Yield", f"{ey:.2f}%", note, status))
 
@@ -590,7 +594,7 @@ def render_macro_tab(qdvd_yield=None):
             erp = ey - ten_y
             erp_bp = round(erp * 100)
             status = "alert" if erp < 0.5 else "watch" if erp < 1.5 else "neutral"
-            val_rows.append(("Equity Risk Premium", f"{erp_bp:+d}bp", "Earnings yield − 10Y", status))
+            val_rows.append(("Equity Risk Premium", f"{erp_bp:+d}bp", f"Earnings yield − {ten_y_label}", status))
 
     # S&P dividend yield
     if sp_div_pct:
