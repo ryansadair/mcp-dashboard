@@ -112,7 +112,6 @@ def _build_enriched_df(tam_df, price_data, div_data):
 
         # Dividend data: prefer Fish CCC spreadsheet, fallback to Supabase/yfinance
         div_yield    = dd.get("dividend_yield", 0) or 0
-        div_rate     = dd.get("dividend_rate", 0) or 0
         ex_date      = dd.get("ex_dividend_date", "")
 
         # Fish CCC data (authoritative for growth rates, payout, streaks)
@@ -121,6 +120,9 @@ def _build_enriched_df(tam_df, price_data, div_data):
         if _STREAKS_AVAILABLE:
             fish = get_fish_metrics(sym)
             div_hist = get_dividend_history(sym)
+
+        # Annualized dividend amount: Fish first (col 12), yfinance fallback
+        div_rate = fish.get("div_amount", 0) or (dd.get("dividend_rate", 0) or 0)
 
         # Growth rates: Fish first, yfinance fallback
         growth_1y  = fish.get("dgr_1y", 0) or (dd.get("div_growth_1y", 0) or 0)

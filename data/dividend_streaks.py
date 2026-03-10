@@ -127,6 +127,8 @@ def _load_fish_data():
                 "chowder":      round(_sf(row[41]), 1) if len(row) > 41 else 0,
                 "streak_began": row[56] if len(row) > 56 and row[56] else None,
                 "recessions":   int(_sf(row[57])) if len(row) > 57 else 0,
+                "div_amount":   round(_sf(row[12]), 4) if len(row) > 12 else 0,
+                "qtly_div":     round(_sf(row[10]), 4) if len(row) > 10 else 0,
             }
 
     # ── Parse "Historical" sheet ───────────────────────────────────────
