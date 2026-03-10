@@ -572,7 +572,10 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
     detail_rows = []
     for _, r in edf.iterrows():
         began = r.get("streak_began", None)
-        began_str = str(int(began)) if began and began != 0 else "N/A"
+        try:
+            began_str = str(int(float(str(began)))) if began and str(began).strip() not in ("", "0", "None", "nan") else "N/A"
+        except (ValueError, TypeError):
+            began_str = "N/A"
         detail_rows.append({
             "Symbol":         r["symbol"],
             "Company":        r["description"],
