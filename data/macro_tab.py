@@ -333,6 +333,22 @@ def render_macro_tab(qdvd_yield=None):
     sp_div = spy_data.get("div_yield")
     sp_div_pct = (sp_div * 100 if sp_div and sp_div < 1 else sp_div) if sp_div else None
 
+    # Fallback: compute S&P div yield from SPY dividendRate / price
+    if sp_div_pct is None:
+        try:
+            import yfinance as yf
+            spy_info = yf.Ticker("SPY").info or {}
+            div_rate = spy_info.get("dividendRate")
+            spy_price = spy_info.get("regularMarketPrice") or spy_info.get("previousClose")
+            if div_rate and spy_price and spy_price > 0:
+                sp_div_pct = round((div_rate / spy_price) * 100, 2)
+        except Exception:
+            pass
+
+    # Fallback: if fwd_pe is missing from yfinance, try trailing P/E
+    if fwd_pe is None:
+        fwd_pe = spy_data.get("trailing_pe")
+
     with col_ctx:
         st.markdown(
             '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
@@ -648,4 +664,4 @@ def render_macro_tab(qdvd_yield=None):
             unsafe_allow_html=True,
         )
 
-    st.caption(f"Data: FRED API · yfinance · {datetime.now().strftime('%I:%M %p')}")
+    st.caption(f"Data: FRED API · yfinance · {datetime.now().strftime('%I:%M %p')}")v
