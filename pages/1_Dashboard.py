@@ -36,6 +36,13 @@ try:
 except ImportError:
     DETECTOR_AVAILABLE = False
 
+# Notion proprietary metrics (Sprint 5)
+try:
+    from data.notion_metrics import fetch_notion_metrics
+    NOTION_METRICS_AVAILABLE = True
+except ImportError:
+    NOTION_METRICS_AVAILABLE = False
+
 # Watchlist (Excel-based, always available independently of Sprint 2)
 try:
     from data.watchlist_tab import render_watchlist_tab
@@ -471,6 +478,14 @@ with tab_holdings:
             with st.spinner("Fetching live prices..."):
                 price_data = fetch_batch_prices(tickers)
 
+            # Fetch Notion proprietary metrics (Sprint 5)
+            notion_data = {}
+            if NOTION_METRICS_AVAILABLE:
+                try:
+                    notion_data = fetch_notion_metrics()
+                except Exception:
+                    notion_data = {}
+
             # Build merged table
             rows = []
             for _, h in tam_df.iterrows():
@@ -480,6 +495,10 @@ with tab_holdings:
                 yoc = h.get("yield_at_cost", 0) or 0
                 # yoc may be decimal (0.0558) or already percentage (5.58)
                 yoc_pct = float(yoc) * 100 if 0 < float(yoc) < 1 else float(yoc)
+
+                # Notion proprietary metrics
+                nm = notion_data.get(sym.upper(), {})
+
                 rows.append({
                     "Company": h["description"],
                     "Symbol": sym,
@@ -489,6 +508,8 @@ with tab_holdings:
                     "Price": mkt.get("price", 0),
                     "Yield on Cost %": round(yoc_pct, 2),
                     "Div Yield %": mkt.get("dividend_yield", 0),
+                    "Baseline": nm.get("div_baseline") if nm.get("div_baseline") is not None else "—",
+                    "Style": nm.get("style_bucket", "—") or "—",
                     "P/E": round(mkt.get("pe_ratio", 0), 1) if mkt.get("pe_ratio") else "—",
                     "52W High": mkt.get("52w_high", 0),
                     "52W Low":  mkt.get("52w_low", 0),
@@ -552,6 +573,8 @@ with tab_holdings:
                     "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
                     "Yield on Cost %": st.column_config.NumberColumn("Yield on Cost", format="%.2f%%"),
                     "Div Yield %": st.column_config.NumberColumn("Curr Yield", format="%.2f%%"),
+                    "Baseline": st.column_config.TextColumn("Baseline", width="small"),
+                    "Style": st.column_config.TextColumn("Style", width="small"),
                     "P/E": st.column_config.NumberColumn("P/E"),
                     "52W High": st.column_config.NumberColumn("52W Hi", format="$%.2f"),
                     "52W Low": st.column_config.NumberColumn("52W Lo", format="$%.2f"),
