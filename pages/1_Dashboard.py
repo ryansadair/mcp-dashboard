@@ -27,6 +27,15 @@ try:
 except ImportError:
     SPRINT2_AVAILABLE = False
 
+# Tamarac auto-detector (Sprint 5)
+try:
+    from data.tamarac_detector import (
+        get_tamarac_status, find_best_tamarac_file, render_tamarac_status_banner,
+    )
+    DETECTOR_AVAILABLE = True
+except ImportError:
+    DETECTOR_AVAILABLE = False
+
 # Watchlist (Excel-based, always available independently of Sprint 2)
 try:
     from data.watchlist_tab import render_watchlist_tab
@@ -76,23 +85,30 @@ inject_global_css()
 render_header()
 render_market_ticker()
 
-# ── Tamarac data loading (Sprint 2) ──────────────────────────────────────
+# ── Tamarac data loading (Sprint 5: auto-detect newest file) ─────────────
 import os
 
-TAMARAC_PATHS = [
-    "data/Tamarac_Holdings.xlsx",
-    "Tamarac_Holdings.xlsx",
-]
-
 tamarac_parsed = None
+_tamarac_path = None
+
 if SPRINT2_AVAILABLE:
-    for p in TAMARAC_PATHS:
-        if os.path.exists(p):
-            @st.cache_data(ttl=300)
-            def _load_tamarac(path, _v=2):
-                return parse_tamarac_excel(path)
-            tamarac_parsed = _load_tamarac(p)
-            break
+    if DETECTOR_AVAILABLE:
+        # Sprint 5: auto-detect newest Tamarac export
+        _tam_status = get_tamarac_status()
+        if _tam_status["found"]:
+            _tamarac_path = _tam_status["path"]
+    else:
+        # Fallback: original hardcoded paths
+        for p in ["data/Tamarac_Holdings.xlsx", "Tamarac_Holdings.xlsx"]:
+            if os.path.exists(p):
+                _tamarac_path = p
+                break
+
+    if _tamarac_path:
+        @st.cache_data(ttl=300)
+        def _load_tamarac(path, _v=3):
+            return parse_tamarac_excel(path)
+        tamarac_parsed = _load_tamarac(_tamarac_path)
 
 # ── Strategy Selector ──────────────────────────────────────────────────────
 if "active_strategy" not in st.session_state:
@@ -146,6 +162,10 @@ active = st.session_state["active_strategy"]
 strat = STRATEGIES[active]
 kpis = get_strategy_kpis(active)
 bench_ytd = get_benchmark_ytd(strat["bench_ticker"])
+
+# ── Tamarac file status banner ────────────────────────────────────────────
+if DETECTOR_AVAILABLE:
+    render_tamarac_status_banner()
 
 # ── Override KPIs with real data when Sprint 2 is available ───────────────
 if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
