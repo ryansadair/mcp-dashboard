@@ -71,6 +71,13 @@ try:
 except ImportError:
     MACRO_AVAILABLE = False
 
+# Markets tab (Sprint 5)
+try:
+    from data.markets_tab import render_markets_tab
+    MARKETS_AVAILABLE = True
+except ImportError:
+    MARKETS_AVAILABLE = False
+
 # Monthly YTD returns from Tamarac (separate file Ryan updates)
 try:
     from data.monthly_returns import STRATEGY_YTD, AS_OF_DATE
@@ -229,8 +236,8 @@ render_kpi_cards(active, kpis, bench_ytd)
 st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 # ── Tabs ───────────────────────────────────────────────────────────────────
-tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro = st.tabs([
-    "📊 Overview", "📋 Holdings", "📈 Performance", "💰 Dividends", "🔍 Watchlist", "🌐 Macro"
+tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets = st.tabs([
+    "📊 Overview", "📋 Holdings", "📈 Performance", "💰 Dividends", "🔍 Watchlist", "🌐 Macro", "🏛️ Markets"
 ])
 
 # ── Plotly dark theme (reused across tabs) ─────────────────────────────────
@@ -904,6 +911,16 @@ with tab_macro:
         render_macro_tab(qdvd_yield=qdvd_yield)
     else:
         st.info("Macro module not found. Ensure `data/macro_tab.py` is in the data folder.")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# MARKETS
+# ══════════════════════════════════════════════════════════════════════════
+with tab_markets:
+    if MARKETS_AVAILABLE:
+        render_markets_tab()
+    else:
+        st.info("Markets module not found. Ensure `data/markets_tab.py` is in the data folder.")
 
 
 # ── Footer ─────────────────────────────────────────────────────────────────
