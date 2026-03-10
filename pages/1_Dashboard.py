@@ -585,7 +585,7 @@ with tab_holdings:
                 },
             )
 
-            # Sector breakdown
+            # Sector breakdown — compact table + pie chart
             if len(filtered) > 0 and "Sector" in filtered.columns:
                 st.divider()
                 st.markdown("**Sector Breakdown**")
@@ -593,13 +593,36 @@ with tab_holdings:
                     Holdings=("Symbol", "count"),
                     Total_Weight=("Weight %", "sum"),
                     Avg_Yield=("Div Yield %", "mean"),
-                    Avg_YoC=("Yield on Cost %", "mean"),
                 ).round(2).sort_values("Total_Weight", ascending=False)
-                st.dataframe(sect_agg, use_container_width=True, column_config={
-                    "Total_Weight": st.column_config.NumberColumn("Weight %", format="%.2f%%"),
-                    "Avg_Yield": st.column_config.NumberColumn("Avg Yield %", format="%.2f%%"),
-                    "Avg_YoC": st.column_config.NumberColumn("Avg YoC %", format="%.2f%%"),
-                })
+
+                col_tbl, col_pie = st.columns([3, 2])
+                with col_tbl:
+                    st.dataframe(sect_agg, use_container_width=True, height=(42 + len(sect_agg) * 36), column_config={
+                        "Holdings": st.column_config.NumberColumn("#", width="small"),
+                        "Total_Weight": st.column_config.NumberColumn("Wt %", format="%.1f%%", width="small"),
+                        "Avg_Yield": st.column_config.NumberColumn("Avg Yld %", format="%.2f%%", width="small"),
+                    })
+                with col_pie:
+                    pie_colors = [SECTOR_COLORS.get(s, "#888") for s in sect_agg.index]
+                    fig_pie = go.Figure(go.Pie(
+                        labels=sect_agg.index.tolist(),
+                        values=sect_agg["Total_Weight"].tolist(),
+                        marker=dict(colors=pie_colors),
+                        hole=0.45,
+                        textinfo="label+percent",
+                        textposition="outside",
+                        textfont=dict(size=10, color="rgba(255,255,255,0.6)"),
+                        hovertemplate="%{label}: %{value:.1f}%<extra></extra>",
+                        sort=False,
+                    ))
+                    _pie_layout = {**PLOTLY_DARK}
+                    _pie_layout["margin"] = dict(l=10, r=10, t=10, b=10)
+                    fig_pie.update_layout(
+                        **_pie_layout,
+                        height=max(260, len(sect_agg) * 28 + 80),
+                        showlegend=False,
+                    )
+                    st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
 
             st.caption(f"Tamarac export + yfinance live prices • {datetime.now().strftime('%I:%M %p')}")
 
