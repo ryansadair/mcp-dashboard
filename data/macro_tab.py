@@ -88,11 +88,30 @@ def _yf_sp500_metrics():
         import yfinance as yf
         spy = yf.Ticker("SPY")
         info = spy.info or {}
+        fi = spy.fast_info
+
+        fwd_pe = info.get("forwardPE")
+        trailing_pe = info.get("trailingPE")
+        div_yield = info.get("dividendYield")
+        price = getattr(fi, "last_price", None)
+
+        # Fallback P/E: compute from trailingEps if available
+        if fwd_pe is None and trailing_pe is None:
+            eps = info.get("trailingEps")
+            if eps and eps > 0 and price and price > 0:
+                trailing_pe = round(price / eps, 1)
+
+        # Fallback div yield: compute from dividendRate / price
+        if div_yield is None:
+            div_rate = info.get("dividendRate")
+            if div_rate and price and price > 0:
+                div_yield = div_rate / price
+
         return {
-            "fwd_pe": info.get("forwardPE"),
-            "trailing_pe": info.get("trailingPE"),
-            "div_yield": info.get("dividendYield"),
-            "price": getattr(spy.fast_info, "last_price", None),
+            "fwd_pe": fwd_pe,
+            "trailing_pe": trailing_pe,
+            "div_yield": div_yield,
+            "price": price,
         }
     except Exception:
         return {}
@@ -329,25 +348,9 @@ def render_macro_tab(qdvd_yield=None):
 
     # Pre-fetch valuation data needed for context box
     spy_data = _yf_sp500_metrics()
-    fwd_pe = spy_data.get("fwd_pe")
+    fwd_pe = spy_data.get("fwd_pe") or spy_data.get("trailing_pe")
     sp_div = spy_data.get("div_yield")
     sp_div_pct = (sp_div * 100 if sp_div and sp_div < 1 else sp_div) if sp_div else None
-
-    # Fallback: compute S&P div yield from SPY dividendRate / price
-    if sp_div_pct is None:
-        try:
-            import yfinance as yf
-            spy_info = yf.Ticker("SPY").info or {}
-            div_rate = spy_info.get("dividendRate")
-            spy_price = spy_info.get("regularMarketPrice") or spy_info.get("previousClose")
-            if div_rate and spy_price and spy_price > 0:
-                sp_div_pct = round((div_rate / spy_price) * 100, 2)
-        except Exception:
-            pass
-
-    # Fallback: if fwd_pe is missing from yfinance, try trailing P/E
-    if fwd_pe is None:
-        fwd_pe = spy_data.get("trailing_pe")
 
     with col_ctx:
         st.markdown(
@@ -664,4 +667,4 @@ def render_macro_tab(qdvd_yield=None):
             unsafe_allow_html=True,
         )
 
-    st.caption(f"Data: FRED API · yfinance · {datetime.now().strftime('%I:%M %p')}")v
+    st.caption(f"Data: FRED API · yfinance · {datetime.now().strftime('%I:%M %p')}")
