@@ -99,6 +99,46 @@ inject_global_css()
 render_header()
 render_market_ticker()
 
+# ── Data freshness indicator (reads fetched_at from Supabase) ─────────────
+_refresh_label = ""
+try:
+    from data.market_data import get_cache_timestamp
+    _raw_ts = get_cache_timestamp()
+    if _raw_ts:
+        from datetime import timedelta
+        try:
+            _parsed = datetime.fromisoformat(_raw_ts.replace("Z", "+00:00"))
+            _pacific = _parsed - timedelta(hours=7)  # PDT offset; change to 8 for PST
+            _age_min = int((datetime.utcnow() - _parsed.replace(tzinfo=None)).total_seconds() / 60)
+            _time_str = _pacific.strftime("%I:%M %p").lstrip("0")
+
+            if _age_min <= 20:
+                _status_dot = "#569542"
+                _age_str = f"{_age_min}m ago" if _age_min >= 2 else "just now"
+            elif _age_min <= 60:
+                _status_dot = "#C9A84C"
+                _age_str = f"{_age_min}m ago"
+            else:
+                _status_dot = "#c45454"
+                _age_str = f"{_age_min // 60}h ago"
+
+            _refresh_label = (
+                f'<div style="display:flex;align-items:center;justify-content:flex-end;'
+                f'padding:4px 28px 2px;gap:6px;">'
+                f'<span style="width:6px;height:6px;border-radius:50%;background:{_status_dot};'
+                f'display:inline-block;"></span>'
+                f'<span style="font-size:10px;color:rgba(255,255,255,0.30);">'
+                f'Data refreshed {_time_str} PT ({_age_str})</span>'
+                f'</div>'
+            )
+        except Exception:
+            pass
+except ImportError:
+    pass
+
+if _refresh_label:
+    st.markdown(_refresh_label, unsafe_allow_html=True)
+
 # ── Tamarac data loading (Sprint 5: auto-detect newest file) ─────────────
 import os
 
