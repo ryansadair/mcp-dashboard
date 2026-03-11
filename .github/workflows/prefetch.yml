@@ -1,0 +1,93 @@
+# Martin Capital Partners — Automated Data Pre-Fetch
+# .github/workflows/prefetch.yml
+#
+# Replaces Windows Task Scheduler. Runs on GitHub's servers,
+# pushes data to Supabase. No dependency on Ryan's office machine.
+#
+# Schedule (all times UTC — PT is UTC-7 during PDT, UTC-8 during PST):
+#   - Quick refresh: every 15 min during market hours (1330-2015 UTC = 6:30am-1:15pm PT)
+#   - Full refresh:  6:30am PT daily (1330 UTC) — includes dividends, benchmarks, history
+#   - EOD snapshot:  1:15pm PT daily (2015 UTC) — final prices after market close
+#
+# GitHub Actions cron uses UTC. PDT (Mar-Nov): PT = UTC-7. PST (Nov-Mar): PT = UTC-8.
+# Adjust these crons if needed after DST changes.
+#
+# Required GitHub Secrets (Settings > Secrets and variables > Actions):
+#   SUPABASE_URL  — e.g. https://idtytpyehfbqldnvwenb.supabase.co
+#   SUPABASE_KEY  — your service role key (not anon key)
+
+name: Data Pre-Fetch
+
+on:
+  # ── Scheduled runs ────────────────────────────────────────────────────
+  schedule:
+    # Quick refresh: every 15 min, market hours Mon-Fri
+    # 1330-2015 UTC = 6:30am-1:15pm PT (during PDT)
+    - cron: '30,45 13 * * 1-5'
+    - cron: '0,15,30,45 14-19 * * 1-5'
+    - cron: '0,15 20 * * 1-5'
+
+  # ── Manual trigger (for testing or forcing a refresh) ─────────────────
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run mode'
+        required: true
+        default: 'quick'
+        type: choice
+        options:
+          - quick
+          - full
+          - eod
+
+jobs:
+  prefetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install yfinance pandas requests openpyxl
+
+      - name: Determine run mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
+          else
+            # Auto-detect: first run of the day (13:30 UTC) = full, last (20:15) = eod, else quick
+            HOUR=$(date -u +%H)
+            MIN=$(date -u +%M)
+            if [ "$HOUR" = "13" ] && [ "$MIN" = "30" ]; then
+              echo "mode=full" >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "20" ] && [ "$MIN" = "15" ]; then
+              echo "mode=eod" >> $GITHUB_OUTPUT
+            else
+              echo "mode=quick" >> $GITHUB_OUTPUT
+            fi
+          fi
+          echo "Run mode: $(cat $GITHUB_OUTPUT | grep mode | cut -d= -f2)"
+
+      - name: Run prefetch
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          RUN_MODE: ${{ steps.mode.outputs.mode }}
+        run: |
+          python prefetch_cloud.py --mode $RUN_MODE
+
+      - name: Log result
+        if: always()
+        run: |
+          echo "Prefetch completed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Mode: ${{ steps.mode.outputs.mode }}"
