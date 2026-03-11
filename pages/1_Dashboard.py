@@ -99,8 +99,10 @@ inject_global_css()
 render_header()
 render_market_ticker()
 
-# ── Data freshness indicator (reads fetched_at from Supabase) ─────────────
-_refresh_label = ""
+# ── Data freshness + Tamarac status (combined, right-aligned) ─────────────
+_status_parts = []
+
+# Part 1: Supabase data freshness
 try:
     from data.market_data import get_cache_timestamp
     _raw_ts = get_cache_timestamp()
@@ -122,22 +124,42 @@ try:
                 _status_dot = "#c45454"
                 _age_str = f"{_age_min // 60}h ago"
 
-            _refresh_label = (
-                f'<div style="display:flex;align-items:center;justify-content:flex-end;'
-                f'padding:4px 28px 2px;gap:6px;">'
+            _status_parts.append(
                 f'<span style="width:6px;height:6px;border-radius:50%;background:{_status_dot};'
                 f'display:inline-block;"></span>'
-                f'<span style="font-size:10px;color:rgba(255,255,255,0.30);">'
-                f'Data refreshed {_time_str} PT ({_age_str})</span>'
-                f'</div>'
+                f'<span>Data refreshed {_time_str} PT ({_age_str})</span>'
             )
         except Exception:
             pass
 except ImportError:
     pass
 
-if _refresh_label:
-    st.markdown(_refresh_label, unsafe_allow_html=True)
+# Part 2: Tamarac file status
+if DETECTOR_AVAILABLE:
+    try:
+        _tam_status = get_tamarac_status()
+        if _tam_status["found"]:
+            _tam_mod = _tam_status["modified"].strftime("%b %d, %Y at %I:%M %p") if _tam_status["modified"] else ""
+            _tam_age = _tam_status["age_days"]
+            _tam_dot = "#C9A84C" if _tam_status["stale"] else "rgba(86,149,66,0.7)"
+            _tam_age_str = f" ({_tam_age}d ago)" if _tam_age > 0 else ""
+            _status_parts.append(
+                f'<span style="width:6px;height:6px;border-radius:50%;background:{_tam_dot};'
+                f'display:inline-block;"></span>'
+                f'<span>Tamarac: {_tam_status["filename"]} · {_tam_mod}{_tam_age_str}</span>'
+            )
+    except Exception:
+        pass
+
+if _status_parts:
+    _divider = '<span style="opacity:0.2;margin:0 6px;">|</span>'
+    st.markdown(
+        f'<div style="display:flex;align-items:center;justify-content:flex-end;'
+        f'padding:4px 28px 2px;gap:6px;font-size:10px;color:rgba(255,255,255,0.30);">'
+        f'{_divider.join(_status_parts)}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
 # ── Tamarac data loading (Sprint 5: auto-detect newest file) ─────────────
 import os
@@ -218,9 +240,7 @@ strat = STRATEGIES[active]
 kpis = get_strategy_kpis(active)
 bench_ytd = get_benchmark_ytd(strat["bench_ticker"])
 
-# ── Tamarac file status banner ────────────────────────────────────────────
-if DETECTOR_AVAILABLE:
-    render_tamarac_status_banner()
+# (Tamarac status now displayed in combined status line below market ticker)
 
 # ── Override KPIs with real data when Sprint 2 is available ───────────────
 if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
