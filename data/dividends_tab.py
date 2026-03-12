@@ -76,6 +76,36 @@ RED   = BRAND["red"]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# HELPER: yfinance dividend history fallback (for tickers not in Fish CCC)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _fetch_yf_annual_dividends(ticker):
+    """
+    Fetch annual dividend totals from yfinance as a fallback when Fish CCC
+    Historical data is unavailable (ADRs, newer holdings, non-US stocks).
+    Returns dict: {year: annual_total} or empty dict on failure.
+    """
+    try:
+        import yfinance as yf
+        tk = yf.Ticker(ticker)
+        divs = tk.dividends
+        if divs is None or divs.empty:
+            return {}
+
+        df = divs.reset_index()
+        df.columns = ["date", "amount"]
+        df["year"] = pd.to_datetime(df["date"]).dt.year
+        current_year = datetime.now().year
+
+        # Sum by year, exclude current (incomplete) year
+        annual = df[df["year"] < current_year].groupby("year")["amount"].sum()
+        return {int(yr): round(float(amt), 4) for yr, amt in annual.items() if amt > 0}
+    except Exception:
+        return {}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # HELPER: build the enriched holdings dataframe used across all sub-tabs
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -769,41 +799,56 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
         )
         st.plotly_chart(fig4, use_container_width=True, config=PLOTLY_CONFIG)
 
-    # ── Dividend History (from Fish Historical sheet) ──────────────────────
+    # ── Dividend History (Fish CCC preferred, yfinance fallback) ─────────
     st.divider()
-    st.markdown("**Dividend Per Share History** (from CCC Historical Data)")
+    st.markdown("**Dividend Per Share History**")
 
-    # Individual holding selector for detailed history
-    hist_tickers = sorted(edf[edf["div_history"].apply(lambda d: len(d) > 0)]["symbol"].tolist())
-    # Also include tickers without Fish history — show all holdings with a note
+    # All holdings alphabetical — single list, no separator needed now
     all_tickers = sorted(edf["symbol"].tolist())
-    no_hist_tickers = [t for t in all_tickers if t not in hist_tickers]
 
-    if hist_tickers or no_hist_tickers:
-        display_options = ["Select a ticker..."] + hist_tickers
-        if no_hist_tickers:
-            display_options += ["───── No CCC history ─────"] + no_hist_tickers
+    if all_tickers:
         selected_hist = st.selectbox(
             "View individual dividend history",
-            options=display_options,
+            options=["Select a ticker..."] + all_tickers,
             key="div_hist_select",
         )
-        if selected_hist and selected_hist not in ("Select a ticker...", "───── No CCC history ─────"):
+        if selected_hist and selected_hist != "Select a ticker...":
             matching = edf[edf["symbol"] == selected_hist]
             if matching.empty:
                 st.info(f"No data found for {selected_hist}.")
             else:
                 row_data = matching.iloc[0]
-                hist = row_data["div_history"]
+                fish_hist = row_data["div_history"]
+
+                # Determine source: Fish CCC first, yfinance fallback
+                hist = {}
+                _data_source = ""
+                if fish_hist:
+                    hist = fish_hist
+                    _data_source = "CCC"
+                else:
+                    # yfinance fallback — fetch annual dividend totals
+                    hist = _fetch_yf_annual_dividends(selected_hist)
+                    _data_source = "yfinance"
+
                 if not hist:
                     st.info(
-                        f"**{selected_hist}** is not in the CCC Historical sheet. "
-                        f"This is common for ADRs, newer holdings, or non-US stocks. "
-                        f"Dividend history is available on the Stock Detail page via yfinance."
+                        f"No dividend history available for **{selected_hist}**. "
+                        f"This stock may not pay a dividend or data is unavailable."
                     )
-                elif hist:
+                else:
                     years_sorted = sorted(hist.keys())
                     amounts = [hist[y] for y in years_sorted]
+
+                    # Source badge
+                    _src_color = GREEN if _data_source == "CCC" else "rgba(255,255,255,0.4)"
+                    _src_note = "CCC Historical Data (authoritative)" if _data_source == "CCC" else "yfinance (total payouts — may include specials/FX effects)"
+                    st.markdown(
+                        f'<div style="font-size:10px;color:rgba(255,255,255,0.30);margin-bottom:8px;">'
+                        f'Source: <span style="color:{_src_color};font-weight:600;">{_data_source.upper()}</span>'
+                        f' · {_src_note}</div>',
+                        unsafe_allow_html=True,
+                    )
 
                     # ── Header with key stats ─────────────────────────────
                     fish_m = {}
@@ -813,11 +858,19 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
                         streak_yrs, streak_tier = get_streak(selected_hist)
 
                     _latest_amt = amounts[-1] if amounts else 0
-                    _latest_yr = years_sorted[-1] if years_sorted else ""
                     _cagr_5 = fish_m.get("dgr_5y", 0) or 0
                     _cagr_10 = fish_m.get("dgr_10y", 0) or 0
 
-                    # Stats row
+                    # Compute CAGR from history if Fish doesn't have it
+                    if not _cagr_5 and len(amounts) >= 6:
+                        _old = amounts[-6]
+                        if _old > 0 and _latest_amt > 0:
+                            _cagr_5 = round(((_latest_amt / _old) ** (1/5) - 1) * 100, 1)
+                    if not _cagr_10 and len(amounts) >= 11:
+                        _old = amounts[-11]
+                        if _old > 0 and _latest_amt > 0:
+                            _cagr_10 = round(((_latest_amt / _old) ** (1/10) - 1) * 100, 1)
+
                     _hdr_cols = st.columns(5)
                     with _hdr_cols[0]:
                         st.metric("Latest Annual DPS", f"${_latest_amt:.2f}" if _latest_amt else "—")
