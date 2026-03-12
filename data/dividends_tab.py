@@ -125,6 +125,8 @@ def _build_enriched_df(tam_df, price_data, div_data):
         div_rate = fish.get("div_amount", 0) or (dd.get("dividend_rate", 0) or 0)
 
         # Growth rates: Fish first, yfinance fallback
+        # Track source so risk monitor can avoid false cut alerts on ADRs/specials
+        _fish_has_growth = bool(fish.get("dgr_1y") or fish.get("dgr_5y") or (consec_years > 0 and _STREAKS_AVAILABLE))
         growth_1y  = fish.get("dgr_1y", 0) or (dd.get("div_growth_1y", 0) or 0)
         growth_3y  = fish.get("dgr_3y", 0) or (dd.get("div_growth_3y", 0) or 0)
         growth_5y  = fish.get("dgr_5y", 0) or (dd.get("div_growth_5y", 0) or 0)
@@ -179,14 +181,17 @@ def _build_enriched_df(tam_df, price_data, div_data):
             "streak_began":  streak_began,
             "recessions":    int(recessions),
             "div_history":   div_hist,
+            "fish_sourced":  _fish_has_growth,
         })
 
     return pd.DataFrame(rows).sort_values("weight", ascending=False).reset_index(drop=True)
 
 
-def _safety_grade(payout, growth_5y, consec):
+def _safety_grade(payout, growth_5y, consec, fish_sourced=False):
     """
     Compute a simple dividend safety grade based on available data.
+    For non-Fish tickers (ADRs, special div payers), treat moderate negative
+    growth as neutral since yfinance lumps FX effects and specials into totals.
     Returns letter grade string.
     """
     score = 0
@@ -204,17 +209,31 @@ def _safety_grade(payout, growth_5y, consec):
     else:
         score += 1
 
-    # Growth component
-    if growth_5y >= 10:
-        score += 5
-    elif growth_5y >= 5:
-        score += 4
-    elif growth_5y >= 2:
-        score += 3
-    elif growth_5y >= 0:
-        score += 2
+    # Growth component — trust Fish data; be lenient with yfinance fallback
+    if fish_sourced:
+        if growth_5y >= 10:
+            score += 5
+        elif growth_5y >= 5:
+            score += 4
+        elif growth_5y >= 2:
+            score += 3
+        elif growth_5y >= 0:
+            score += 2
+        else:
+            score += 0
     else:
-        score += 0
+        # Non-Fish: only penalize severe declines (>15%), treat moderate
+        # negatives as neutral (likely ADR FX noise or special div drops)
+        if growth_5y >= 10:
+            score += 5
+        elif growth_5y >= 5:
+            score += 4
+        elif growth_5y >= 2:
+            score += 3
+        elif growth_5y >= -15:
+            score += 2  # neutral — could be FX/special noise
+        else:
+            score += 0  # severe enough to likely be real
 
     # Streak component (0 = no data available, treat as neutral)
     if consec == 0:
@@ -247,8 +266,9 @@ def _safety_grade(payout, growth_5y, consec):
         return "C"
 
 
-def _growth_tier(growth_5y):
-    """Classify a holding into dividend growth tiers."""
+def _growth_tier(growth_5y, fish_sourced=False):
+    """Classify a holding into dividend growth tiers.
+    For non-Fish tickers, moderate negative growth is labeled as uncertain."""
     if growth_5y >= 10:
         return "Elite (10%+)"
     elif growth_5y >= 5:
@@ -257,6 +277,8 @@ def _growth_tier(growth_5y):
         return "Steady (2–5%)"
     elif growth_5y >= 0:
         return "Slow (<2%)"
+    elif not fish_sourced and growth_5y > -15:
+        return "Uncertain (non-CCC)"
     else:
         return "Cut / Frozen"
 
@@ -330,8 +352,8 @@ def render_dividends_tab(tamarac_parsed, active_strategy, strat_config, kpis):
     edf = _build_enriched_df(tam_df, price_data, div_data)
 
     # Add computed columns
-    edf["safety"]      = edf.apply(lambda r: _safety_grade(r["payout_ratio"], r["growth_5y"], r["consec_years"]), axis=1)
-    edf["growth_tier"] = edf["growth_5y"].apply(_growth_tier)
+    edf["safety"]      = edf.apply(lambda r: _safety_grade(r["payout_ratio"], r["growth_5y"], r["consec_years"], r.get("fish_sourced", False)), axis=1)
+    edf["growth_tier"] = edf.apply(lambda r: _growth_tier(r["growth_5y"], r.get("fish_sourced", False)), axis=1)
 
     # ── Sub-tabs ───────────────────────────────────────────────────────────
     sub_announce, sub_income, sub_detail, sub_safety = st.tabs([
@@ -598,6 +620,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Recessions":     r["recessions"] if r["consec_years"] > 0 else "N/A",
             "Payout %":       r["payout_ratio"],
             "Safety":         r["safety"],
+            "Src":            "CCC" if r.get("fish_sourced", False) else "yF",
             "Sector":         r["sector"],
         })
     detail_df = pd.DataFrame(detail_rows)
@@ -628,12 +651,18 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             pass
         return ""
 
+    def _color_src(val):
+        if val == "CCC":
+            return f"color: {GREEN}; font-weight: 600; font-size: 10px"
+        return f"color: rgba(255,255,255,0.3); font-size: 10px"
+
     styled = (
         detail_df.style
         .map(_color_growth, subset=["1Y Growth", "3Y Growth", "5Y Growth", "10Y Growth"])
         .map(_color_payout, subset=["Payout %"])
         .map(_color_yield, subset=["Curr Yield", "Yield on Cost"])
         .map(_color_safety, subset=["Safety"])
+        .map(_color_src, subset=["Src"])
         .format({
             "Wt%":            "{:.2f}%",
             "Curr Yield":     "{:.2f}%",
@@ -668,6 +697,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Recessions":    st.column_config.TextColumn("Recess.", width="small"),
             "Payout %":      st.column_config.NumberColumn("Payout", format="%.0f%%"),
             "Safety":        st.column_config.TextColumn("Safety", width="small"),
+            "Src":           st.column_config.TextColumn("Src", width="small"),
             "Sector":        st.column_config.TextColumn("Sector", width="medium"),
         },
     )
@@ -805,13 +835,14 @@ def _render_safety_growth(edf, active_strategy, strat_color):
             unsafe_allow_html=True,
         )
 
-        tier_order = ["Elite (10%+)", "Strong (5–10%)", "Steady (2–5%)", "Slow (<2%)", "Cut / Frozen"]
+        tier_order = ["Elite (10%+)", "Strong (5–10%)", "Steady (2–5%)", "Slow (<2%)", "Uncertain (non-CCC)", "Cut / Frozen"]
         tier_colors = {
-            "Elite (10%+)":   GREEN,
-            "Strong (5–10%)": "#6aad56",
-            "Steady (2–5%)":  GOLD,
-            "Slow (<2%)":     "#e8a838",
-            "Cut / Frozen":   RED,
+            "Elite (10%+)":       GREEN,
+            "Strong (5–10%)":     "#6aad56",
+            "Steady (2–5%)":      GOLD,
+            "Slow (<2%)":         "#e8a838",
+            "Uncertain (non-CCC)": "rgba(255,255,255,0.35)",
+            "Cut / Frozen":       RED,
         }
 
         # Only include holdings with non-zero growth data
@@ -954,15 +985,30 @@ def _render_safety_growth(edf, active_strategy, strat_color):
     )
 
     # Flag holdings that meet any risk criteria
+    # Note: for holdings without Fish CCC data (ADRs, foreign stocks), yfinance
+    # growth rates can be misleading (FX effects, special dividends counted then
+    # dropped). We use stricter thresholds for non-Fish tickers to avoid false alarms.
     risk_rows = []
     for _, r in edf.iterrows():
         concerns = []
+        is_fish = r.get("fish_sourced", False)
+
         if r["payout_ratio"] >= 75:
             concerns.append(f"Elevated payout ratio ({r['payout_ratio']:.0f}%)")
-        if r["growth_5y"] < 0:
-            concerns.append(f"Negative 5Y dividend growth ({r['growth_5y']:+.1f}%)")
-        if r["growth_1y"] < -10:
-            concerns.append(f"Significant 1Y decline ({r['growth_1y']:+.1f}%)")
+
+        if is_fish:
+            # Fish data is reliable — flag any negative growth
+            if r["growth_5y"] < 0:
+                concerns.append(f"Negative 5Y dividend growth ({r['growth_5y']:+.1f}%)")
+            if r["growth_1y"] < -10:
+                concerns.append(f"Significant 1Y decline ({r['growth_1y']:+.1f}%)")
+        else:
+            # yfinance fallback — use stricter thresholds to filter ADR/special noise
+            if r["growth_5y"] < -10:
+                concerns.append(f"Possible 5Y decline ({r['growth_5y']:+.1f}%) — verify (non-CCC)")
+            if r["growth_1y"] < -20:
+                concerns.append(f"Possible 1Y decline ({r['growth_1y']:+.1f}%) — verify (non-CCC)")
+
         if 0 < r["consec_years"] < 5:
             concerns.append(f"Short streak ({r['consec_years']}y) — possible reset")
 

@@ -127,12 +127,26 @@ def _dividend_alerts(tickers, price_data, div_data):
             except (ValueError, TypeError):
                 pass
 
-        # Dividend growth alerts (from Fish or Supabase)
+        # Dividend growth alerts — Fish CCC data is authoritative (tracks regular
+        # dividends only, ignoring FX noise on ADRs and special dividend drops).
+        # Only fall back to yfinance if Fish has no data, and use a stricter
+        # threshold (-15%) to avoid false "cut" alerts from ADRs (e.g. KOF, TTE)
+        # or companies with occasional specials (e.g. CME).
         growth_1y = 0
+        _source = "yfinance"
+        _fish_has_data = False
+
         if _FISH_AVAILABLE:
             fish = get_fish_metrics(ticker)
-            growth_1y = fish.get("dgr_1y", 0) or 0
-        if growth_1y == 0:
+            ccc_years, _ = get_streak(ticker)
+            fish_growth = fish.get("dgr_1y", 0) or 0
+            if fish_growth != 0 or ccc_years > 0:
+                # Fish has data for this ticker — trust it
+                growth_1y = fish_growth
+                _source = "CCC"
+                _fish_has_data = True
+
+        if not _fish_has_data:
             growth_1y = dd.get("div_growth_1y", 0) or 0
 
         if growth_1y >= 10:
@@ -141,19 +155,31 @@ def _dividend_alerts(tickers, price_data, div_data):
                 "severity": "positive",
                 "ticker": ticker,
                 "title": f"{ticker} dividend grew {growth_1y:+.1f}% (1Y)",
-                "detail": f"{name} — strong dividend growth",
+                "detail": f"{name} — strong dividend growth ({_source})",
                 "value": growth_1y,
                 "sort_key": 100 - growth_1y,  # show best growers first
             })
-        elif growth_1y < -5:
+        elif _fish_has_data and growth_1y < -5:
+            # Fish data is reliable — flag even moderate declines
             alerts.append({
                 "type": "dividend",
                 "severity": "critical",
                 "ticker": ticker,
                 "title": f"{ticker} dividend declined {growth_1y:+.1f}% (1Y)",
-                "detail": f"{name} — potential dividend cut concern",
+                "detail": f"{name} — potential dividend cut ({_source})",
                 "value": growth_1y,
-                "sort_key": 0,  # show cuts at top
+                "sort_key": 0,
+            })
+        elif not _fish_has_data and growth_1y < -15:
+            # yfinance fallback — use strict threshold to filter ADR/special noise
+            alerts.append({
+                "type": "dividend",
+                "severity": "warning",
+                "ticker": ticker,
+                "title": f"{ticker} dividend may have declined {growth_1y:+.1f}% (1Y)",
+                "detail": f"{name} — verify manually (may be ADR FX effect or special div drop)",
+                "value": growth_1y,
+                "sort_key": 1,
             })
 
     alerts.sort(key=lambda a: a["sort_key"])
