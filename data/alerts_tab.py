@@ -87,8 +87,8 @@ def _price_mover_alerts(tickers, price_data, threshold=2.0):
                 "sort_key": abs(chg),
             })
 
-    # Sort by magnitude (biggest movers first)
-    alerts.sort(key=lambda a: a["sort_key"], reverse=True)
+    # Sort by change value: best (most positive) on top, worst (most negative) on bottom
+    alerts.sort(key=lambda a: a["value"], reverse=True)
     return alerts
 
 
