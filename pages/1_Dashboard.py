@@ -146,10 +146,12 @@ if DETECTOR_AVAILABLE:
     try:
         _tam_status = get_tamarac_status()
         if _tam_status["found"]:
-            _tam_mod = _tam_status["modified"].strftime("%b %d, %Y at %I:%M %p") if _tam_status["modified"] else ""
+            # Show date only — the file mtime can be misleading across timezones
+            # (Streamlit Cloud runs in UTC, OneDrive may sync with different timestamps)
+            _tam_mod = _tam_status["modified"].strftime("%b %d, %Y") if _tam_status["modified"] else ""
             _tam_age = _tam_status["age_days"]
             _tam_dot = "#C9A84C" if _tam_status["stale"] else "rgba(86,149,66,0.7)"
-            _tam_age_str = f" ({_tam_age}d ago)" if _tam_age > 0 else ""
+            _tam_age_str = f" ({_tam_age}d ago)" if _tam_age > 0 else " (today)"
             _status_parts.append(
                 f'<span style="width:6px;height:6px;border-radius:50%;background:{_tam_dot};'
                 f'display:inline-block;"></span>'

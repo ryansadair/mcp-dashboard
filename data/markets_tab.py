@@ -245,20 +245,21 @@ def render_markets_tab():
     with st.spinner("Fetching market data..."):
         quotes = _fetch_market_quotes()
 
+    def _sort_by_change(items):
+        """Sort items by change_pct descending (best performers on top)."""
+        return sorted(items, key=lambda x: quotes.get(x[1], {}).get("change_pct", 0), reverse=True)
+
     # ── U.S. Indices ──────────────────────────────────────────────────────
     st.markdown(_section_header("🇺🇸", "U.S. Equity Indices"), unsafe_allow_html=True)
-    st.markdown(_render_market_table(INDICES, quotes, section_label="Index"), unsafe_allow_html=True)
+    st.markdown(_render_market_table(_sort_by_change(INDICES), quotes, section_label="Index"), unsafe_allow_html=True)
 
     # ── Sector ETFs ───────────────────────────────────────────────────────
     st.markdown(_section_header("📊", "S&P Sector ETFs"), unsafe_allow_html=True)
-
-    # Sort by change_pct descending (best performers at top)
-    sorted_sectors = sorted(SECTORS, key=lambda x: quotes.get(x[1], {}).get("change_pct", 0), reverse=True)
-    st.markdown(_render_market_table(sorted_sectors, quotes, section_label="Sector"), unsafe_allow_html=True)
+    st.markdown(_render_market_table(_sort_by_change(SECTORS), quotes, section_label="Sector"), unsafe_allow_html=True)
 
     # ── Fixed Income ──────────────────────────────────────────────────────
     st.markdown(_section_header("🏦", "Fixed Income ETFs"), unsafe_allow_html=True)
-    st.markdown(_render_market_table(FIXED_INCOME, quotes, section_label="Category"), unsafe_allow_html=True)
+    st.markdown(_render_market_table(_sort_by_change(FIXED_INCOME), quotes, section_label="Category"), unsafe_allow_html=True)
 
     # ── Global Markets ────────────────────────────────────────────────────
     st.markdown(_section_header("🌍", "Global Markets"), unsafe_allow_html=True)
@@ -270,18 +271,18 @@ def render_markets_tab():
             'text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Developed</div>',
             unsafe_allow_html=True,
         )
-        st.markdown(_render_market_table(GLOBAL_DEVELOPED, quotes, section_label="Market"), unsafe_allow_html=True)
+        st.markdown(_render_market_table(_sort_by_change(GLOBAL_DEVELOPED), quotes, section_label="Market"), unsafe_allow_html=True)
     with col_em:
         st.markdown(
             '<div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.4);'
             'text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Emerging</div>',
             unsafe_allow_html=True,
         )
-        st.markdown(_render_market_table(GLOBAL_EMERGING, quotes, section_label="Market"), unsafe_allow_html=True)
+        st.markdown(_render_market_table(_sort_by_change(GLOBAL_EMERGING), quotes, section_label="Market"), unsafe_allow_html=True)
 
     # ── Commodities ───────────────────────────────────────────────────────
     st.markdown(_section_header("🛢️", "Commodities"), unsafe_allow_html=True)
-    st.markdown(_render_market_table(COMMODITIES, quotes, section_label="Commodity"), unsafe_allow_html=True)
+    st.markdown(_render_market_table(_sort_by_change(COMMODITIES), quotes, section_label="Commodity"), unsafe_allow_html=True)
 
     # ── Footer ────────────────────────────────────────────────────────────
     st.caption(f"Data: yfinance (ETF proxies) · Cached 15 min · {datetime.now().strftime('%I:%M %p')}")
