@@ -127,26 +127,28 @@ def _dividend_alerts(tickers, price_data, div_data):
             except (ValueError, TypeError):
                 pass
 
-        # Dividend growth alerts — Fish CCC data is authoritative (tracks regular
-        # dividends only, ignoring FX noise on ADRs and special dividend drops).
-        # Only fall back to yfinance if Fish has no data, and use a stricter
-        # threshold (-15%) to avoid false "cut" alerts from ADRs (e.g. KOF, TTE)
-        # or companies with occasional specials (e.g. CME).
+        # Dividend growth alerts — Fish CCC data tracks regular dividends only,
+        # but ADRs (KOF, TTE) can appear in Fish with FX-distorted growth rates.
+        # Only trust Fish growth as "real" if growth is positive OR the ticker has
+        # a meaningful streak (5+ years). Otherwise treat as unreliable.
         growth_1y = 0
         _source = "yfinance"
-        _fish_has_data = False
+        _fish_reliable = False
 
         if _FISH_AVAILABLE:
             fish = get_fish_metrics(ticker)
             ccc_years, _ = get_streak(ticker)
             fish_growth = fish.get("dgr_1y", 0) or 0
+
             if fish_growth != 0 or ccc_years > 0:
-                # Fish has data for this ticker — trust it
                 growth_1y = fish_growth
                 _source = "CCC"
-                _fish_has_data = True
+                # Only mark as reliable if positive growth or long streak
+                if fish_growth >= 0 or ccc_years >= 5:
+                    _fish_reliable = True
+                # else: negative growth + short streak → likely ADR/special noise
 
-        if not _fish_has_data:
+        if _source == "yfinance":
             growth_1y = dd.get("div_growth_1y", 0) or 0
 
         if growth_1y >= 10:
@@ -157,10 +159,10 @@ def _dividend_alerts(tickers, price_data, div_data):
                 "title": f"{ticker} dividend grew {growth_1y:+.1f}% (1Y)",
                 "detail": f"{name} — strong dividend growth ({_source})",
                 "value": growth_1y,
-                "sort_key": 100 - growth_1y,  # show best growers first
+                "sort_key": 100 - growth_1y,
             })
-        elif _fish_has_data and growth_1y < -5:
-            # Fish data is reliable — flag even moderate declines
+        elif _fish_reliable and growth_1y < -5:
+            # Reliable Fish data with negative growth — real cut concern
             alerts.append({
                 "type": "dividend",
                 "severity": "critical",
@@ -170,8 +172,8 @@ def _dividend_alerts(tickers, price_data, div_data):
                 "value": growth_1y,
                 "sort_key": 0,
             })
-        elif not _fish_has_data and growth_1y < -15:
-            # yfinance fallback — use strict threshold to filter ADR/special noise
+        elif not _fish_reliable and growth_1y < -15:
+            # Unreliable source (ADR in Fish or yfinance) — strict threshold + caveat
             alerts.append({
                 "type": "dividend",
                 "severity": "warning",

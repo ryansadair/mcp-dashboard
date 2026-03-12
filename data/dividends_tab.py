@@ -125,12 +125,31 @@ def _build_enriched_df(tam_df, price_data, div_data):
         div_rate = fish.get("div_amount", 0) or (dd.get("dividend_rate", 0) or 0)
 
         # Growth rates: Fish first, yfinance fallback
-        # Track source so risk monitor can avoid false cut alerts on ADRs/specials
-        _fish_has_growth = bool(fish.get("dgr_1y") or fish.get("dgr_5y") or (consec_years > 0 and _STREAKS_AVAILABLE))
-        growth_1y  = fish.get("dgr_1y", 0) or (dd.get("div_growth_1y", 0) or 0)
-        growth_3y  = fish.get("dgr_3y", 0) or (dd.get("div_growth_3y", 0) or 0)
-        growth_5y  = fish.get("dgr_5y", 0) or (dd.get("div_growth_5y", 0) or 0)
+        # Track source so risk monitor can avoid false cut alerts on ADRs/specials.
+        # Key insight: ADRs like KOF, TTE can appear in Fish CCC data, but their
+        # growth rates are USD-converted totals that fluctuate with FX rates.
+        # If Fish shows negative growth AND the ticker has no meaningful streak
+        # (< 5 years), treat the growth data as unreliable.
+        fish_dgr_1y = fish.get("dgr_1y", 0) or 0
+        fish_dgr_5y = fish.get("dgr_5y", 0) or 0
+        fish_has_any = bool(fish_dgr_1y or fish_dgr_5y)
+
+        growth_1y  = fish_dgr_1y or (dd.get("div_growth_1y", 0) or 0)
+        growth_3y  = (fish.get("dgr_3y", 0) or 0) or (dd.get("div_growth_3y", 0) or 0)
+        growth_5y  = fish_dgr_5y or (dd.get("div_growth_5y", 0) or 0)
         growth_10y = fish.get("dgr_10y", 0)
+
+        # Fish data is "reliable" only if:
+        #   1) Fish has growth data AND growth is positive (clearly not an ADR issue), OR
+        #   2) Fish has growth data AND the ticker has a 5+ year streak (real dividend grower)
+        # Otherwise, negative Fish growth is likely FX/special noise.
+        _fish_has_growth = False
+        if fish_has_any:
+            if growth_5y >= 0 or growth_1y >= 0:
+                _fish_has_growth = True  # positive growth — trust it
+            elif consec_years >= 5:
+                _fish_has_growth = True  # long streak — real grower with a down year
+            # else: negative growth + short/no streak → likely ADR/special, don't trust
 
         # Payout ratio: Fish first, yfinance fallback
         payout_ratio = fish.get("payout_ratio", 0) or (dd.get("payout_ratio", 0) or 0)
