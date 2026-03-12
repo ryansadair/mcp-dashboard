@@ -449,35 +449,17 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
         st.caption(f"Checked: ±2% price moves, ex-dividend dates, earnings dates, 52-week proximity")
         return
 
-    # ── Filter ────────────────────────────────────────────────────────────
-    alert_types = sorted(set(a["type"] for a in all_alerts))
-    type_labels = {
-        "price": "💹 Price Movers",
-        "dividend": "💰 Dividend Events",
-        "earnings": "📅 Earnings Dates",
-        "52w": "📊 52-Week Proximity",
-    }
-
-    selected_types = st.multiselect(
-        "Filter by type",
-        options=alert_types,
-        default=alert_types,
-        format_func=lambda t: type_labels.get(t, t),
-        key="alerts_type_filter",
-        label_visibility="collapsed",
-    )
-
     # ── Render sections ───────────────────────────────────────────────────
-    if "price" in selected_types and price_alerts:
+    if price_alerts:
         _render_alert_section("Price Movers (±2%+ Today)", price_alerts, "💹")
 
-    if "dividend" in selected_types and div_alerts:
+    if div_alerts:
         _render_alert_section("Dividend Events", div_alerts, "💰")
 
-    if "earnings" in selected_types and earnings_alerts:
+    if earnings_alerts:
         _render_alert_section("Upcoming Earnings", earnings_alerts, "📅")
 
-    if "52w" in selected_types and proximity_alerts:
+    if proximity_alerts:
         _render_alert_section("52-Week Proximity", proximity_alerts, "📊")
 
     # ── Footer ────────────────────────────────────────────────────────────
