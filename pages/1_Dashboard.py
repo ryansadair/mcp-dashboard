@@ -78,6 +78,13 @@ try:
 except ImportError:
     MARKETS_AVAILABLE = False
 
+# Alerts tab (Sprint 6)
+try:
+    from data.alerts_tab import render_alerts_tab
+    ALERTS_AVAILABLE = True
+except ImportError:
+    ALERTS_AVAILABLE = False
+
 # Monthly YTD returns from Tamarac (separate file Ryan updates)
 try:
     from data.monthly_returns import STRATEGY_YTD, AS_OF_DATE
@@ -297,8 +304,8 @@ render_kpi_cards(active, kpis, bench_ytd)
 st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 # ── Tabs ───────────────────────────────────────────────────────────────────
-tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets = st.tabs([
-    "📊 Overview", "📋 Holdings", "📈 Performance", "💰 Dividends", "🔍 Watchlist", "🌐 Macro", "🏛️ Markets"
+tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
+    "📊 Overview", "📋 Holdings", "📈 Performance", "💰 Dividends", "🔍 Watchlist", "🌐 Macro", "🏛️ Markets", "🔔 Alerts"
 ])
 
 # ── Plotly dark theme (reused across tabs) ─────────────────────────────────
@@ -982,6 +989,18 @@ with tab_markets:
         render_markets_tab()
     else:
         st.info("Markets module not found. Ensure `data/markets_tab.py` is in the data folder.")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ALERTS
+# ══════════════════════════════════════════════════════════════════════════
+with tab_alerts:
+    if ALERTS_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed:
+        render_alerts_tab(tamarac_parsed, active)
+    elif not ALERTS_AVAILABLE:
+        st.info("Alerts module not found. Ensure `data/alerts_tab.py` is in the data folder.")
+    else:
+        st.info("Alerts require Tamarac holdings data. Upload a Tamarac export to enable alerts.")
 
 
 # ── Footer ─────────────────────────────────────────────────────────────────
