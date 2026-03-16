@@ -315,6 +315,7 @@ def fetch_index_data():
         "DX-Y.NYB": "US Dollar",
         "CL=F":     "Crude Oil",
         "GC=F":     "Gold",
+        "BTC-USD":  "Bitcoin",
     }
 
     results = {}

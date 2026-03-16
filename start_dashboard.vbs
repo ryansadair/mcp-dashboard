@@ -1,2 +1,0 @@
-Set objShell = CreateObject("WScript.Shell")
-objShell.Run """C:\Users\RyanAdair\Martin Capital Partners LLC\Eugene - Documents\Operations\Scripts\Portfolio Dashboard\venv\Scripts\python.exe"" -m streamlit run ""C:\Users\RyanAdair\Martin Capital Partners LLC\Eugene - Documents\Operations\Scripts\Portfolio Dashboard\app.py"" --server.address 0.0.0.0 --server.port 8501", 0, False

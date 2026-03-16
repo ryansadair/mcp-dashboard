@@ -4,13 +4,19 @@
 # Replaces Windows Task Scheduler. Runs on GitHub's servers,
 # pushes data to Supabase. No dependency on Ryan's office machine.
 #
-# Schedule (all times UTC — PT is UTC-7 during PDT, UTC-8 during PST):
-#   - Quick refresh: every 15 min during market hours (1330-2015 UTC = 6:30am-1:15pm PT)
-#   - Full refresh:  6:30am PT daily (1330 UTC) — includes dividends, benchmarks, history
-#   - EOD snapshot:  1:15pm PT daily (2015 UTC) — final prices after market close
+# DESIGN: Single cron entry runs every 15 min, 24/7/365.
+# The Python script itself checks market hours and exits early
+# if outside the window. This avoids GitHub Actions' cron throttling
+# issue where multiple cron lines on low-activity repos get merged
+# or skipped.
 #
-# GitHub Actions cron uses UTC. PDT (Mar-Nov): PT = UTC-7. PST (Nov-Mar): PT = UTC-8.
-# Adjust these crons if needed after DST changes.
+# Market hours check (in prefetch_cloud.py):
+#   - Mon-Fri, 9:00 AM - 4:30 PM ET (with DST auto-detection)
+#   - Auto-mode: first run = full, last run = eod, rest = quick
+#   - Outside market hours: exits with code 0 (no error)
+#
+# The keepalive step prevents GitHub's 60-day inactivity auto-disable
+# by committing a tiny timestamp file on Sundays.
 #
 # Required GitHub Secrets (Settings > Secrets and variables > Actions):
 #   SUPABASE_URL  — e.g. https://idtytpyehfbqldnvwenb.supabase.co
@@ -19,23 +25,22 @@
 name: Data Pre-Fetch
 
 on:
-  # ── Scheduled runs ────────────────────────────────────────────────────
+  # Single cron: every 15 min, every day.
+  # Python handles market hours gating — this simplifies GitHub's scheduler
+  # and avoids the throttling that happens with multiple cron lines.
   schedule:
-    # Quick refresh: every 15 min, market hours Mon-Fri
-    # 1330-2015 UTC = 6:30am-1:15pm PT (during PDT)
-    - cron: '30,45 13 * * 1-5'
-    - cron: '0,15,30,45 14-19 * * 1-5'
-    - cron: '0,15 20 * * 1-5'
+    - cron: '*/15 * * * *'
 
-  # ── Manual trigger (for testing or forcing a refresh) ─────────────────
+  # Manual trigger (for testing or forcing a refresh)
   workflow_dispatch:
     inputs:
       mode:
         description: 'Run mode'
         required: true
-        default: 'quick'
+        default: 'auto'
         type: choice
         options:
+          - auto
           - quick
           - full
           - eod
@@ -48,6 +53,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -59,35 +66,61 @@ jobs:
         run: |
           pip install yfinance pandas requests openpyxl
 
-      - name: Determine run mode
-        id: mode
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
-          else
-            # Auto-detect: first run of the day (13:30 UTC) = full, last (20:15) = eod, else quick
-            HOUR=$(date -u +%H)
-            MIN=$(date -u +%M)
-            if [ "$HOUR" = "13" ] && [ "$MIN" = "30" ]; then
-              echo "mode=full" >> $GITHUB_OUTPUT
-            elif [ "$HOUR" = "20" ] && [ "$MIN" = "15" ]; then
-              echo "mode=eod" >> $GITHUB_OUTPUT
-            else
-              echo "mode=quick" >> $GITHUB_OUTPUT
-            fi
-          fi
-          echo "Run mode: $(cat $GITHUB_OUTPUT | grep mode | cut -d= -f2)"
-
       - name: Run prefetch
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-          RUN_MODE: ${{ steps.mode.outputs.mode }}
         run: |
-          python prefetch_cloud.py --mode $RUN_MODE
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ github.event.inputs.mode }}"
+            # Manual dispatch with non-auto mode should force run
+            if [ "$MODE" != "auto" ]; then
+              python prefetch_cloud.py --mode "$MODE" --force
+            else
+              python prefetch_cloud.py --mode auto
+            fi
+          else
+            python prefetch_cloud.py --mode auto
+          fi
 
       - name: Log result
         if: always()
         run: |
           echo "Prefetch completed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-          echo "Mode: ${{ steps.mode.outputs.mode }}"
+
+  # ── Keepalive: prevent GitHub's 60-day inactivity auto-disable ────────
+  # Runs once a week (Sunday midnight UTC) and commits a tiny file
+  # so the repo shows activity and GitHub doesn't disable the schedule.
+  keepalive:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '*/15 * * * *'
+    # Only run on Sundays (day 0 in cron, but we check in the step)
+    steps:
+      - name: Check if Sunday
+        id: check
+        run: |
+          DAY=$(date -u +%u)  # 1=Mon, 7=Sun
+          HOUR=$(date -u +%H)
+          MIN=$(date -u +%M)
+          # Run only on Sunday at ~00:00 UTC (first cron hit of the day)
+          if [ "$DAY" = "7" ] && [ "$HOUR" = "00" ] && [ "$MIN" -lt "16" ]; then
+            echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout repo
+        if: steps.check.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update keepalive timestamp
+        if: steps.check.outputs.run == 'true'
+        run: |
+          date -u '+%Y-%m-%d %H:%M:%S UTC' > .github/keepalive.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/keepalive.txt
+          git diff --cached --quiet || git commit -m "keepalive: $(date -u '+%Y-%m-%d')"
+          git push || echo "Push failed — repo may be read-only"

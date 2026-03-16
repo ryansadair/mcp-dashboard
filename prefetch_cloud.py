@@ -733,20 +733,92 @@ def push_to_supabase(prices=None, dividends=None, indices=None,
 # MAIN
 # ══════════════════════════════════════════════════════════════════════════
 
+def _is_market_hours():
+    """
+    Check if current UTC time falls within US equity market hours.
+    Market: Mon-Fri, 9:30 AM - 4:00 PM ET.
+    We add a 30-min buffer on each side for pre/post processing.
+    Returns (is_open, et_hour, et_min, weekday).
+
+    ET offset: UTC-4 during EDT (Mar-Nov), UTC-5 during EST (Nov-Mar).
+    We detect DST by checking if we're between 2nd Sunday of March
+    and 1st Sunday of November.
+    """
+    from datetime import timezone
+    now_utc = datetime.now(timezone.utc)
+    year = now_utc.year
+    weekday = now_utc.weekday()  # 0=Mon, 6=Sun
+
+    # Find 2nd Sunday of March and 1st Sunday of November for DST
+    mar1 = date(year, 3, 1)
+    mar_first_sun = 7 - mar1.weekday() if mar1.weekday() != 6 else 0
+    dst_start = date(year, 3, mar_first_sun + 7 + 1)  # 2nd Sunday
+
+    nov1 = date(year, 11, 1)
+    nov_first_sun = 7 - nov1.weekday() if nov1.weekday() != 6 else 0
+    dst_end = date(year, 11, nov_first_sun + 1)  # 1st Sunday
+
+    today = now_utc.date()
+    is_edt = dst_start <= today < dst_end
+    et_offset = 4 if is_edt else 5
+
+    et_hour = (now_utc.hour - et_offset) % 24
+    et_min = now_utc.minute
+
+    # Market hours with buffer: 9:00 AM - 4:30 PM ET, Mon-Fri
+    is_weekday = weekday < 5
+    is_in_window = (et_hour > 9 or (et_hour == 9 and et_min >= 0)) and \
+                   (et_hour < 16 or (et_hour == 16 and et_min <= 30))
+
+    return is_weekday and is_in_window, et_hour, et_min, weekday
+
+
+def _auto_detect_mode(et_hour, et_min):
+    """
+    Auto-detect run mode based on Eastern Time:
+      - 9:00 AM ET (first run of day): full
+      - 4:00-4:30 PM ET (after close): eod
+      - Everything else: quick
+    """
+    if et_hour == 9 and et_min <= 15:
+        return "full"
+    elif et_hour == 16:
+        return "eod"
+    return "quick"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Martin Capital — Cloud Data Pre-Fetcher")
-    parser.add_argument("--mode", choices=["quick", "full", "eod"], default="quick",
-                        help="quick=prices+indices, full=everything, eod=prices+indices+benchmarks")
+    parser.add_argument("--mode", choices=["quick", "full", "eod", "auto"], default="auto",
+                        help="quick=prices+indices, full=everything, eod=prices+indices+benchmarks, auto=detect from time")
     parser.add_argument("--dry", action="store_true", help="Skip Supabase push (testing)")
+    parser.add_argument("--force", action="store_true", help="Run even outside market hours")
     args = parser.parse_args()
 
     start = time.time()
-    mode  = args.mode
+
+    # ── Market hours gate ─────────────────────────────────────────────────
+    is_open, et_hour, et_min, weekday = _is_market_hours()
+    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+    if not is_open and not args.force and args.mode == "auto":
+        print(f"\n  Martin Capital — Cloud Pre-Fetch")
+        print(f"  {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')} "
+              f"({day_names[weekday]} {et_hour}:{et_min:02d} ET)")
+        print(f"  Outside market hours — skipping. Use --force to override.")
+        sys.exit(0)
+
+    # ── Mode detection ────────────────────────────────────────────────────
+    if args.mode == "auto":
+        mode = _auto_detect_mode(et_hour, et_min)
+    else:
+        mode = args.mode
 
     print(f"\n{'=' * 60}")
     print(f"  Martin Capital — Cloud Pre-Fetch")
     print(f"  Mode: {mode.upper()}{'  (DRY RUN)' if args.dry else ''}")
-    print(f"  {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    print(f"  {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')} "
+          f"({day_names[weekday]} {et_hour}:{et_min:02d} ET)")
     print(f"{'=' * 60}\n")
 
     # 1. Gather tickers
