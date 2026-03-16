@@ -85,6 +85,20 @@ try:
 except ImportError:
     ALERTS_AVAILABLE = False
 
+# Finviz enrichment (Sprint 7)
+try:
+    from data.finviz_tab import render_finviz_panel
+    FINVIZ_AVAILABLE = True
+except ImportError:
+    FINVIZ_AVAILABLE = False
+
+# Mobile responsiveness (Sprint 7)
+try:
+    from utils.mobile_css import inject_mobile_css
+    MOBILE_CSS_AVAILABLE = True
+except ImportError:
+    MOBILE_CSS_AVAILABLE = False
+
 # Monthly YTD returns from Tamarac (separate file Ryan updates)
 try:
     from data.monthly_returns import STRATEGY_YTD, AS_OF_DATE
@@ -102,6 +116,10 @@ from streamlit_autorefresh import st_autorefresh
 st_autorefresh(interval=15 * 60 * 1000, key="data_refresh")
 
 inject_global_css()
+
+# Sprint 7: mobile responsiveness
+if MOBILE_CSS_AVAILABLE:
+    inject_mobile_css()
 
 render_header()
 render_market_ticker()
@@ -149,10 +167,14 @@ if DETECTOR_AVAILABLE:
             _tam_age = _tam_status["age_days"]
             _tam_dot = "#C9A84C" if _tam_status["stale"] else "rgba(86,149,66,0.7)"
             _tam_age_str = f"{_tam_age}d ago" if _tam_age > 0 else "today"
+            # Show the internal "As of Date" from the Excel, not filesystem mtime
+            _tam_date_str = ""
+            if _tam_status.get("as_of_date"):
+                _tam_date_str = f' · as-of {_tam_status["as_of_date"].strftime("%b %d")}'
             _status_parts.append(
                 f'<span style="width:6px;height:6px;border-radius:50%;background:{_tam_dot};'
                 f'display:inline-block;"></span>'
-                f'<span>Tamarac: {_tam_status["filename"]} · updated {_tam_age_str}</span>'
+                f'<span>Tamarac: {_tam_status["filename"]}{_tam_date_str} · {_tam_age_str}</span>'
             )
     except Exception:
         pass
@@ -698,6 +720,11 @@ with tab_holdings:
                     )
                     st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
 
+            # ── Finviz Analyst Enrichment (Sprint 7) ─────────────────
+            if FINVIZ_AVAILABLE:
+                st.divider()
+                render_finviz_panel(tam_df, price_data)
+
             st.caption(f"Tamarac export + yfinance live prices • {datetime.now().strftime('%I:%M %p')}")
 
         else:
@@ -1008,7 +1035,7 @@ st.markdown(
     "border-top:1px solid rgba(255,255,255,0.04);font-size:11px;color:rgba(255,255,255,0.2);'>"
     "<span>© 2026 Martin Capital Partners LLC</span>"
     "<span style='opacity:0.3;'>|</span>"
-    "<span>Data: yfinance · FRED · Notion</span>"
+    "<span>Data: yfinance · FRED · Notion · Finviz</span>"
     "<span style='opacity:0.3;'>|</span>"
     "<span>Internal use only</span>"
     "</div>",

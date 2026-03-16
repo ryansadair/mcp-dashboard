@@ -57,6 +57,34 @@ _FILE_PATTERNS = [
 STALE_THRESHOLD_DAYS = 7
 
 
+# ── As-of-date reader ─────────────────────────────────────────────────────
+
+def _read_as_of_date(path):
+    """
+    Read the 'As of Date' from inside a Tamarac Excel file (cell A2 of
+    the first sheet).  Returns a datetime, or None on failure.
+
+    This is more reliable than os.path.getmtime() because OneDrive syncs
+    can update the filesystem modification time without changing the file
+    content.  The 'As of Date' only changes when Ryan exports a new file
+    from Tamarac.
+    """
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        ws = wb[wb.sheetnames[0]]
+        val = ws.cell(2, 1).value
+        wb.close()
+        if isinstance(val, datetime):
+            return val
+        # Try parsing string dates
+        if val:
+            return datetime.strptime(str(val)[:10], "%Y-%m-%d")
+    except Exception:
+        pass
+    return None
+
+
 # ── Core lookup ────────────────────────────────────────────────────────────
 
 def _scan_for_files():
@@ -96,17 +124,25 @@ def find_best_tamarac_file():
 def find_all_tamarac_files():
     """
     Return list of all found Tamarac files as dicts:
-    [{"path": str, "modified": datetime, "size_kb": float, "filename": str}, ...]
-    Sorted newest-first.
+    [{"path": str, "modified": datetime, "as_of_date": datetime|None,
+      "size_kb": float, "filename": str}, ...]
+    Sorted newest-first by as_of_date (falls back to mtime if unreadable).
     """
     results = []
     for path_str, mtime in _scan_for_files():
+        as_of = _read_as_of_date(path_str)
         results.append({
             "path": path_str,
             "filename": os.path.basename(path_str),
             "modified": datetime.fromtimestamp(mtime),
+            "as_of_date": as_of,
             "size_kb": round(os.path.getsize(path_str) / 1024, 1),
         })
+    # Re-sort by as_of_date (prefer internal date), falling back to mtime
+    results.sort(
+        key=lambda x: x["as_of_date"] or x["modified"],
+        reverse=True,
+    )
     return results
 
 
@@ -141,13 +177,18 @@ def get_tamarac_status():
         }
 
     best = files[0]
-    age = (datetime.now() - best["modified"]).days
+    # Use the internal "As of Date" from the Excel file for age calculation.
+    # This is immune to OneDrive syncs bumping the filesystem mtime.
+    # Fall back to mtime if the internal date can't be read.
+    effective_date = best.get("as_of_date") or best["modified"]
+    age = (datetime.now() - effective_date).days
 
     return {
         "found": True,
         "path": best["path"],
         "filename": best["filename"],
         "modified": best["modified"],
+        "as_of_date": best.get("as_of_date"),
         "age_days": age,
         "stale": age > STALE_THRESHOLD_DAYS,
         "all_files": files,
@@ -171,13 +212,15 @@ def render_tamarac_status_banner():
         )
         return status
 
-    mod_str = status["modified"].strftime("%b %d, %Y at %I:%M %p")
+    # Show the internal "As of Date" if available, otherwise fall back to mtime
+    display_date = status.get("as_of_date") or status["modified"]
+    mod_str = display_date.strftime("%b %d, %Y")
     age = status["age_days"]
 
     if status["stale"]:
         st.warning(
             f"📂 **Tamarac data is {age} days old** — "
-            f"`{status['filename']}` last modified {mod_str}. "
+            f"`{status['filename']}` as-of {mod_str}. "
             f"Consider uploading a fresh export.",
             icon="⏰"
         )
@@ -186,7 +229,7 @@ def render_tamarac_status_banner():
         st.markdown(
             f"<div style='font-size:11px;color:rgba(255,255,255,0.3);padding:2px 0 6px 0;'>"
             f"📂 Tamarac: <span style=\"color:rgba(86,149,66,0.7);\">{status['filename']}</span>"
-            f" · updated {mod_str}"
+            f" · as-of {mod_str}"
             f"{'  · <span style=\"color:rgba(201,168,76,0.7);\">(' + str(age) + 'd ago)</span>' if age > 0 else ''}"
             f"</div>",
             unsafe_allow_html=True,
