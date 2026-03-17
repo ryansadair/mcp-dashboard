@@ -399,40 +399,51 @@ with tab_overview:
                     # Sort within each sector by daily return (best first)
                     hm_df = hm_df.sort_values(["sector", "daily_return"], ascending=[True, False])
 
-                    # Build hierarchical labels/parents for sector grouping
-                    # Structure: root ("") → sector → ticker
+                    strat_label = STRATEGY_NAMES.get(active, active)
+
+                    # Build hierarchical ids/labels/parents for sector grouping
+                    # Structure: root → sector → ticker
+                    # Use unique ids to avoid conflicts (e.g. ticker name = sector name)
+                    tm_ids = []
                     tm_labels = []
                     tm_parents = []
                     tm_values = []
                     tm_text = []
                     tm_colors = []
 
-                    strat_label = STRATEGY_NAMES.get(active, active)
+                    # Root node
+                    tm_ids.append("root")
+                    tm_labels.append(strat_label)
+                    tm_parents.append("")
+                    tm_values.append(0)
+                    tm_text.append("")
+                    tm_colors.append(0)
 
-                    # Add sector parent nodes (Plotly needs them explicitly)
-                    sectors_seen = []
+                    # Sector parent nodes
                     for sector in hm_df["sector"].unique():
-                        sectors_seen.append(sector)
+                        tm_ids.append(f"sector_{sector}")
                         tm_labels.append(sector)
-                        tm_parents.append(strat_label)
-                        tm_values.append(0)  # Plotly computes from children
+                        tm_parents.append("root")
+                        tm_values.append(0)
                         tm_text.append("")
-                        tm_colors.append(0)  # neutral color for sector headers
+                        tm_colors.append(0)
 
-                    # Add ticker leaf nodes under their sector
+                    # Ticker leaf nodes under their sector
                     for _, row in hm_df.iterrows():
+                        tm_ids.append(f"tick_{row['symbol']}")
                         tm_labels.append(row["symbol"])
-                        tm_parents.append(row["sector"])
+                        tm_parents.append(f"sector_{row['sector']}")
                         tm_values.append(row["weight"])
                         tm_text.append(f"{row['daily_return']:+.2f}%")
                         tm_colors.append(row["daily_return"])
 
                     fig_tm = go.Figure(go.Treemap(
+                        ids=tm_ids,
                         labels=tm_labels,
                         parents=tm_parents,
                         values=tm_values,
                         text=tm_text,
-                        branchvalues="total",
+                        branchvalues="remainder",
                         texttemplate="<b>%{label}</b><br>%{text}",
                         textfont=dict(size=13, family="DM Sans"),
                         hovertemplate=(
@@ -459,8 +470,8 @@ with tab_overview:
                         pathbar=dict(visible=False),
                     ))
 
-                    # Start one level down so sectors show as groups, not a single root block
-                    fig_tm.update_traces(level=strat_label)
+                    # Start at root level so sectors show as groups
+                    fig_tm.update_traces(level="root")
 
                     _tm_layout = {**PLOTLY_DARK}
                     _tm_layout["margin"] = dict(l=0, r=0, t=36, b=0)
