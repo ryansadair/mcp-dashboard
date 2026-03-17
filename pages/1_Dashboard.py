@@ -261,10 +261,11 @@ tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_ma
     "📊 Overview", "📋 Holdings", "📈 Performance", "💰 Dividends", "🔍 Watchlist", "🌐 Macro", "🏛️ Markets", "🔔 Alerts"
 ])
 
-# ── Strategy Selector (now below tabs) ────────────────────────────────────
+# ── Strategy state + data (computed once, rendered per-tab) ───────────────
 if "active_strategy" not in st.session_state:
     st.session_state["active_strategy"] = "QDVD"
 
+# Inject selectbox styling once (global CSS)
 st.markdown("""
 <style>
 [data-testid="stSelectbox"] { max-width: 460px; }
@@ -297,24 +298,33 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Compute strategy data once (shared across all tabs)
 strat_keys   = list(STRATEGIES.keys())
 strat_labels = [f"{STRATEGIES[k]['full_name']}  ({k})" for k in strat_keys]
-current_idx  = strat_keys.index(st.session_state["active_strategy"])
-selected_label = st.selectbox(
-    "Strategy", options=strat_labels, index=current_idx,
-    key="strategy_select", label_visibility="collapsed",
-)
-selected_key = strat_keys[strat_labels.index(selected_label)]
-if selected_key != st.session_state["active_strategy"]:
-    st.session_state["active_strategy"] = selected_key
-    st.rerun()
 
+# We need a unique selectbox key per tab to avoid Streamlit duplicate key errors,
+# but all of them sync to the same session_state value.
+def _render_strategy_header(tab_key):
+    """Render strategy selector + KPI cards inside a tab. Call at the top of each strategy-specific tab."""
+    current_idx = strat_keys.index(st.session_state["active_strategy"])
+    selected_label = st.selectbox(
+        "Strategy", options=strat_labels, index=current_idx,
+        key=f"strategy_select_{tab_key}", label_visibility="collapsed",
+    )
+    selected_key = strat_keys[strat_labels.index(selected_label)]
+    if selected_key != st.session_state["active_strategy"]:
+        st.session_state["active_strategy"] = selected_key
+        st.rerun()
+
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+    render_kpi_cards(active, kpis, bench_ytd)
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+# Pre-compute active strategy data (used by _render_strategy_header and tab content)
 active = st.session_state["active_strategy"]
 strat = STRATEGIES[active]
 kpis = get_strategy_kpis(active)
 bench_ytd = get_benchmark_ytd(strat["bench_ticker"])
-
-# (Tamarac status now displayed in combined status line below market ticker)
 
 # ── Override KPIs with real data when Sprint 2 is available ───────────────
 if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
@@ -322,11 +332,9 @@ if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
     cash_kpi = get_cash_weight(tamarac_parsed, active)
 
     if not tam_kpi.empty:
-        # Real holdings count (excluding cash)
-        kpis = dict(kpis)  # copy so we don't mutate the cached dict
+        kpis = dict(kpis)
         kpis["holdings"] = len(tam_kpi)
 
-        # Real dividend yield and daily return from yfinance
         kpi_tickers = tuple(tam_kpi["symbol"].tolist())
         kpi_prices = fetch_batch_prices(kpi_tickers)
 
@@ -343,18 +351,14 @@ if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
             weighted_daily += wt * chg
             equity_weight += wt
 
-        # Dividend yield: weighted avg across equity holdings only
         if equity_weight > 0:
             kpis["div_yield"] = round(weighted_yield / equity_weight, 2)
 
-        # Daily return: include cash (0% return) so total weights sum to 100%
-        # Cash contributes nothing to return but dilutes the overall move
-        cash_decimal = cash_kpi / 100  # cash_kpi is already a percentage
+        cash_decimal = cash_kpi / 100
         total_portfolio_weight = equity_weight + cash_decimal
         if total_portfolio_weight > 0:
             kpis["daily_return"] = round(weighted_daily / total_portfolio_weight, 2)
 
-        # Cash weight for KPI card
         kpis["cash_pct"] = round(cash_kpi, 1)
 
 # Override YTD with official Tamarac monthly numbers when available
@@ -362,13 +366,6 @@ if MONTHLY_RETURNS_AVAILABLE and active in STRATEGY_YTD:
     kpis = dict(kpis) if not isinstance(kpis, dict) else kpis
     kpis["ytd"] = STRATEGY_YTD[active]
     kpis["ytd_as_of"] = AS_OF_DATE
-
-st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
-# ── KPI Cards ──────────────────────────────────────────────────────────────
-render_kpi_cards(active, kpis, bench_ytd)
-
-st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 # ── Plotly dark theme (reused across tabs) ─────────────────────────────────
 PLOTLY_DARK = dict(
@@ -406,6 +403,7 @@ _YAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(
 # OVERVIEW
 # ══════════════════════════════════════════════════════════════════════════
 with tab_overview:
+    _render_strategy_header("overview")
     left, right = st.columns([3, 2])
 
     with left:
@@ -662,6 +660,7 @@ with tab_overview:
 # HOLDINGS — Sprint 2 upgrade: real Tamarac + live yfinance
 # ══════════════════════════════════════════════════════════════════════════
 with tab_holdings:
+    _render_strategy_header("holdings")
 
     # ── Sprint 2: Tamarac + yfinance ─────────────────────────────────────
     if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
@@ -866,6 +865,7 @@ with tab_holdings:
 # PERFORMANCE — Powered by Strategy_Returns.xlsx
 # ══════════════════════════════════════════════════════════════════════════
 with tab_perf:
+    _render_strategy_header("perf")
     from data.performance import load_strategy_returns, get_benchmark_ytd
 
     all_returns = load_strategy_returns()
@@ -1037,6 +1037,7 @@ with tab_perf:
 # DIVIDENDS — Sprint 4: full dividend intelligence with sub-tabs
 # ══════════════════════════════════════════════════════════════════════════
 with tab_divs:
+    _render_strategy_header("divs")
 
     if DIV_TAB_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
         render_dividends_tab(tamarac_parsed, active, strat, kpis)
@@ -1120,6 +1121,7 @@ with tab_markets:
 # ALERTS
 # ══════════════════════════════════════════════════════════════════════════
 with tab_alerts:
+    _render_strategy_header("alerts")
     if ALERTS_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed:
         render_alerts_tab(tamarac_parsed, active)
     elif not ALERTS_AVAILABLE:
