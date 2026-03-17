@@ -368,7 +368,7 @@ with tab_overview:
     left, right = st.columns([3, 2])
 
     with left:
-        # Holdings Daily Return Heatmap
+        # Holdings Daily Return Treemap
         if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
             tam_ov_hm = get_holdings_for_strategy(tamarac_parsed, active)
 
@@ -381,48 +381,59 @@ with tab_overview:
                     sym = row["symbol"]
                     mkt = ov_hm_prices.get(sym, {})
                     chg = mkt.get("change_1d_pct", 0) or 0
+                    sector = mkt.get("sector", "") or "Other"
                     hm_rows.append({
                         "symbol": sym,
                         "weight": row["weight_pct"],
                         "daily_return": round(chg, 2),
+                        "sector": sector,
                     })
 
                 hm_df = pd.DataFrame(hm_rows).sort_values("weight", ascending=False)
 
                 if len(hm_df) > 0:
-                    bar_df = hm_df.sort_values("daily_return", ascending=True)
-                    colors = ["#569542" if r >= 0 else "#c45454" for r in bar_df["daily_return"]]
-                    fig_bar = go.Figure()
-                    _bar_min = bar_df["daily_return"].min()
-                    _bar_max = bar_df["daily_return"].max()
-                    _bar_pad = max(abs(_bar_min), abs(_bar_max)) * 0.25
-                    fig_bar.add_trace(go.Bar(
-                        x=bar_df["daily_return"], y=bar_df["symbol"], orientation="h",
-                        marker=dict(color=colors),
-                        text=[f"{r:+.2f}%" for r in bar_df["daily_return"]],
-                        textposition="outside",
-                        textfont=dict(size=10, color="rgba(255,255,255,0.6)"),
-                        cliponaxis=False,
-                    ))
-                    fig_bar.update_layout(
-                        title=f"Today's Returns — {STRATEGY_NAMES.get(active, active)}",
-                        paper_bgcolor="rgba(255,255,255,0.02)",
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        font=dict(family="DM Sans", color="rgba(255,255,255,0.6)"),
-                        margin=dict(l=10, r=60, t=40, b=10),
-                        height=max(250, len(bar_df) * 22 + 60),
-                        xaxis=dict(
-                            gridcolor="rgba(255,255,255,0.04)",
-                            showline=False, ticksuffix="%", zeroline=True,
-                            zerolinecolor="rgba(255,255,255,0.1)",
-                            fixedrange=True,
-                            range=[_bar_min - _bar_pad, _bar_max + _bar_pad],
+                    # Build treemap: blocks sized by weight, colored by daily return
+                    # Color scale: red (negative) → dark neutral → green (positive)
+                    _tm_max = max(abs(hm_df["daily_return"].min()), abs(hm_df["daily_return"].max()), 1.0)
+
+                    fig_tm = go.Figure(go.Treemap(
+                        labels=hm_df["symbol"],
+                        parents=[""] * len(hm_df),
+                        values=hm_df["weight"],
+                        text=[f"{r:+.2f}%" for r in hm_df["daily_return"]],
+                        texttemplate="<b>%{label}</b><br>%{text}",
+                        textfont=dict(size=13, family="DM Sans"),
+                        hovertemplate=(
+                            "<b>%{label}</b><br>"
+                            "Weight: %{value:.1f}%<br>"
+                            "Return: %{text}<extra></extra>"
                         ),
-                        yaxis=dict(showgrid=False, showline=False, tickfont=dict(size=10), fixedrange=True),
-                        showlegend=False,
-                        dragmode=False,
+                        marker=dict(
+                            colors=hm_df["daily_return"],
+                            colorscale=[
+                                [0.0, "#c45454"],       # most negative → red
+                                [0.35, "#8a3a3a"],      # mild negative
+                                [0.5, "rgba(40,40,50,1)"],  # zero → dark neutral
+                                [0.65, "#3a6a30"],      # mild positive
+                                [1.0, "#569542"],       # most positive → green
+                            ],
+                            cmid=0,
+                            cmin=-_tm_max,
+                            cmax=_tm_max,
+                            line=dict(width=2, color="rgba(12,17,23,0.8)"),
+                            showscale=False,
+                        ),
+                        tiling=dict(pad=3),
+                    ))
+
+                    _tm_layout = {**PLOTLY_DARK}
+                    _tm_layout["margin"] = dict(l=0, r=0, t=36, b=0)
+                    fig_tm.update_layout(
+                        **_tm_layout,
+                        title=f"Today's Returns — {STRATEGY_NAMES.get(active, active)}",
+                        height=360,
                     )
-                    st.plotly_chart(fig_bar, use_container_width=True, config=PLOTLY_CONFIG)
+                    st.plotly_chart(fig_tm, use_container_width=True, config=PLOTLY_CONFIG)
                 else:
                     st.info("No holdings data available.")
             else:
