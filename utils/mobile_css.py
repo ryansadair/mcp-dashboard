@@ -101,9 +101,11 @@ def inject_mobile_css():
         min-width: 600px;
     }
 
-    /* Plotly charts: reduce height */
+    /* Plotly charts: let them use their natural height from Python.
+       The treemap and other charts set their own heights appropriately.
+       Only constrain if needed for specific chart types. */
     [data-testid="stPlotlyChart"] {
-        max-height: 300px !important;
+        overflow: hidden !important;
     }
 
     /* Custom HTML tables (markets, alerts): allow scroll */
@@ -160,9 +162,9 @@ def inject_mobile_css():
         font-size: 10px !important;
     }
 
-    /* Plotly: shorter on phone */
+    /* Plotly: let charts use natural height on phone too */
     [data-testid="stPlotlyChart"] {
-        max-height: 240px !important;
+        overflow: hidden !important;
     }
 
     /* Expanders: bigger touch target */
