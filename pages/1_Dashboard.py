@@ -392,15 +392,47 @@ with tab_overview:
                 hm_df = pd.DataFrame(hm_rows).sort_values("weight", ascending=False)
 
                 if len(hm_df) > 0:
-                    # Build treemap: blocks sized by weight, colored by daily return
+                    # Build treemap: grouped by sector, sorted by return within each sector
                     # Color scale: red (negative) → dark neutral → green (positive)
                     _tm_max = max(abs(hm_df["daily_return"].min()), abs(hm_df["daily_return"].max()), 1.0)
 
+                    # Sort within each sector by daily return (best first)
+                    hm_df = hm_df.sort_values(["sector", "daily_return"], ascending=[True, False])
+
+                    # Build hierarchical labels/parents for sector grouping
+                    # Structure: root ("") → sector → ticker
+                    tm_labels = []
+                    tm_parents = []
+                    tm_values = []
+                    tm_text = []
+                    tm_colors = []
+
+                    strat_label = STRATEGY_NAMES.get(active, active)
+
+                    # Add sector parent nodes (Plotly needs them explicitly)
+                    sectors_seen = []
+                    for sector in hm_df["sector"].unique():
+                        sectors_seen.append(sector)
+                        tm_labels.append(sector)
+                        tm_parents.append(strat_label)
+                        tm_values.append(0)  # Plotly computes from children
+                        tm_text.append("")
+                        tm_colors.append(0)  # neutral color for sector headers
+
+                    # Add ticker leaf nodes under their sector
+                    for _, row in hm_df.iterrows():
+                        tm_labels.append(row["symbol"])
+                        tm_parents.append(row["sector"])
+                        tm_values.append(row["weight"])
+                        tm_text.append(f"{row['daily_return']:+.2f}%")
+                        tm_colors.append(row["daily_return"])
+
                     fig_tm = go.Figure(go.Treemap(
-                        labels=hm_df["symbol"],
-                        parents=[""] * len(hm_df),
-                        values=hm_df["weight"],
-                        text=[f"{r:+.2f}%" for r in hm_df["daily_return"]],
+                        labels=tm_labels,
+                        parents=tm_parents,
+                        values=tm_values,
+                        text=tm_text,
+                        branchvalues="total",
                         texttemplate="<b>%{label}</b><br>%{text}",
                         textfont=dict(size=13, family="DM Sans"),
                         hovertemplate=(
@@ -409,13 +441,13 @@ with tab_overview:
                             "Return: %{text}<extra></extra>"
                         ),
                         marker=dict(
-                            colors=hm_df["daily_return"],
+                            colors=tm_colors,
                             colorscale=[
-                                [0.0, "#c45454"],       # most negative → red
-                                [0.35, "#8a3a3a"],      # mild negative
+                                [0.0, "#c45454"],           # most negative → red
+                                [0.35, "#8a3a3a"],          # mild negative
                                 [0.5, "rgba(40,40,50,1)"],  # zero → dark neutral
-                                [0.65, "#3a6a30"],      # mild positive
-                                [1.0, "#569542"],       # most positive → green
+                                [0.65, "#3a6a30"],          # mild positive
+                                [1.0, "#569542"],           # most positive → green
                             ],
                             cmid=0,
                             cmin=-_tm_max,
@@ -424,13 +456,17 @@ with tab_overview:
                             showscale=False,
                         ),
                         tiling=dict(pad=3),
+                        pathbar=dict(visible=False),
                     ))
+
+                    # Start one level down so sectors show as groups, not a single root block
+                    fig_tm.update_traces(level=strat_label)
 
                     _tm_layout = {**PLOTLY_DARK}
                     _tm_layout["margin"] = dict(l=0, r=0, t=36, b=0)
                     fig_tm.update_layout(
                         **_tm_layout,
-                        title=f"Today's Returns — {STRATEGY_NAMES.get(active, active)}",
+                        title=f"Today's Returns — {strat_label}",
                         height=360,
                     )
                     st.plotly_chart(fig_tm, use_container_width=True, config=PLOTLY_CONFIG)
