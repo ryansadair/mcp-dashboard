@@ -215,7 +215,53 @@ if SPRINT2_AVAILABLE:
         _tam_mtime = os.path.getmtime(_tamarac_path)
         tamarac_parsed = _load_tamarac(_tamarac_path, _mtime=_tam_mtime)
 
-# ── Strategy Selector ──────────────────────────────────────────────────────
+# ── Top-Level Navigation Tabs (Sprint 7: promoted above strategy selector) ─
+# Styled as a primary nav bar with gold active indicator
+st.markdown("""
+<style>
+/* ── Top-level tab nav bar styling ─────────────────────────────────────── */
+[data-testid="stTabs"] {
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 0px;
+}
+[data-testid="stTabs"] [role="tablist"] {
+    gap: 0px !important;
+    background: rgba(0,0,0,0.15);
+    border-radius: 0;
+    padding: 0 16px;
+}
+[data-testid="stTabs"] [role="tab"] {
+    padding: 14px 20px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.02em;
+    color: rgba(255,255,255,0.45) !important;
+    border-bottom: 3px solid transparent !important;
+    border-radius: 0 !important;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+[data-testid="stTabs"] [role="tab"]:hover {
+    color: rgba(255,255,255,0.7) !important;
+    background: rgba(255,255,255,0.02) !important;
+}
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+    color: rgba(255,255,255,0.95) !important;
+    border-bottom: 3px solid #C9A84C !important;
+    background: rgba(201,168,76,0.04) !important;
+}
+/* Remove Streamlit's default tab underline */
+[data-testid="stTabs"] [role="tablist"] {
+    border-bottom: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
+    "📊 Overview", "📋 Holdings", "📈 Performance", "💰 Dividends", "🔍 Watchlist", "🌐 Macro", "🏛️ Markets", "🔔 Alerts"
+])
+
+# ── Strategy Selector (now below tabs) ────────────────────────────────────
 if "active_strategy" not in st.session_state:
     st.session_state["active_strategy"] = "QDVD"
 
@@ -323,11 +369,6 @@ st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 render_kpi_cards(active, kpis, bench_ytd)
 
 st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
-# ── Tabs ───────────────────────────────────────────────────────────────────
-tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
-    "📊 Overview", "📋 Holdings", "📈 Performance", "💰 Dividends", "🔍 Watchlist", "🌐 Macro", "🏛️ Markets", "🔔 Alerts"
-])
 
 # ── Plotly dark theme (reused across tabs) ─────────────────────────────────
 PLOTLY_DARK = dict(
