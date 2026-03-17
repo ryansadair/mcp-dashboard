@@ -478,7 +478,7 @@ with tab_overview:
                     fig_tm.update_layout(
                         **_tm_layout,
                         title=f"Today's Returns — {strat_label}",
-                        height=360,
+                        height=max(550, len(hm_df) * 18 + 100),
                     )
                     st.plotly_chart(fig_tm, use_container_width=True, config=PLOTLY_CONFIG)
                 else:
