@@ -1,22 +1,28 @@
 # Martin Capital Partners — Automated Data Pre-Fetch
 # .github/workflows/prefetch.yml
 #
-# Replaces Windows Task Scheduler. Runs on GitHub's servers,
-# pushes data to Supabase. No dependency on Ryan's office machine.
+# Runs on GitHub's servers, pushes data to Supabase.
+# No dependency on Ryan's office machine.
 #
-# DESIGN: Single cron entry runs every 15 min, 24/7/365.
-# The Python script itself checks market hours and exits early
-# if outside the window. This avoids GitHub Actions' cron throttling
-# issue where multiple cron lines on low-activity repos get merged
-# or skipped.
+# Schedule: every 15 min during US market hours only (EDT).
+# Market: 9:30 AM - 4:00 PM ET. We run 9:00 AM - 4:30 PM ET for buffer.
+# EDT = UTC-4, so 9:00 AM ET = 13:00 UTC, 4:30 PM ET = 20:30 UTC.
 #
-# Market hours check (in prefetch_cloud.py):
-#   - Mon-Fri, 9:00 AM - 4:30 PM ET (with DST auto-detection)
-#   - Auto-mode: first run = full, last run = eod, rest = quick
-#   - Outside market hours: exits with code 0 (no error)
+# Two cron lines cover 13:00-20:30 UTC, Mon-Fri:
+#   Line 1: minutes 0,15,30,45 for hours 13-19 UTC
+#   Line 2: minutes 0,15,30 for hour 20 UTC (last 3 slots)
 #
-# The keepalive step prevents GitHub's 60-day inactivity auto-disable
-# by committing a tiny timestamp file on Sundays.
+# The Python script has its own market hours check as a safety net
+# (with DST detection), so even if cron fires at a bad time, it exits
+# cleanly in <1 second.
+#
+# NOTE on DST: These cron times are for EDT (Mar-Nov). During EST
+# (Nov-Mar), market hours shift to 14:00-21:30 UTC. Update these
+# crons after the November DST change, or rely on the Python safety
+# net which auto-detects DST and will simply skip the early/late runs.
+#
+# GitHub Actions cron caveat: GitHub may delay or skip scheduled runs
+# on low-activity repos. A manual trigger is always available as backup.
 #
 # Required GitHub Secrets (Settings > Secrets and variables > Actions):
 #   SUPABASE_URL  — e.g. https://idtytpyehfbqldnvwenb.supabase.co
@@ -25,11 +31,11 @@
 name: Data Pre-Fetch
 
 on:
-  # Single cron: every 15 min, every day.
-  # Python handles market hours gating — this simplifies GitHub's scheduler
-  # and avoids the throttling that happens with multiple cron lines.
   schedule:
-    - cron: '*/15 * * * *'
+    # EDT market hours: 13:00-19:45 UTC, Mon-Fri
+    - cron: '0,15,30,45 13-19 * * 1-5'
+    # EDT market close buffer: 20:00, 20:15, 20:30 UTC
+    - cron: '0,15,30 20 * * 1-5'
 
   # Manual trigger (for testing or forcing a refresh)
   workflow_dispatch:
@@ -53,8 +59,6 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -73,7 +77,6 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             MODE="${{ github.event.inputs.mode }}"
-            # Manual dispatch with non-auto mode should force run
             if [ "$MODE" != "auto" ]; then
               python prefetch_cloud.py --mode "$MODE" --force
             else
@@ -87,40 +90,3 @@ jobs:
         if: always()
         run: |
           echo "Prefetch completed at $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
-
-  # ── Keepalive: prevent GitHub's 60-day inactivity auto-disable ────────
-  # Runs once a week (Sunday midnight UTC) and commits a tiny file
-  # so the repo shows activity and GitHub doesn't disable the schedule.
-  keepalive:
-    runs-on: ubuntu-latest
-    if: github.event.schedule == '*/15 * * * *'
-    # Only run on Sundays (day 0 in cron, but we check in the step)
-    steps:
-      - name: Check if Sunday
-        id: check
-        run: |
-          DAY=$(date -u +%u)  # 1=Mon, 7=Sun
-          HOUR=$(date -u +%H)
-          MIN=$(date -u +%M)
-          # Run only on Sunday at ~00:00 UTC (first cron hit of the day)
-          if [ "$DAY" = "7" ] && [ "$HOUR" = "00" ] && [ "$MIN" -lt "16" ]; then
-            echo "run=true" >> $GITHUB_OUTPUT
-          else
-            echo "run=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Checkout repo
-        if: steps.check.outputs.run == 'true'
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update keepalive timestamp
-        if: steps.check.outputs.run == 'true'
-        run: |
-          date -u '+%Y-%m-%d %H:%M:%S UTC' > .github/keepalive.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .github/keepalive.txt
-          git diff --cached --quiet || git commit -m "keepalive: $(date -u '+%Y-%m-%d')"
-          git push || echo "Push failed — repo may be read-only"
