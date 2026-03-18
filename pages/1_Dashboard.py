@@ -111,12 +111,6 @@ except ImportError:
 if not check_password():
     st.stop()
 
-# ── Manual refresh via URL param ──────────────────────────────────────────
-if st.query_params.get("refresh") == "1":
-    st.cache_data.clear()
-    del st.query_params["refresh"]
-    st.rerun()
-
 # ── Auto-refresh every 15 minutes to stay in sync with Task Scheduler ────
 from streamlit_autorefresh import st_autorefresh
 st_autorefresh(interval=15 * 60 * 1000, key="data_refresh")
@@ -187,20 +181,49 @@ if DETECTOR_AVAILABLE:
 
 if _status_parts:
     _divider = '<span style="opacity:0.2;margin:0 6px;">|</span>'
-    _refresh_link = (
-        '<a href="?refresh=1" target="_self" style="color:rgba(255,255,255,0.20);'
-        'text-decoration:none;font-size:10px;letter-spacing:0.04em;transition:color 0.15s;'
-        '"onmouseover="this.style.color=\'#C9A84C\'" onmouseout="this.style.color=\'rgba(255,255,255,0.20)\'"'
-        '>⟳ Refresh</a>'
-    )
     st.markdown(
         f'<div style="display:flex;align-items:center;justify-content:flex-end;'
         f'padding:4px 28px 2px;gap:6px;font-size:10px;color:rgba(255,255,255,0.30);">'
         f'{_divider.join(_status_parts)}'
-        f'{_divider}{_refresh_link}'
         f'</div>',
         unsafe_allow_html=True,
     )
+
+    # Refresh button styled to look like inline text link
+    st.markdown("""
+    <style>
+    div[data-testid="stMainBlockContainer"] > div > div > div > div.refresh-area {
+        display: flex;
+        justify-content: flex-end;
+        padding-right: 28px;
+        margin-top: -8px;
+    }
+    .refresh-area .stButton > button {
+        background: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: rgba(255,255,255,0.18) !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.04em !important;
+        text-transform: uppercase !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        height: 16px !important;
+        line-height: 16px !important;
+    }
+    .refresh-area .stButton > button:hover {
+        color: #C9A84C !important;
+        background: none !important;
+        border: none !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    with st.container():
+        st.markdown('<div class="refresh-area">', unsafe_allow_html=True)
+    if st.button("⟳ refresh", key="refresh_btn"):
+        st.cache_data.clear()
+        st.rerun()
 
 # ── Tamarac data loading (Sprint 5: auto-detect newest file) ─────────────
 import os
