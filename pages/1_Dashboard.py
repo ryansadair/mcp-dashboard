@@ -111,6 +111,12 @@ except ImportError:
 if not check_password():
     st.stop()
 
+# ── Manual refresh via URL param ──────────────────────────────────────────
+if st.query_params.get("refresh") == "1":
+    st.cache_data.clear()
+    st.query_params.clear()
+    st.rerun()
+
 # ── Auto-refresh every 15 minutes to stay in sync with Task Scheduler ────
 from streamlit_autorefresh import st_autorefresh
 st_autorefresh(interval=15 * 60 * 1000, key="data_refresh")
@@ -123,23 +129,6 @@ if MOBILE_CSS_AVAILABLE:
 
 render_header()
 render_market_ticker()
-
-# ── Sidebar: refresh control ──────────────────────────────────────────────
-with st.sidebar:
-    st.markdown(
-        '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);'
-        'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Data Controls</div>',
-        unsafe_allow_html=True,
-    )
-    if st.button("⟳  Refresh All Data", key="refresh_btn", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
-    st.markdown(
-        '<div style="font-size:10px;color:rgba(255,255,255,0.2);margin-top:4px;">'
-        'Clears all cached data and reloads from sources. Auto-refreshes every 15 min.'
-        '</div>',
-        unsafe_allow_html=True,
-    )
 
 # ── Data freshness + Tamarac status (combined, right-aligned) ─────────────
 _status_parts = []
@@ -198,10 +187,17 @@ if DETECTOR_AVAILABLE:
 
 if _status_parts:
     _divider = '<span style="opacity:0.2;margin:0 6px;">|</span>'
+    _refresh_link = (
+        '<a href="?refresh=1" target="_self" style="color:rgba(255,255,255,0.20);'
+        'text-decoration:none;font-size:10px;letter-spacing:0.04em;transition:color 0.15s;'
+        '"onmouseover="this.style.color=\'#C9A84C\'" onmouseout="this.style.color=\'rgba(255,255,255,0.20)\'"'
+        '>⟳ Refresh</a>'
+    )
     st.markdown(
         f'<div style="display:flex;align-items:center;justify-content:flex-end;'
         f'padding:4px 28px 2px;gap:6px;font-size:10px;color:rgba(255,255,255,0.30);">'
         f'{_divider.join(_status_parts)}'
+        f'{_divider}{_refresh_link}'
         f'</div>',
         unsafe_allow_html=True,
     )
