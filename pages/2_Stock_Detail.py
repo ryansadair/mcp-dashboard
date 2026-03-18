@@ -35,6 +35,18 @@ try:
 except ImportError:
     _FISH_AVAILABLE = False
 
+# Finviz data (analyst ratings, technicals, ownership)
+try:
+    from data.finviz_data import (
+        fetch_finviz_batch,
+        recommendation_badge,
+        upside_badge,
+        rsi_indicator,
+    )
+    _FINVIZ_AVAILABLE = True
+except ImportError:
+    _FINVIZ_AVAILABLE = False
+
 # ── Supabase config ────────────────────────────────────────────────────────
 SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
 SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # paste your service role key here
@@ -552,6 +564,180 @@ else:
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# FINVIZ: ANALYST, TECHNICALS & OWNERSHIP
+# ══════════════════════════════════════════════════════════════════════════
+if _FINVIZ_AVAILABLE:
+    fv_data = fetch_finviz_batch((ticker_input,))
+    fv = fv_data.get(ticker_input, {})
+
+    if fv:
+        st.markdown("---")
+        st.markdown("#### 🎯 Analyst & Technical Signals")
+
+        # ── Row 1: Analyst Consensus ──────────────────────────────────────
+        rec_val = fv.get("recommendation")
+        rec_label = fv.get("rec_label", "—")
+        target = fv.get("target_price")
+        upside = fv.get("upside_pct")
+        rsi = fv.get("rsi_14")
+        earnings = fv.get("earnings_date")
+
+        a1, a2, a3, a4, a5, a6 = st.columns(6)
+
+        with a1:
+            if rec_val is not None:
+                # Color the metric based on rating
+                if rec_val <= 2.0:
+                    _rec_color = GREEN
+                elif rec_val <= 3.0:
+                    _rec_color = GOLD
+                else:
+                    _rec_color = "#c45454"
+                st.markdown(
+                    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
+                    f"letter-spacing:0.06em;margin-bottom:4px;'>Analyst Rating</div>"
+                    f"<div style='font-size:20px;font-weight:700;color:{_rec_color};'>{rec_val:.1f}</div>"
+                    f"<div style='font-size:11px;color:{_rec_color};font-weight:600;'>{rec_label}</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.metric("Analyst Rating", "—")
+
+        with a2:
+            st.metric("Target Price", f"${target:.0f}" if target else "—")
+
+        with a3:
+            if upside is not None:
+                _up_color = GREEN if upside >= 0 else "#c45454"
+                _arrow = "▲" if upside >= 0 else "▼"
+                st.markdown(
+                    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
+                    f"letter-spacing:0.06em;margin-bottom:4px;'>Upside to Target</div>"
+                    f"<div style='font-size:20px;font-weight:700;color:{_up_color};'>{_arrow} {upside:+.1f}%</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.metric("Upside to Target", "—")
+
+        with a4:
+            if rsi is not None:
+                if rsi >= 70:
+                    _rsi_color = "#c45454"
+                    _rsi_label = "Overbought"
+                elif rsi <= 30:
+                    _rsi_color = GREEN
+                    _rsi_label = "Oversold"
+                else:
+                    _rsi_color = "rgba(255,255,255,0.8)"
+                    _rsi_label = "Neutral"
+                st.markdown(
+                    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
+                    f"letter-spacing:0.06em;margin-bottom:4px;'>RSI (14)</div>"
+                    f"<div style='font-size:20px;font-weight:700;color:{_rsi_color};'>{rsi:.0f}</div>"
+                    f"<div style='font-size:11px;color:{_rsi_color};'>{_rsi_label}</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.metric("RSI (14)", "—")
+
+        with a5:
+            short_fl = fv.get("short_float")
+            if short_fl is not None:
+                _sf_color = "#c45454" if short_fl >= 5 else GOLD if short_fl >= 3 else "rgba(255,255,255,0.8)"
+                st.markdown(
+                    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
+                    f"letter-spacing:0.06em;margin-bottom:4px;'>Short Float</div>"
+                    f"<div style='font-size:20px;font-weight:700;color:{_sf_color};'>{short_fl:.1f}%</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.metric("Short Float", "—")
+
+        with a6:
+            st.metric("Earnings Date", earnings if earnings else "—")
+
+        # ── Row 2: SMA Distances ──────────────────────────────────────────
+        sma20 = fv.get("sma20_dist")
+        sma50 = fv.get("sma50_dist")
+        sma200 = fv.get("sma200_dist")
+        insider_own = fv.get("insider_own")
+        inst_own = fv.get("inst_own")
+        insider_trans = fv.get("insider_trans")
+
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+        b1, b2, b3, b4, b5, b6 = st.columns(6)
+
+        def _sma_metric(col, label, val):
+            if val is not None:
+                _color = GREEN if val > 0 else "#c45454" if val < -5 else GOLD
+                col.markdown(
+                    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
+                    f"letter-spacing:0.06em;margin-bottom:4px;'>{label}</div>"
+                    f"<div style='font-size:20px;font-weight:700;color:{_color};'>{val:+.1f}%</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                col.metric(label, "—")
+
+        _sma_metric(b1, "vs 20-SMA", sma20)
+        _sma_metric(b2, "vs 50-SMA", sma50)
+        _sma_metric(b3, "vs 200-SMA", sma200)
+
+        with b4:
+            st.metric("Insider Own", f"{insider_own:.1f}%" if insider_own is not None else "—")
+
+        with b5:
+            st.metric("Inst Own", f"{inst_own:.1f}%" if inst_own is not None else "—")
+
+        with b6:
+            if insider_trans is not None:
+                _it_color = GREEN if insider_trans > 0 else "#c45454" if insider_trans < 0 else "rgba(255,255,255,0.6)"
+                st.markdown(
+                    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
+                    f"letter-spacing:0.06em;margin-bottom:4px;'>Insider Trans</div>"
+                    f"<div style='font-size:20px;font-weight:700;color:{_it_color};'>{insider_trans:+.1f}%</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.metric("Insider Trans", "—")
+
+        # ── Performance row ───────────────────────────────────────────────
+        perf_ytd = fv.get("perf_ytd")
+        perf_week = fv.get("perf_week")
+        perf_month = fv.get("perf_month")
+        perf_quarter = fv.get("perf_quarter")
+        perf_half = fv.get("perf_half")
+        perf_year = fv.get("perf_year")
+
+        has_perf = any(v is not None for v in [perf_week, perf_month, perf_quarter, perf_half, perf_year, perf_ytd])
+        if has_perf:
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+            p1, p2, p3, p4, p5, p6 = st.columns(6)
+
+            def _perf_metric(col, label, val):
+                if val is not None:
+                    _color = GREEN if val >= 0 else "#c45454"
+                    col.markdown(
+                        f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
+                        f"letter-spacing:0.06em;margin-bottom:4px;'>{label}</div>"
+                        f"<div style='font-size:16px;font-weight:600;color:{_color};'>{val:+.1f}%</div>",
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    col.metric(label, "—")
+
+            _perf_metric(p1, "Week", perf_week)
+            _perf_metric(p2, "Month", perf_month)
+            _perf_metric(p3, "Quarter", perf_quarter)
+            _perf_metric(p4, "Half Year", perf_half)
+            _perf_metric(p5, "Year", perf_year)
+            _perf_metric(p6, "YTD", perf_ytd)
+
+        st.caption(f"Source: Finviz · Cached 1 hour · Analyst ratings are consensus of Wall Street coverage")
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # 3. DIVIDEND HISTORY
 # ══════════════════════════════════════════════════════════════════════════
 st.markdown("---")
@@ -843,7 +1029,7 @@ st.markdown(
     "border-top:1px solid rgba(255,255,255,0.04);font-size:11px;color:rgba(255,255,255,0.2);'>"
     "<span>© 2026 Martin Capital Partners LLC</span>"
     "<span style='opacity:0.3;'>|</span>"
-    "<span>Data: yfinance</span>"
+    "<span>Data: yfinance · Finviz · Fish CCC</span>"
     "<span style='opacity:0.3;'>|</span>"
     "<span>Internal use only</span>"
     "</div>",
