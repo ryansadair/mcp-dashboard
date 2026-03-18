@@ -111,9 +111,21 @@ except ImportError:
 if not check_password():
     st.stop()
 
-# ── Auto-refresh every 15 minutes to stay in sync with Task Scheduler ────
-from streamlit_autorefresh import st_autorefresh
-st_autorefresh(interval=15 * 60 * 1000, key="data_refresh")
+# ── Auto-refresh every 15 minutes ─────────────────────────────────────────
+# streamlit-autorefresh can fail silently on Cloud; HTML meta refresh is more reliable
+try:
+    from streamlit_autorefresh import st_autorefresh
+    _refresh_count = st_autorefresh(interval=15 * 60 * 1000, limit=None, key="data_refresh")
+except Exception:
+    _refresh_count = 0
+
+# Fallback: if autorefresh isn't working, inject an HTML meta refresh
+# This triggers a full page reload every 15 min — session state persists
+if _refresh_count == 0:
+    st.markdown(
+        '<meta http-equiv="refresh" content="900">',
+        unsafe_allow_html=True,
+    )
 
 inject_global_css()
 
