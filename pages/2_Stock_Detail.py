@@ -47,6 +47,13 @@ try:
 except ImportError:
     _FINVIZ_AVAILABLE = False
 
+# Market data for peer comparison
+try:
+    from data.market_data import fetch_batch_prices
+    _MARKET_DATA_AVAILABLE = True
+except ImportError:
+    _MARKET_DATA_AVAILABLE = False
+
 # ── Supabase config ────────────────────────────────────────────────────────
 SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
 SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # paste your service role key here
@@ -1019,8 +1026,143 @@ else:
     st.info("Financial data not available for this ticker.")
 
 
+# ══════════════════════════════════════════════════════════════════════════
+# 6. PEER COMPARISON
+# ══════════════════════════════════════════════════════════════════════════
+# Find sector peers from the same Tamarac holdings universe
+_current_sector = g("sector", "")
+if _current_sector and _MARKET_DATA_AVAILABLE and available_tickers:
+    # Gather all unique tickers from Tamarac (excluding current ticker)
+    peer_candidates = [t for t in available_tickers if t != ticker_input]
 
+    if peer_candidates:
+        # Fetch price data for all candidates to find same-sector peers
+        with st.spinner("Finding sector peers..."):
+            peer_prices = fetch_batch_prices(tuple(peer_candidates))
 
+        # Filter to same sector
+        same_sector = []
+        for t in peer_candidates:
+            p = peer_prices.get(t, {})
+            if p.get("sector", "") == _current_sector:
+                same_sector.append(t)
+
+        if same_sector:
+            st.markdown("---")
+            st.markdown(f"#### 👥 Sector Peers — {_current_sector}")
+            st.markdown(
+                f"<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
+                f"Holdings in the same sector across all MCP strategies"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            # Limit to 8 peers max
+            same_sector = same_sector[:8]
+
+            # Include current ticker in the comparison
+            all_compare = [ticker_input] + same_sector
+            compare_prices = fetch_batch_prices(tuple(all_compare))
+
+            # Fetch Finviz data for all compare tickers
+            compare_fv = {}
+            if _FINVIZ_AVAILABLE:
+                compare_fv = fetch_finviz_batch(tuple(all_compare))
+
+            # Fetch Fish CCC data for dividend metrics
+            compare_fish = {}
+            if _FISH_AVAILABLE:
+                for t in all_compare:
+                    try:
+                        fd = get_all_fish_data(t)
+                        compare_fish[t] = fd.get("metrics", {})
+                    except Exception:
+                        compare_fish[t] = {}
+
+            # Build comparison table
+            _th = ("padding:6px 8px;font-size:10px;font-weight:600;"
+                   "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
+                   "border-bottom:1px solid rgba(255,255,255,0.06)")
+            _tw = "width:100%;border-collapse:collapse;table-layout:fixed"
+            _cols = ('<colgroup>'
+                     '<col style="width:8%"><col style="width:20%"><col style="width:10%">'
+                     '<col style="width:10%"><col style="width:10%"><col style="width:10%">'
+                     '<col style="width:10%"><col style="width:10%"><col style="width:12%">'
+                     '</colgroup>')
+
+            # Header
+            st.markdown(
+                f'<table style="{_tw}">{_cols}<thead><tr>'
+                f'<th style="text-align:left;{_th}">Sym</th>'
+                f'<th style="text-align:left;{_th}">Company</th>'
+                f'<th style="text-align:right;{_th}">Price</th>'
+                f'<th style="text-align:right;{_th}">Yield</th>'
+                f'<th style="text-align:right;{_th}">5Y DGR</th>'
+                f'<th style="text-align:right;{_th}">Payout</th>'
+                f'<th style="text-align:right;{_th}">P/E</th>'
+                f'<th style="text-align:right;{_th}">YTD</th>'
+                f'<th style="text-align:center;{_th}">Analyst</th>'
+                f'</tr></thead></table>',
+                unsafe_allow_html=True,
+            )
+
+            # Rows
+            for t in all_compare:
+                p = compare_prices.get(t, {})
+                fv = compare_fv.get(t, {})
+                fish = compare_fish.get(t, {})
+
+                _price = p.get("price", 0)
+                _yield = p.get("dividend_yield", 0) or 0
+                _pe = p.get("pe_ratio", 0) or fv.get("pe", 0) or 0
+                _name = p.get("name", t)
+                _ytd = fv.get("perf_ytd")
+                _dgr5 = fish.get("dgr_5y", 0) or 0
+                _payout = fish.get("payout_ratio", 0) or 0
+                _rec = fv.get("recommendation")
+                _rec_label = fv.get("rec_label", "—")
+
+                # Highlight current ticker row
+                is_current = t == ticker_input
+                bg = "background:rgba(201,168,76,0.06);" if is_current else ""
+                sym_color = "#C9A84C" if is_current else "rgba(255,255,255,0.7)"
+                sym_weight = "700" if is_current else "600"
+
+                # Format values
+                price_str = f"${_price:.2f}" if _price else "—"
+                yield_str = f"{_yield:.2f}%" if _yield > 0 else "—"
+                yield_color = GOLD if _yield > 0 else "rgba(255,255,255,0.4)"
+                dgr5_str = f"{_dgr5:+.1f}%" if _dgr5 else "—"
+                dgr5_color = GREEN if _dgr5 > 0 else "#c45454" if _dgr5 < 0 else "rgba(255,255,255,0.4)"
+                payout_str = f"{_payout:.0f}%" if _payout > 0 else "—"
+                payout_color = GREEN if 0 < _payout < 50 else GOLD if _payout < 70 else "#c45454" if _payout > 0 else "rgba(255,255,255,0.4)"
+                pe_str = f"{_pe:.1f}" if _pe > 0 else "—"
+                ytd_str = f"{_ytd:+.1f}%" if _ytd is not None else "—"
+                ytd_color = GREEN if _ytd and _ytd >= 0 else "#c45454" if _ytd else "rgba(255,255,255,0.4)"
+
+                # Analyst badge
+                if _rec is not None:
+                    rec_html = recommendation_badge(_rec, _rec_label) if _FINVIZ_AVAILABLE else f"{_rec_label}"
+                else:
+                    rec_html = '<span style="font-size:11px;color:rgba(255,255,255,0.3);">—</span>'
+
+                st.markdown(
+                    f'<table style="{_tw}">{_cols}<tbody>'
+                    f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03);{bg}">'
+                    f'<td style="text-align:left;padding:8px;font-size:12px;font-weight:{sym_weight};color:{sym_color};">{t}</td>'
+                    f'<td style="text-align:left;padding:8px;font-size:11px;color:rgba(255,255,255,0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{_name}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.8);">{price_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{yield_color};">{yield_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{dgr5_color};">{dgr5_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{payout_color};">{payout_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.7);">{pe_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{ytd_color};">{ytd_str}</td>'
+                    f'<td style="text-align:center;padding:8px;">{rec_html}</td>'
+                    f'</tr></tbody></table>',
+                    unsafe_allow_html=True,
+                )
+
+            st.caption(f"Peers: MCP holdings in {_current_sector} · Finviz + Fish CCC · {datetime.now().strftime('%I:%M %p')}")
 
 
 # ── Footer ────────────────────────────────────────────────────────────────
