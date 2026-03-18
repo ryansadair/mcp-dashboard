@@ -25,7 +25,12 @@ def render_watchlist_tab():
         parse_watchlist_excel, get_watchlist_names, enrich_batch,
     )
 
-    st.markdown("#### 🔍 Research Watchlists")
+    st.markdown(
+        '<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);'
+        'text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">'
+        'Research Watchlists</div>',
+        unsafe_allow_html=True,
+    )
 
     # ── Parse the Excel file ───────────────────────────────────────────────
     @st.cache_data(ttl=300)
