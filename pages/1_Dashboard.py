@@ -181,37 +181,44 @@ if DETECTOR_AVAILABLE:
 
 if _status_parts:
     _divider = '<span style="opacity:0.2;margin:0 6px;">|</span>'
-    _status_col, _refresh_col = st.columns([20, 1])
-    with _status_col:
-        st.markdown(
-            f'<div style="display:flex;align-items:center;justify-content:flex-end;'
-            f'padding:4px 0 2px;gap:6px;font-size:10px;color:rgba(255,255,255,0.30);">'
-            f'{_divider.join(_status_parts)}'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-    with _refresh_col:
-        st.markdown("""
-        <style>
-        div[data-testid="stColumn"]:last-child .stButton > button {
-            background: none !important;
-            border: none !important;
-            color: rgba(255,255,255,0.20) !important;
-            font-size: 12px !important;
-            padding: 0 !important;
-            min-height: 0 !important;
-            height: 20px !important;
-            line-height: 20px !important;
-            margin-top: 4px !important;
-        }
-        div[data-testid="stColumn"]:last-child .stButton > button:hover {
-            color: #C9A84C !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        if st.button("⟳", key="refresh_btn", help="Refresh all data"):
-            st.cache_data.clear()
-            st.rerun()
+    st.markdown(
+        f'<div style="display:flex;align-items:center;justify-content:flex-end;'
+        f'padding:4px 28px 2px;gap:6px;font-size:10px;color:rgba(255,255,255,0.30);">'
+        f'{_divider.join(_status_parts)}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Tiny refresh link — right-aligned below status
+    st.markdown("""
+    <style>
+    .refresh-row .stButton > button {
+        background: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: rgba(255,255,255,0.18) !important;
+        font-size: 10px !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        height: auto !important;
+        line-height: 1 !important;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .refresh-row .stButton > button:hover {
+        color: #C9A84C !important;
+        background: none !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    _spacer, _btn = st.columns([9, 1])
+    with _btn:
+        with st.container():
+            st.markdown('<div class="refresh-row">', unsafe_allow_html=True)
+            if st.button("⟳ Refresh", key="refresh_btn"):
+                st.cache_data.clear()
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
 # ── Tamarac data loading (Sprint 5: auto-detect newest file) ─────────────
 import os
