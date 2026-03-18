@@ -114,7 +114,7 @@ if not check_password():
 # ── Manual refresh via URL param ──────────────────────────────────────────
 if st.query_params.get("refresh") == "1":
     st.cache_data.clear()
-    st.query_params.clear()
+    del st.query_params["refresh"]
     st.rerun()
 
 # ── Auto-refresh every 15 minutes to stay in sync with Task Scheduler ────
