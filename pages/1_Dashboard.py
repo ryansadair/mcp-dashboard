@@ -221,28 +221,29 @@ st.markdown("""
 <style>
 /* ── Top-level tab nav bar styling ─────────────────────────────────────── */
 [data-testid="stTabs"] {
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
     margin-bottom: 0px;
 }
 [data-testid="stTabs"] [role="tablist"] {
     gap: 0px !important;
-    background: rgba(0,0,0,0.15);
+    background: rgba(0,0,0,0.20);
     border-radius: 0;
     padding: 0 16px;
 }
 [data-testid="stTabs"] [role="tab"] {
-    padding: 14px 20px !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.02em;
-    color: rgba(255,255,255,0.45) !important;
+    padding: 18px 24px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.35) !important;
     border-bottom: 3px solid transparent !important;
     border-radius: 0 !important;
     transition: all 0.15s ease;
     white-space: nowrap;
 }
 [data-testid="stTabs"] [role="tab"]:hover {
-    color: rgba(255,255,255,0.7) !important;
+    color: rgba(255,255,255,0.65) !important;
     background: rgba(255,255,255,0.02) !important;
 }
 [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
@@ -258,7 +259,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
-    "📊 Overview", "📋 Holdings", "📈 Performance", "💰 Dividends", "🔍 Watchlist", "🌐 Macro", "🏛️ Markets", "🔔 Alerts"
+    "Overview", "Holdings", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "Alerts"
 ])
 
 # ── Strategy state + data (computed once, rendered per-tab) ───────────────
