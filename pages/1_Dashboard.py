@@ -713,24 +713,9 @@ with tab_holdings:
             display_df = pd.DataFrame(rows)
 
 
-            # Detail selector & sector filter — single row
-            c_detail, c_sector = st.columns([3, 1])
-            with c_detail:
-                detail_ticker = st.selectbox(
-                    "Ticker Detail",
-                    options=display_df["Symbol"].tolist(),
-                    key="holdings_detail_select",
-                    label_visibility="collapsed",
-                    index=None,
-                    placeholder="Select a ticker for detail view...",
-                )
-                if detail_ticker:
-                    st.session_state["detail_ticker"] = detail_ticker
-                    st.query_params["ticker"] = detail_ticker
-                    st.switch_page("pages/2_Stock_Detail.py")
-            with c_sector:
-                sectors = ["All"] + sorted(display_df["Sector"].dropna().unique().tolist())
-                sector_filter = st.selectbox("Sector", sectors, key="s2_sector", label_visibility="collapsed")
+            # Sector filter
+            sectors = ["All"] + sorted(display_df["Sector"].dropna().unique().tolist())
+            sector_filter = st.selectbox("Sector", sectors, key="s2_sector", label_visibility="collapsed")
 
             filtered = display_df.copy()
             if sector_filter != "All":
@@ -759,9 +744,13 @@ with tab_holdings:
                 "% From 52W Hi": "{:+.1f}%",
             })
 
-            st.dataframe(
+            # Row-selection enabled — click a row to navigate to stock detail
+            event = st.dataframe(
                 styled, use_container_width=True, hide_index=True,
                 height=(42 + len(filtered) * 36),
+                selection_mode="single-row",
+                on_select="rerun",
+                key="holdings_table",
                 column_config={
                     "Company": st.column_config.TextColumn("Company", width="medium"),
                     "Symbol": st.column_config.TextColumn("Symbol", width="small"),
@@ -778,6 +767,14 @@ with tab_holdings:
                     "% From 52W Hi": st.column_config.NumberColumn("% From Hi", format="%+.1f%%"),
                 },
             )
+
+            # Navigate to stock detail when a row is selected
+            if event and event.selection and event.selection.rows:
+                selected_idx = event.selection.rows[0]
+                selected_ticker = filtered.iloc[selected_idx]["Symbol"]
+                st.session_state["detail_ticker"] = selected_ticker
+                st.query_params["ticker"] = selected_ticker
+                st.switch_page("pages/2_Stock_Detail.py")
 
             # Sector breakdown — compact table + pie chart
             if len(filtered) > 0 and "Sector" in filtered.columns:
