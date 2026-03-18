@@ -639,21 +639,13 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-    # ── Clickable ticker detail ────────────────────────────────────────────
-    detail_ticker = st.selectbox(
-        "Ticker Detail",
-        options=edf["symbol"].tolist(),
-        key="div_detail_ticker_select",
-        label_visibility="collapsed",
-        index=None,
-        placeholder="Select a ticker to view stock detail...",
-    )
-    if detail_ticker:
-        st.session_state["detail_ticker"] = detail_ticker
-        st.query_params["ticker"] = detail_ticker
-        st.switch_page("pages/2_Stock_Detail.py")
-
     st.markdown(f"**Dividend Metrics — {STRATEGY_NAMES.get(active_strategy, active_strategy)}** · {len(edf)} holdings")
+    st.markdown(
+        "<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:8px;'>"
+        "Click any row to open stock detail page"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
     # Build display columns
     detail_rows = []
@@ -737,9 +729,13 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
         })
     )
 
-    st.dataframe(
+    # Row-selection enabled dataframe — click a row to navigate to stock detail
+    event = st.dataframe(
         styled, use_container_width=True, hide_index=True,
         height=(42 + len(detail_df) * 36),
+        selection_mode="single-row",
+        on_select="rerun",
+        key="div_detail_table",
         column_config={
             "Symbol":        st.column_config.TextColumn("Symbol", width="small"),
             "Company":       st.column_config.TextColumn("Company", width="medium"),
@@ -760,6 +756,14 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Sector":        st.column_config.TextColumn("Sector", width="medium"),
         },
     )
+
+    # Navigate to stock detail when a row is selected
+    if event and event.selection and event.selection.rows:
+        selected_idx = event.selection.rows[0]
+        selected_ticker = detail_df.iloc[selected_idx]["Symbol"]
+        st.session_state["detail_ticker"] = selected_ticker
+        st.query_params["ticker"] = selected_ticker
+        st.switch_page("pages/2_Stock_Detail.py")
 
     # ── Current Yield vs Yield on Cost chart (moved from Income Dashboard) ─
     st.divider()
@@ -880,216 +884,9 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
         )
         st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
 
-    # ── Dividend History (Fish CCC preferred, yfinance fallback) ─────────
-    st.divider()
-    st.markdown("**Dividend Per Share History**")
-
-    # All holdings alphabetical — single list, no separator needed now
-    all_tickers = sorted(edf["symbol"].tolist())
-
-    if all_tickers:
-        selected_hist = st.selectbox(
-            "View individual dividend history",
-            options=["Select a ticker..."] + all_tickers,
-            key="div_hist_select",
-        )
-        if selected_hist and selected_hist != "Select a ticker...":
-            matching = edf[edf["symbol"] == selected_hist]
-            if matching.empty:
-                st.info(f"No data found for {selected_hist}.")
-            else:
-                row_data = matching.iloc[0]
-                fish_hist = row_data["div_history"]
-
-                # Determine source: Fish CCC first, yfinance fallback
-                hist = {}
-                _data_source = ""
-                if fish_hist:
-                    hist = fish_hist
-                    _data_source = "CCC"
-                else:
-                    # yfinance fallback — fetch annual dividend totals
-                    hist = _fetch_yf_annual_dividends(selected_hist)
-                    _data_source = "yfinance"
-
-                if not hist:
-                    st.info(
-                        f"No dividend history available for **{selected_hist}**. "
-                        f"This stock may not pay a dividend or data is unavailable."
-                    )
-                else:
-                    years_sorted = sorted(hist.keys())
-                    amounts = [hist[y] for y in years_sorted]
-
-                    # Source badge
-                    _src_color = GREEN if _data_source == "CCC" else "rgba(255,255,255,0.4)"
-                    _src_note = "CCC Historical Data (authoritative)" if _data_source == "CCC" else "yfinance (total payouts — may include specials/FX effects)"
-                    st.markdown(
-                        f'<div style="font-size:10px;color:rgba(255,255,255,0.30);margin-bottom:8px;">'
-                        f'Source: <span style="color:{_src_color};font-weight:600;">{_data_source.upper()}</span>'
-                        f' · {_src_note}</div>',
-                        unsafe_allow_html=True,
-                    )
-
-                    # ── Header with key stats ─────────────────────────────
-                    fish_m = {}
-                    streak_yrs = 0
-                    if _STREAKS_AVAILABLE:
-                        fish_m = get_fish_metrics(selected_hist)
-                        streak_yrs, streak_tier = get_streak(selected_hist)
-
-                    _latest_amt = amounts[-1] if amounts else 0
-                    _cagr_5 = fish_m.get("dgr_5y", 0) or 0
-                    _cagr_10 = fish_m.get("dgr_10y", 0) or 0
-
-                    # Compute CAGR from history if Fish doesn't have it
-                    if not _cagr_5 and len(amounts) >= 6:
-                        _old = amounts[-6]
-                        if _old > 0 and _latest_amt > 0:
-                            _cagr_5 = round(((_latest_amt / _old) ** (1/5) - 1) * 100, 1)
-                    if not _cagr_10 and len(amounts) >= 11:
-                        _old = amounts[-11]
-                        if _old > 0 and _latest_amt > 0:
-                            _cagr_10 = round(((_latest_amt / _old) ** (1/10) - 1) * 100, 1)
-
-                    _hdr_cols = st.columns(5)
-                    with _hdr_cols[0]:
-                        st.metric("Latest Annual DPS", f"${_latest_amt:.2f}" if _latest_amt else "—")
-                    with _hdr_cols[1]:
-                        st.metric("Consec. Increases", f"{streak_yrs}y" if streak_yrs > 0 else "—")
-                    with _hdr_cols[2]:
-                        st.metric("5Y CAGR", f"{_cagr_5:+.1f}%" if _cagr_5 else "—")
-                    with _hdr_cols[3]:
-                        st.metric("10Y CAGR", f"{_cagr_10:+.1f}%" if _cagr_10 else "—")
-                    with _hdr_cols[4]:
-                        st.metric("History", f"{len(years_sorted)} years")
-
-                    # ── Bar chart ─────────────────────────────────────────
-                    fig_single = go.Figure()
-                    bar_colors = [GREEN if (i == 0 or amounts[i] >= amounts[i-1]) else RED
-                                  for i in range(len(amounts))]
-                    fig_single.add_trace(go.Bar(
-                        x=years_sorted, y=amounts,
-                        marker=dict(color=bar_colors, opacity=0.8),
-                        text=[f"${a:.2f}" for a in amounts],
-                        textposition="outside",
-                        textfont=dict(size=9, color="rgba(255,255,255,0.6)"),
-                    ))
-                    _single_layout = {**PLOTLY_DARK}
-                    _single_layout["margin"] = dict(l=10, r=10, t=40, b=10)
-                    fig_single.update_layout(
-                        **_single_layout,
-                        title=f"{selected_hist} — Annual Dividend Per Share",
-                        height=280,
-                        xaxis={**_XAXIS, "dtick": 1},
-                        yaxis={**_YAXIS, "tickprefix": "$"},
-                        showlegend=False,
-                    )
-                    st.plotly_chart(fig_single, use_container_width=True, config=PLOTLY_CONFIG)
-
-                    # ── FactSet-style history table (newest first) ────────
-                    if len(amounts) >= 2:
-                        st.markdown(f"**Dividend History — {selected_hist}**")
-
-                        # Build table rows newest to oldest
-                        _th = ("padding:8px 10px;font-size:10px;font-weight:600;"
-                               "color:rgba(255,255,255,0.3);text-transform:uppercase;"
-                               "letter-spacing:0.06em;border-bottom:1px solid rgba(255,255,255,0.06)")
-                        _tw = "width:100%;border-collapse:collapse;table-layout:fixed"
-                        _cols = ('<colgroup><col style="width:12%"><col style="width:18%">'
-                                 '<col style="width:18%"><col style="width:16%">'
-                                 '<col style="width:18%"><col style="width:18%"></colgroup>')
-
-                        # Header
-                        st.markdown(
-                            f'<table style="{_tw}">{_cols}<thead><tr>'
-                            f'<th style="text-align:left;{_th}">Year</th>'
-                            f'<th style="text-align:right;{_th}">Annual DPS</th>'
-                            f'<th style="text-align:right;{_th}">Prior Year</th>'
-                            f'<th style="text-align:right;{_th}">Chg %</th>'
-                            f'<th style="text-align:right;{_th}">$ Change</th>'
-                            f'<th style="text-align:right;{_th}">Status</th>'
-                            f'</tr></thead></table>',
-                            unsafe_allow_html=True,
-                        )
-
-                        # Rows — newest to oldest
-                        for i in range(len(amounts) - 1, -1, -1):
-                            yr = years_sorted[i]
-                            amt = amounts[i]
-
-                            if i > 0:
-                                prior = amounts[i - 1]
-                                if prior > 0:
-                                    pct = ((amt - prior) / prior) * 100
-                                    dollar_chg = amt - prior
-                                else:
-                                    pct = 0
-                                    dollar_chg = 0
-                                prior_str = f"${prior:.2f}"
-                            else:
-                                pct = 0
-                                dollar_chg = 0
-                                prior_str = "—"
-
-                            # Color + status
-                            if i == 0:
-                                chg_color = "rgba(255,255,255,0.3)"
-                                pct_str = "—"
-                                chg_str = "—"
-                                status = "—"
-                                status_color = "rgba(255,255,255,0.3)"
-                            elif pct > 0:
-                                chg_color = GREEN
-                                pct_str = f"+{pct:.1f}%"
-                                chg_str = f"+${dollar_chg:.2f}"
-                                status = "▲ Increase"
-                                status_color = GREEN
-                            elif pct < -0.5:
-                                chg_color = RED
-                                pct_str = f"{pct:.1f}%"
-                                chg_str = f"-${abs(dollar_chg):.2f}"
-                                status = "▼ Decrease"
-                                status_color = RED
-                            else:
-                                chg_color = "rgba(255,255,255,0.4)"
-                                pct_str = "0.0%"
-                                chg_str = "$0.00"
-                                status = "◆ Flat"
-                                status_color = "rgba(255,255,255,0.4)"
-
-                            # Highlight row for increases
-                            bg = ""
-                            if i > 0 and pct > 0:
-                                bg = "background:rgba(86,149,66,0.04);"
-                            elif i > 0 and pct < -0.5:
-                                bg = "background:rgba(196,84,84,0.04);"
-
-                            st.markdown(
-                                f'<table style="{_tw}">{_cols}<tbody>'
-                                f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03);{bg}">'
-                                f'<td style="text-align:left;padding:10px 10px;font-size:13px;'
-                                f'font-weight:600;color:rgba(255,255,255,0.8)">{yr}</td>'
-                                f'<td style="text-align:right;padding:10px 10px;font-size:14px;'
-                                f'font-weight:700;font-family:\'DM Serif Display\',serif;'
-                                f'color:rgba(255,255,255,0.9)">${amt:.2f}</td>'
-                                f'<td style="text-align:right;padding:10px 10px;font-size:13px;'
-                                f'color:rgba(255,255,255,0.35)">{prior_str}</td>'
-                                f'<td style="text-align:right;padding:10px 10px;font-size:13px;'
-                                f'font-weight:600;color:{chg_color}">{pct_str}</td>'
-                                f'<td style="text-align:right;padding:10px 10px;font-size:13px;'
-                                f'color:{chg_color}">{chg_str}</td>'
-                                f'<td style="text-align:right;padding:10px 10px;font-size:11px;'
-                                f'font-weight:600;color:{status_color}">{status}</td>'
-                                f'</tr></tbody></table>',
-                                unsafe_allow_html=True,
-                            )
-    else:
-        st.info("No holdings found. Ensure the Tamarac export is loaded.")
-
 
 # ═══════════════════════════════════════════════════════════════════════════
-# SUB-TAB 4: SAFETY & GROWTH ANALYTICS
+# SUB-TAB 3: SAFETY & GROWTH ANALYTICS
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _render_safety_growth(edf, active_strategy, strat_color):
