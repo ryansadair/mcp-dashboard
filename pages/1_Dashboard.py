@@ -423,12 +423,57 @@ with tab_overview:
                     sector = mkt.get("sector", "") or "Other"
                     hm_rows.append({
                         "symbol": sym,
+                        "description": row["description"],
                         "weight": row["weight_pct"],
                         "daily_return": round(chg, 2),
                         "sector": sector,
                     })
 
                 hm_df = pd.DataFrame(hm_rows).sort_values("weight", ascending=False)
+
+                # ── Today's Movers — top contributors & detractors ────
+                if len(hm_df) > 0:
+                    hm_df["contrib"] = (hm_df["weight"] * hm_df["daily_return"] / 100).round(4)
+                    movers_sorted = hm_df.sort_values("contrib", ascending=False)
+                    top3 = movers_sorted.head(3)
+                    bot3 = movers_sorted.tail(3).iloc[::-1]
+
+                    col_top, col_bot = st.columns(2)
+                    with col_top:
+                        st.markdown(
+                            "<div style='font-size:10px;color:rgba(86,149,66,0.8);text-transform:uppercase;"
+                            "letter-spacing:0.06em;margin-bottom:6px;font-weight:700;'>▲ Top Contributors</div>",
+                            unsafe_allow_html=True,
+                        )
+                        for _, m in top3.iterrows():
+                            _c_color = "#569542" if m["daily_return"] >= 0 else "#c45454"
+                            st.markdown(
+                                f"<div style='display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);'>"
+                                f"<div style='flex:0 0 46px;font-size:12px;font-weight:600;color:#C9A84C;'>{m['symbol']}</div>"
+                                f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{m['description']}</div>"
+                                f"<div style='flex:0 0 58px;font-size:12px;color:{_c_color};text-align:right;font-weight:600;'>{m['daily_return']:+.2f}%</div>"
+                                f"</div>",
+                                unsafe_allow_html=True,
+                            )
+
+                    with col_bot:
+                        st.markdown(
+                            "<div style='font-size:10px;color:rgba(196,84,84,0.8);text-transform:uppercase;"
+                            "letter-spacing:0.06em;margin-bottom:6px;font-weight:700;'>▼ Top Detractors</div>",
+                            unsafe_allow_html=True,
+                        )
+                        for _, m in bot3.iterrows():
+                            _d_color = "#569542" if m["daily_return"] >= 0 else "#c45454"
+                            st.markdown(
+                                f"<div style='display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);'>"
+                                f"<div style='flex:0 0 46px;font-size:12px;font-weight:600;color:#C9A84C;'>{m['symbol']}</div>"
+                                f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{m['description']}</div>"
+                                f"<div style='flex:0 0 58px;font-size:12px;color:{_d_color};text-align:right;font-weight:600;'>{m['daily_return']:+.2f}%</div>"
+                                f"</div>",
+                                unsafe_allow_html=True,
+                            )
+
+                    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
 
                 if len(hm_df) > 0:
                     # Build treemap: grouped by sector, sorted by return within each sector
@@ -597,71 +642,6 @@ with tab_overview:
                 f"</div>",
                 unsafe_allow_html=True
             )
-
-        # ── Today's Movers — top contributors & detractors ──────────────
-        if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed and not tam_ov.empty:
-            mover_rows = []
-            for _, h in tam_ov.iterrows():
-                sym = h["symbol"]
-                mkt = ov_prices.get(sym, {})
-                chg = mkt.get("change_1d_pct", 0) or 0
-                wt = h["weight_pct"]
-                # Weighted contribution = weight × return / 100
-                contrib = round(wt * chg / 100, 4)
-                mover_rows.append({
-                    "symbol": sym,
-                    "description": h["description"],
-                    "chg": chg,
-                    "weight": wt,
-                    "contrib": contrib,
-                })
-
-            if mover_rows:
-                mover_df = pd.DataFrame(mover_rows).sort_values("contrib", ascending=False)
-                top3 = mover_df.head(3)
-                bot3 = mover_df.tail(3).iloc[::-1]  # worst first
-
-                st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
-                st.markdown("<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:10px;'>Today's Movers</div>", unsafe_allow_html=True)
-
-                # Contributors
-                st.markdown(
-                    "<div style='font-size:10px;color:rgba(86,149,66,0.7);text-transform:uppercase;"
-                    "letter-spacing:0.06em;margin-bottom:4px;font-weight:600;'>▲ Top Contributors</div>",
-                    unsafe_allow_html=True,
-                )
-                for _, m in top3.iterrows():
-                    _c_color = "#569542" if m["chg"] >= 0 else "#c45454"
-                    _c_contrib = m["contrib"] * 100  # convert to basis points feel
-                    st.markdown(
-                        f"<div style='display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);'>"
-                        f"<div style='flex:0 0 46px;font-size:12px;font-weight:600;color:#C9A84C;'>{m['symbol']}</div>"
-                        f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{m['description']}</div>"
-                        f"<div style='flex:0 0 58px;font-size:12px;color:{_c_color};text-align:right;font-weight:600;'>{m['chg']:+.2f}%</div>"
-                        f"<div style='flex:0 0 52px;font-size:11px;color:rgba(255,255,255,0.3);text-align:right;'>{m['weight']:.1f}%</div>"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
-                # Detractors
-                st.markdown(
-                    "<div style='font-size:10px;color:rgba(196,84,84,0.7);text-transform:uppercase;"
-                    "letter-spacing:0.06em;margin-bottom:4px;font-weight:600;'>▼ Top Detractors</div>",
-                    unsafe_allow_html=True,
-                )
-                for _, m in bot3.iterrows():
-                    _d_color = "#569542" if m["chg"] >= 0 else "#c45454"
-                    st.markdown(
-                        f"<div style='display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);'>"
-                        f"<div style='flex:0 0 46px;font-size:12px;font-weight:600;color:#C9A84C;'>{m['symbol']}</div>"
-                        f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{m['description']}</div>"
-                        f"<div style='flex:0 0 58px;font-size:12px;color:{_d_color};text-align:right;font-weight:600;'>{m['chg']:+.2f}%</div>"
-                        f"<div style='flex:0 0 52px;font-size:11px;color:rgba(255,255,255,0.3);text-align:right;'>{m['weight']:.1f}%</div>"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
 
         # Top 10 Holdings — compact display with headers
         st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
