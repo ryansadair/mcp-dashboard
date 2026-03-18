@@ -124,6 +124,23 @@ if MOBILE_CSS_AVAILABLE:
 render_header()
 render_market_ticker()
 
+# ── Sidebar: refresh control ──────────────────────────────────────────────
+with st.sidebar:
+    st.markdown(
+        '<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);'
+        'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Data Controls</div>',
+        unsafe_allow_html=True,
+    )
+    if st.button("⟳  Refresh All Data", key="refresh_btn", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+    st.markdown(
+        '<div style="font-size:10px;color:rgba(255,255,255,0.2);margin-top:4px;">'
+        'Clears all cached data and reloads from sources. Auto-refreshes every 15 min.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
 # ── Data freshness + Tamarac status (combined, right-aligned) ─────────────
 _status_parts = []
 
@@ -188,37 +205,6 @@ if _status_parts:
         f'</div>',
         unsafe_allow_html=True,
     )
-
-    # Tiny refresh link — right-aligned below status
-    st.markdown("""
-    <style>
-    .refresh-row .stButton > button {
-        background: none !important;
-        border: none !important;
-        box-shadow: none !important;
-        color: rgba(255,255,255,0.18) !important;
-        font-size: 10px !important;
-        padding: 0 !important;
-        min-height: 0 !important;
-        height: auto !important;
-        line-height: 1 !important;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-    }
-    .refresh-row .stButton > button:hover {
-        color: #C9A84C !important;
-        background: none !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    _spacer, _btn = st.columns([9, 1])
-    with _btn:
-        with st.container():
-            st.markdown('<div class="refresh-row">', unsafe_allow_html=True)
-            if st.button("⟳ Refresh", key="refresh_btn"):
-                st.cache_data.clear()
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
 
 # ── Tamarac data loading (Sprint 5: auto-detect newest file) ─────────────
 import os
