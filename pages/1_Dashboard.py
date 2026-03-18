@@ -448,11 +448,12 @@ with tab_overview:
                         )
                         for _, m in top3.iterrows():
                             _c_color = "#569542" if m["daily_return"] >= 0 else "#c45454"
+                            _c_bp = m["contrib"] * 100
                             st.markdown(
                                 f"<div style='display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);'>"
                                 f"<div style='flex:0 0 46px;font-size:12px;font-weight:600;color:#C9A84C;'>{m['symbol']}</div>"
-                                f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{m['description']}</div>"
                                 f"<div style='flex:0 0 58px;font-size:12px;color:{_c_color};text-align:right;font-weight:600;'>{m['daily_return']:+.2f}%</div>"
+                                f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.3);text-align:right;'>{_c_bp:+.1f}bp</div>"
                                 f"</div>",
                                 unsafe_allow_html=True,
                             )
@@ -465,11 +466,12 @@ with tab_overview:
                         )
                         for _, m in bot3.iterrows():
                             _d_color = "#569542" if m["daily_return"] >= 0 else "#c45454"
+                            _d_bp = m["contrib"] * 100
                             st.markdown(
                                 f"<div style='display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);'>"
                                 f"<div style='flex:0 0 46px;font-size:12px;font-weight:600;color:#C9A84C;'>{m['symbol']}</div>"
-                                f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{m['description']}</div>"
                                 f"<div style='flex:0 0 58px;font-size:12px;color:{_d_color};text-align:right;font-weight:600;'>{m['daily_return']:+.2f}%</div>"
+                                f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.3);text-align:right;'>{_d_bp:+.1f}bp</div>"
                                 f"</div>",
                                 unsafe_allow_html=True,
                             )
