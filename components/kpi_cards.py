@@ -50,14 +50,14 @@ def render_kpi_cards(strategy: str, kpis: dict, bench_ytd: float):
 
     ytd_str = f"{ytd:+.2f}%"
     ytd_color = GREEN if ytd > 0 else RED if ytd < 0 else "rgba(255,255,255,0.95)"
-    ytd_sub = ""
+    ytd_label = "YTD Return"
     if ytd_as_of:
         from datetime import datetime
         try:
             dt = datetime.strptime(ytd_as_of, "%Y-%m-%d")
-            ytd_sub = f"as of {dt.strftime('%b %d')}"
+            ytd_label = f"YTD as of {dt.strftime('%b %d')}"
         except ValueError:
-            ytd_sub = f"as of {ytd_as_of}"
+            ytd_label = f"YTD as of {ytd_as_of}"
 
     cash_str = f"{cash_pct:.1f}%" if cash_pct > 0 else "—"
 
@@ -70,7 +70,7 @@ def render_kpi_cards(strategy: str, kpis: dict, bench_ytd: float):
     with c1:
         st.markdown(_kpi_card("Daily Return", daily_str, daily_color), unsafe_allow_html=True)
     with c2:
-        st.markdown(_kpi_card("YTD Return", ytd_str, ytd_color, ytd_sub), unsafe_allow_html=True)
+        st.markdown(_kpi_card(ytd_label, ytd_str, ytd_color), unsafe_allow_html=True)
     with c3:
         st.markdown(_kpi_card("Cash", cash_str), unsafe_allow_html=True)
     with c4:
