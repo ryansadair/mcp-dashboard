@@ -20,11 +20,25 @@ from datetime import datetime
 # ── Ticker Universe ────────────────────────────────────────────────────────
 
 INDICES = [
-    ("S&P 500",       "^GSPC"),
-    ("Dow Jones",     "^DJI"),
-    ("Nasdaq 100",    "^NDX"),
-    ("Russell 2000",  "^RUT"),
-    ("VIX",           "^VIX"),
+    ("Nasdaq 100",         "^NDX"),
+    ("Dow Jones 30",       "^DJI"),
+    ("Russell 2000",       "^RUT"),
+    ("Russell 1000 Value", "^RLV"),
+    ("Russell 1000 Growth","^RLG"),
+    ("US Agg Bond",        "AGG"),
+    ("Crude Oil",          "CL=F"),
+    ("Gold",               "GC=F"),
+]
+
+DIVIDEND_BENCHMARKS = [
+    ("S&P 500",                          "^GSPC"),
+    ("S&P 500 High Div",                 "SPYD"),
+    ("S&P Div Aristocrats (SDY)",        "SDY"),
+    ("S&P MCap Div Aristocrats (REGL)",  "REGL"),
+    ("S&P MidCap 400",                   "^SP400"),
+    ("Russell 3000",                     "^RUA"),
+    ("Intl Dividend (DWX)",              "DWX"),
+    ("Dow Select Dividend (DVY)",        "DVY"),
 ]
 
 SECTORS = [
@@ -79,7 +93,7 @@ COMMODITIES = [
 ]
 
 # Collect all tickers for batch fetch
-_ALL_GROUPS = [INDICES, SECTORS, FIXED_INCOME, GLOBAL_DEVELOPED, GLOBAL_EMERGING, COMMODITIES]
+_ALL_GROUPS = [INDICES, DIVIDEND_BENCHMARKS, SECTORS, FIXED_INCOME, GLOBAL_DEVELOPED, GLOBAL_EMERGING, COMMODITIES]
 _ALL_TICKERS = []
 for group in _ALL_GROUPS:
     for _, ticker in group:
@@ -249,9 +263,14 @@ def render_markets_tab():
         """Sort items by change_pct descending (best performers on top)."""
         return sorted(items, key=lambda x: quotes.get(x[1], {}).get("change_pct", 0), reverse=True)
 
-    # ── U.S. Indices ──────────────────────────────────────────────────────
-    st.markdown(_section_header("🇺🇸", "U.S. Equity Indices"), unsafe_allow_html=True)
-    st.markdown(_render_market_table(_sort_by_change(INDICES), quotes, section_label="Index"), unsafe_allow_html=True)
+    # ── Indices & Dividend Benchmarks (side by side) ────────────────────────
+    col_idx, col_div = st.columns(2)
+    with col_idx:
+        st.markdown(_section_header("📈", "Indices"), unsafe_allow_html=True)
+        st.markdown(_render_market_table(_sort_by_change(INDICES), quotes, section_label="Index"), unsafe_allow_html=True)
+    with col_div:
+        st.markdown(_section_header("💰", "Dividend Benchmarks"), unsafe_allow_html=True)
+        st.markdown(_render_market_table(_sort_by_change(DIVIDEND_BENCHMARKS), quotes, section_label="Benchmark"), unsafe_allow_html=True)
 
     # ── Sector ETFs ───────────────────────────────────────────────────────
     st.markdown(_section_header("📊", "S&P Sector ETFs"), unsafe_allow_html=True)
