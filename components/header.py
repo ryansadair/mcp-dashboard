@@ -42,6 +42,12 @@ def render_header():
         <div style="text-align:right;">
             <div style="font-size:13px;color:rgba(255,255,255,0.6);">
                 {date_str}<span style="opacity:0.4;margin-left:10px;">{time_str}</span>
+                <span onclick="window.parent.location.reload();"
+                      style="margin-left:10px;color:rgba(255,255,255,0.15);cursor:pointer;font-size:12px;
+                             transition:color 0.15s;"
+                      onmouseover="this.style.color='#C9A84C'"
+                      onmouseout="this.style.color='rgba(255,255,255,0.15)'"
+                      title="Refresh data">⟳</span>
             </div>
             <div style="font-size:11px;color:{status_color};margin-top:4px;">
                 <span style="width:6px;height:6px;border-radius:50%;background:{status_color};display:inline-block;margin-right:6px;"></span>
