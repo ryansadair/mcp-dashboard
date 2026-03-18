@@ -181,13 +181,42 @@ if DETECTOR_AVAILABLE:
 
 if _status_parts:
     _divider = '<span style="opacity:0.2;margin:0 6px;">|</span>'
-    st.markdown(
-        f'<div style="display:flex;align-items:center;justify-content:flex-end;'
-        f'padding:4px 28px 2px;gap:6px;font-size:10px;color:rgba(255,255,255,0.30);">'
-        f'{_divider.join(_status_parts)}'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+    _status_col, _refresh_col = st.columns([11, 1])
+    with _status_col:
+        st.markdown(
+            f'<div style="display:flex;align-items:center;justify-content:flex-end;'
+            f'padding:4px 0 2px;gap:6px;font-size:10px;color:rgba(255,255,255,0.30);">'
+            f'{_divider.join(_status_parts)}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    with _refresh_col:
+        # Style the refresh button to be compact and match the status bar
+        st.markdown("""
+        <style>
+        [data-testid="stButton"] button[kind="secondary"][key*="refresh_btn"],
+        div[data-testid="stColumn"]:last-child .stButton > button {
+            background: none !important;
+            border: 1px solid rgba(255,255,255,0.08) !important;
+            color: rgba(255,255,255,0.30) !important;
+            font-size: 14px !important;
+            padding: 2px 8px !important;
+            min-height: 0 !important;
+            height: 26px !important;
+            border-radius: 6px !important;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        div[data-testid="stColumn"]:last-child .stButton > button:hover {
+            border-color: #C9A84C !important;
+            color: #C9A84C !important;
+            background: rgba(201,168,76,0.06) !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        if st.button("⟳", key="refresh_btn", help="Clear cache and refresh all data"):
+            st.cache_data.clear()
+            st.rerun()
 
 # ── Tamarac data loading (Sprint 5: auto-detect newest file) ─────────────
 import os
