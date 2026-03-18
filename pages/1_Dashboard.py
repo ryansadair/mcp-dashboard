@@ -255,6 +255,32 @@ st.markdown("""
 [data-testid="stTabs"] [role="tablist"] {
     border-bottom: none !important;
 }
+
+/* ── Sub-tab styling (nested tabs inside tab panels) ──────────────────── */
+/* Sub-tabs inherit the uppercase/no-emoji treatment but are more compact */
+[data-testid="stTabs"] [data-testid="stTabs"] [role="tablist"] {
+    background: rgba(255,255,255,0.02) !important;
+    padding: 0 8px !important;
+    border-radius: 6px !important;
+    margin-bottom: 12px !important;
+}
+[data-testid="stTabs"] [data-testid="stTabs"] [role="tab"] {
+    padding: 10px 16px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.35) !important;
+    border-bottom: 2px solid transparent !important;
+}
+[data-testid="stTabs"] [data-testid="stTabs"] [role="tab"]:hover {
+    color: rgba(255,255,255,0.6) !important;
+}
+[data-testid="stTabs"] [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+    color: rgba(255,255,255,0.9) !important;
+    border-bottom: 2px solid #C9A84C !important;
+    background: rgba(201,168,76,0.04) !important;
+}
 </style>
 """, unsafe_allow_html=True)
 

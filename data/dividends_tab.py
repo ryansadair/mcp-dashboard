@@ -407,7 +407,7 @@ def render_dividends_tab(tamarac_parsed, active_strategy, strat_config, kpis):
 
     # ── Sub-tabs ───────────────────────────────────────────────────────────
     sub_announce, sub_detail, sub_safety = st.tabs([
-        "📅 Announcements", "📊 Dividend Detail", "🛡️ Safety & Growth"
+        "Announcements", "Dividend Detail", "Safety & Growth"
     ])
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -1045,7 +1045,7 @@ def _render_safety_growth(edf, active_strategy, strat_color):
 
     # ── Risk Monitor ──────────────────────────────────────────────────────
     st.divider()
-    st.markdown("**⚠️ Dividend Risk Monitor**")
+    st.markdown("**Dividend Risk Monitor**")
     st.markdown(
         "<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
         "Holdings with elevated payout ratios, declining growth, or broken streaks"

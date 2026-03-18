@@ -263,7 +263,7 @@ def render_macro_tab(qdvd_yield=None):
         '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
         'text-transform:uppercase;letter-spacing:0.06em;padding:12px 0 8px;'
         'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">'
-        '📊 Rates & Yields</div>',
+        'Rates & Yields</div>',
         unsafe_allow_html=True,
     )
 
@@ -358,7 +358,7 @@ def render_macro_tab(qdvd_yield=None):
             '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
             'text-transform:uppercase;letter-spacing:0.06em;padding:12px 0 8px;'
             'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">'
-            '💡 Dividend Strategy Context</div>',
+            'Dividend Strategy Context</div>',
             unsafe_allow_html=True,
         )
 
@@ -425,7 +425,7 @@ def render_macro_tab(qdvd_yield=None):
             '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
             'text-transform:uppercase;letter-spacing:0.06em;padding:12px 0 8px;'
             'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">'
-            '🧭 Sentiment</div>',
+            'Sentiment</div>',
             unsafe_allow_html=True,
         )
 
@@ -497,7 +497,7 @@ def render_macro_tab(qdvd_yield=None):
         '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
         'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
         'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">'
-        '📈 Economic Indicators</div>',
+        'Economic Indicators</div>',
         unsafe_allow_html=True,
     )
 
@@ -592,7 +592,7 @@ def render_macro_tab(qdvd_yield=None):
         '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
         'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
         'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">'
-        '🎯 Market Valuation</div>',
+        'Market Valuation</div>',
         unsafe_allow_html=True,
     )
 

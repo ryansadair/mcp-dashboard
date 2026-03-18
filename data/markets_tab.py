@@ -233,12 +233,12 @@ def _render_market_table(items, quotes, show_pct=True, section_label=None):
     return html
 
 
-def _section_header(emoji, title):
+def _section_header(title):
     return (
         f'<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
         f'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
         f'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:4px">'
-        f'{emoji} {title}</div>'
+        f'{title}</div>'
     )
 
 
@@ -266,22 +266,22 @@ def render_markets_tab():
     # ── Indices & Dividend Benchmarks (side by side) ────────────────────────
     col_idx, col_div = st.columns(2)
     with col_idx:
-        st.markdown(_section_header("📈", "Indices"), unsafe_allow_html=True)
+        st.markdown(_section_header("Indices"), unsafe_allow_html=True)
         st.markdown(_render_market_table(_sort_by_change(INDICES), quotes, section_label="Index"), unsafe_allow_html=True)
     with col_div:
-        st.markdown(_section_header("💰", "Dividend Benchmarks"), unsafe_allow_html=True)
+        st.markdown(_section_header("Dividend Benchmarks"), unsafe_allow_html=True)
         st.markdown(_render_market_table(_sort_by_change(DIVIDEND_BENCHMARKS), quotes, section_label="Benchmark"), unsafe_allow_html=True)
 
     # ── Sector ETFs ───────────────────────────────────────────────────────
-    st.markdown(_section_header("📊", "S&P Sector ETFs"), unsafe_allow_html=True)
+    st.markdown(_section_header("S&P Sector ETFs"), unsafe_allow_html=True)
     st.markdown(_render_market_table(_sort_by_change(SECTORS), quotes, section_label="Sector"), unsafe_allow_html=True)
 
     # ── Fixed Income ──────────────────────────────────────────────────────
-    st.markdown(_section_header("🏦", "Fixed Income ETFs"), unsafe_allow_html=True)
+    st.markdown(_section_header("Fixed Income ETFs"), unsafe_allow_html=True)
     st.markdown(_render_market_table(_sort_by_change(FIXED_INCOME), quotes, section_label="Category"), unsafe_allow_html=True)
 
     # ── Global Markets ────────────────────────────────────────────────────
-    st.markdown(_section_header("🌍", "Global Markets"), unsafe_allow_html=True)
+    st.markdown(_section_header("Global Markets"), unsafe_allow_html=True)
 
     col_dev, col_em = st.columns(2)
     with col_dev:
@@ -300,7 +300,7 @@ def render_markets_tab():
         st.markdown(_render_market_table(_sort_by_change(GLOBAL_EMERGING), quotes, section_label="Market"), unsafe_allow_html=True)
 
     # ── Commodities ───────────────────────────────────────────────────────
-    st.markdown(_section_header("🛢️", "Commodities"), unsafe_allow_html=True)
+    st.markdown(_section_header("Commodities"), unsafe_allow_html=True)
     st.markdown(_render_market_table(_sort_by_change(COMMODITIES), quotes, section_label="Commodity"), unsafe_allow_html=True)
 
     # ── Footer ────────────────────────────────────────────────────────────

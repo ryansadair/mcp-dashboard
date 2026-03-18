@@ -54,7 +54,7 @@ def render_finviz_panel(tam_df, price_data):
         '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
         'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
         'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
-        '🎯 Analyst Ratings & Price Targets</div>',
+        'Analyst Ratings &amp; Price Targets</div>',
         unsafe_allow_html=True,
     )
 
@@ -213,7 +213,7 @@ def render_finviz_panel(tam_df, price_data):
         '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
         'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
         'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
-        '📉 Technical Signals</div>',
+        'Technical Signals</div>',
         unsafe_allow_html=True,
     )
 
@@ -285,7 +285,7 @@ def render_finviz_panel(tam_df, price_data):
             '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
             'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
             'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
-            '⚠️ Elevated Short Interest (≥3%)</div>',
+            'Elevated Short Interest (≥3%)</div>',
             unsafe_allow_html=True,
         )
         for _, r in high_short.sort_values("short_float", ascending=False).iterrows():

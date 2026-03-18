@@ -422,7 +422,7 @@ if not info.get("longName") and not info.get("shortName"):
     st.stop()
 
 if yf_warning:
-    st.warning(f"⚠️ {yf_warning}")
+    st.warning(f"{yf_warning}")
 
 # ── Helper ────────────────────────────────────────────────────────────────
 def g(key, default=""):
@@ -491,7 +491,7 @@ qs6.metric("52W Low", f"${g('fiftyTwoWeekLow', 0):.2f}" if g("fiftyTwoWeekLow", 
 desc = g("longBusinessSummary", "")
 if desc:
     st.markdown("---")
-    with st.expander("📄 Company Description", expanded=True):
+    with st.expander("Company Description", expanded=True):
         st.markdown(f"<div style='font-size:13px;color:rgba(255,255,255,0.6);line-height:1.7;'>{desc}</div>",
                     unsafe_allow_html=True)
         ed1, ed2, ed3 = st.columns(3)
@@ -504,7 +504,7 @@ if desc:
 # 3. PRICE CHART WITH MOVING AVERAGES
 # ══════════════════════════════════════════════════════════════════════════
 st.markdown("---")
-st.markdown("#### 📈 Price Chart")
+st.markdown('<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">Price Chart</div>', unsafe_allow_html=True)
 
 if not hist.empty:
     period_options = {"1M": 21, "3M": 63, "6M": 126, "YTD": None, "1Y": 252, "2Y": 504, "3Y": 756, "5Y": 1260, "Max": 0}
@@ -579,7 +579,7 @@ if _FINVIZ_AVAILABLE:
 
     if fv:
         st.markdown("---")
-        st.markdown("#### 🎯 Analyst & Technical Signals")
+        st.markdown('<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">Analyst & Technical Signals</div>', unsafe_allow_html=True)
 
         # ── Row 1: Analyst Consensus ──────────────────────────────────────
         rec_val = fv.get("recommendation")
@@ -748,7 +748,12 @@ if _FINVIZ_AVAILABLE:
 # 3. DIVIDEND HISTORY
 # ══════════════════════════════════════════════════════════════════════════
 st.markdown("---")
-st.markdown(f"#### 💰 Dividend History — {ticker_input}")
+st.markdown(
+    f'<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);'
+    f'text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">'
+    f'Dividend History — {ticker_input}</div>',
+    unsafe_allow_html=True,
+)
 
 # ── Try Fish CCC data first (authoritative, up to 27 years) ──────────────
 fish_data = {}
@@ -897,7 +902,7 @@ else:
 # 4. VALUATION METRICS
 # ══════════════════════════════════════════════════════════════════════════
 st.markdown("---")
-st.markdown("#### 📊 Valuation")
+st.markdown('<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">Valuation</div>', unsafe_allow_html=True)
 
 v1, v2, v3, v4, v5, v6 = st.columns(6)
 v1.metric("P/E (TTM)", f"{g('trailingPE', 0):.1f}" if g("trailingPE", 0) else "—")
@@ -934,7 +939,7 @@ vv6.metric("Current Ratio", f"{g('currentRatio', 0):.2f}" if g("currentRatio", 0
 # 5. REVENUE / EARNINGS / MARGINS
 # ══════════════════════════════════════════════════════════════════════════
 st.markdown("---")
-st.markdown("#### 💵 Financials")
+st.markdown('<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">Financials</div>', unsafe_allow_html=True)
 
 financials = data.get("financials", pd.DataFrame())
 
@@ -1049,7 +1054,12 @@ if _current_sector and _MARKET_DATA_AVAILABLE and available_tickers:
 
         if same_sector:
             st.markdown("---")
-            st.markdown(f"#### 👥 Sector Peers — {_current_sector}")
+            st.markdown(
+                f'<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);'
+                f'text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">'
+                f'Sector Peers — {_current_sector}</div>',
+                unsafe_allow_html=True,
+            )
             st.markdown(
                 f"<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
                 f"Holdings in the same sector across all MCP strategies"

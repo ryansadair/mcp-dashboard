@@ -331,7 +331,7 @@ def _render_alert_card(alert):
     )
 
 
-def _render_alert_section(title, alerts, emoji=""):
+def _render_alert_section(title, alerts):
     """Render a section header + list of alerts."""
     if not alerts:
         return
@@ -340,7 +340,7 @@ def _render_alert_section(title, alerts, emoji=""):
         f'<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
         f'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
         f'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
-        f'{emoji} {title}'
+        f'{title}'
         f'<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.3);'
         f'margin-left:8px;">{len(alerts)}</span>'
         f'</div>',
@@ -451,16 +451,16 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
 
     # ── Render sections ───────────────────────────────────────────────────
     if price_alerts:
-        _render_alert_section("Price Movers (±2%+ Today)", price_alerts, "💹")
+        _render_alert_section("Price Movers (±2%+ Today)", price_alerts)
 
     if div_alerts:
-        _render_alert_section("Dividend Events", div_alerts, "💰")
+        _render_alert_section("Dividend Events", div_alerts)
 
     if earnings_alerts:
-        _render_alert_section("Upcoming Earnings", earnings_alerts, "📅")
+        _render_alert_section("Upcoming Earnings", earnings_alerts)
 
     if proximity_alerts:
-        _render_alert_section("52-Week Proximity", proximity_alerts, "📊")
+        _render_alert_section("52-Week Proximity", proximity_alerts)
 
     # ── Footer ────────────────────────────────────────────────────────────
     st.caption(
