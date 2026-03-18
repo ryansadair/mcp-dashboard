@@ -5,9 +5,10 @@ data/dividends_tab.py
 Comprehensive dividend analytics rendered as sub-tabs within the main Dividends tab.
 Sub-tabs:
   1. Announcements — existing dividend_calendar_tab.py (render_dividend_calendar)
-  2. Income Dashboard — income KPIs, monthly income chart, yield comparison, streaks
-  3. Dividend Detail — full sortable table with growth rates, payout, safety, history
-  4. Safety & Growth — growth tiers, safety scores, payout trends, risk monitor
+  2. Dividend Detail — full sortable table with growth rates, payout, safety, history,
+     plus Yield vs YoC chart and Consecutive Increases chart; clickable rows navigate
+     to Stock Detail page
+  3. Safety & Growth — growth tiers, safety scores, payout trends, risk monitor
 
 Data sources:
   - Tamarac Holdings Excel (yield_at_cost, current_yield, annual_income, cost_basis, value, quantity)
@@ -405,8 +406,8 @@ def render_dividends_tab(tamarac_parsed, active_strategy, strat_config, kpis):
     edf["growth_tier"] = edf.apply(lambda r: _growth_tier(r["growth_5y"], r.get("fish_sourced", False)), axis=1)
 
     # ── Sub-tabs ───────────────────────────────────────────────────────────
-    sub_announce, sub_income, sub_detail, sub_safety = st.tabs([
-        "📅 Announcements", "💵 Income Dashboard", "📊 Dividend Detail", "🛡️ Safety & Growth"
+    sub_announce, sub_detail, sub_safety = st.tabs([
+        "📅 Announcements", "📊 Dividend Detail", "🛡️ Safety & Growth"
     ])
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -424,19 +425,13 @@ def render_dividends_tab(tamarac_parsed, active_strategy, strat_config, kpis):
             )
 
     # ═══════════════════════════════════════════════════════════════════════
-    # SUB-TAB 2: INCOME DASHBOARD
-    # ═══════════════════════════════════════════════════════════════════════
-    with sub_income:
-        _render_income_dashboard(edf, tam_df, div_data, active_strategy, strat_color)
-
-    # ═══════════════════════════════════════════════════════════════════════
-    # SUB-TAB 3: DIVIDEND DETAIL TABLE
+    # SUB-TAB 2: DIVIDEND DETAIL TABLE
     # ═══════════════════════════════════════════════════════════════════════
     with sub_detail:
         _render_dividend_detail(edf, active_strategy, strat_color)
 
     # ═══════════════════════════════════════════════════════════════════════
-    # SUB-TAB 4: SAFETY & GROWTH
+    # SUB-TAB 3: SAFETY & GROWTH
     # ═══════════════════════════════════════════════════════════════════════
     with sub_safety:
         _render_safety_growth(edf, active_strategy, strat_color)
@@ -612,11 +607,11 @@ def _render_income_dashboard(edf, tam_df, div_data, active_strategy, strat_color
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# SUB-TAB 3: DIVIDEND DETAIL TABLE
+# SUB-TAB 2: DIVIDEND DETAIL TABLE (formerly sub-tab 3)
 # ═══════════════════════════════════════════════════════════════════════════
 
 def _render_dividend_detail(edf, active_strategy, strat_color):
-    """Full sortable dividend metrics table with all the details."""
+    """Full sortable dividend metrics table with clickable rows for stock detail."""
 
     # ── KPI summary row ────────────────────────────────────────────────────
     # Weighted avg yield (by portfolio weight, excluding zeros)
@@ -643,6 +638,21 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
     with d5: st.metric("Avg Consec. Years", f"{int(avg_consec)}")
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+    # ── Clickable ticker detail ────────────────────────────────────────────
+    detail_ticker = st.selectbox(
+        "Ticker Detail",
+        options=edf["symbol"].tolist(),
+        key="div_detail_ticker_select",
+        label_visibility="collapsed",
+        index=None,
+        placeholder="Select a ticker to view stock detail...",
+    )
+    if detail_ticker:
+        st.session_state["detail_ticker"] = detail_ticker
+        st.query_params["ticker"] = detail_ticker
+        st.switch_page("pages/2_Stock_Detail.py")
+
     st.markdown(f"**Dividend Metrics — {STRATEGY_NAMES.get(active_strategy, active_strategy)}** · {len(edf)} holdings")
 
     # Build display columns
@@ -751,7 +761,101 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
         },
     )
 
-    # ── Yield chart ────────────────────────────────────────────────────────
+    # ── Current Yield vs Yield on Cost chart (moved from Income Dashboard) ─
+    st.divider()
+    col_yoc, col_streak = st.columns(2)
+
+    with col_yoc:
+        st.markdown("**Current Yield vs Yield on Cost**")
+        st.markdown(
+            "<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
+            "YoC reflects dividend growth since purchase — the real compounding story"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        # Build comparison data
+        yoc_df = edf[["symbol", "current_yield", "yield_on_cost", "weight_pct"]].copy()
+        yoc_df = yoc_df.sort_values("yield_on_cost", ascending=True)
+
+        fig_yoc = go.Figure()
+        fig_yoc.add_trace(go.Bar(
+            y=yoc_df["symbol"], x=yoc_df["current_yield"], orientation="h",
+            name="Current Yield",
+            marker=dict(color=BLUE, opacity=0.7),
+            text=[f"{v:.2f}%" for v in yoc_df["current_yield"]],
+            textposition="outside",
+            textfont=dict(size=9, color="rgba(255,255,255,0.5)"),
+        ))
+        fig_yoc.add_trace(go.Bar(
+            y=yoc_df["symbol"], x=yoc_df["yield_on_cost"], orientation="h",
+            name="Yield on Cost",
+            marker=dict(color=GREEN, opacity=0.7),
+            text=[f"{v:.2f}%" for v in yoc_df["yield_on_cost"]],
+            textposition="outside",
+            textfont=dict(size=9, color="rgba(255,255,255,0.5)"),
+        ))
+        _yoc_layout = {**PLOTLY_DARK}
+        _yoc_layout["margin"] = dict(l=10, r=60, t=30, b=10)
+        _yoc_layout["legend"] = dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+            font=dict(size=10, color="rgba(255,255,255,0.5)"),
+            bgcolor="rgba(0,0,0,0)",
+        )
+        fig_yoc.update_layout(
+            **_yoc_layout,
+            barmode="group",
+            height=max(300, len(yoc_df) * 28 + 80),
+            xaxis={**_XAXIS, "ticksuffix": "%"},
+            yaxis={**_YAXIS, "tickfont": dict(size=10)},
+            showlegend=True,
+        )
+        st.plotly_chart(fig_yoc, use_container_width=True, config=PLOTLY_CONFIG)
+
+    # ── Consecutive Increases chart (moved from Income Dashboard) ──────────
+    with col_streak:
+        st.markdown("**Consecutive Dividend Increase Streaks**")
+        st.markdown(
+            "<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
+            "King (50+) · Aristocrat (25+) · Contender (10+) · Challenger (5+)"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        # Build streak data sorted descending
+        streak_df = edf[edf["consec_years"] > 0][["symbol", "consec_years"]].copy()
+        streak_df = streak_df.sort_values("consec_years", ascending=True)
+
+        if not streak_df.empty:
+            colors = []
+            tier_labels = []
+            for _, row in streak_df.iterrows():
+                tier_name, tier_color = _streak_tier(row["consec_years"])
+                colors.append(tier_color)
+                tier_labels.append(f'{row["consec_years"]}y — {tier_name}')
+
+            fig_streak = go.Figure()
+            fig_streak.add_trace(go.Bar(
+                y=streak_df["symbol"], x=streak_df["consec_years"], orientation="h",
+                marker=dict(color=colors, opacity=0.8),
+                text=tier_labels,
+                textposition="outside",
+                textfont=dict(size=10, color="rgba(255,255,255,0.6)"),
+            ))
+            _streak_layout = {**PLOTLY_DARK}
+            _streak_layout["margin"] = dict(l=10, r=80, t=30, b=10)
+            fig_streak.update_layout(
+                **_streak_layout,
+                height=max(300, len(streak_df) * 24 + 80),
+                xaxis={**_XAXIS, "title": "Years"},
+                yaxis=_YAXIS,
+                showlegend=False,
+            )
+            st.plotly_chart(fig_streak, use_container_width=True, config=PLOTLY_CONFIG)
+        else:
+            st.info("No consecutive-year data available for this strategy.")
+
+    # ── Dividend Yield by Holding ──────────────────────────────────────────
     st.divider()
     st.markdown("**Dividend Yield by Holding**")
     yield_df = edf[edf["div_yield"] > 0][["symbol", "div_yield"]].sort_values("div_yield", ascending=True)
@@ -775,29 +879,6 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             showlegend=False,
         )
         st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
-
-    # ── 5Y Growth chart ────────────────────────────────────────────────────
-    st.divider()
-    st.markdown("**5-Year Dividend Growth Rate**")
-    growth_df = edf[edf["growth_5y"] != 0][["symbol", "growth_5y"]].sort_values("growth_5y", ascending=True)
-    if not growth_df.empty:
-        colors = [GREEN if g >= 0 else RED for g in growth_df["growth_5y"]]
-        fig4 = go.Figure()
-        fig4.add_trace(go.Bar(
-            x=growth_df["growth_5y"], y=growth_df["symbol"], orientation="h",
-            marker=dict(color=colors),
-            text=[f"{g:+.1f}%" for g in growth_df["growth_5y"]],
-            textposition="outside",
-            textfont=dict(size=11, color="rgba(255,255,255,0.6)"),
-        ))
-        fig4.update_layout(
-            **PLOTLY_DARK,
-            xaxis=_XAXIS,
-            yaxis=_YAXIS,
-            height=max(300, len(growth_df) * 28 + 80),
-            showlegend=False,
-        )
-        st.plotly_chart(fig4, use_container_width=True, config=PLOTLY_CONFIG)
 
     # ── Dividend History (Fish CCC preferred, yfinance fallback) ─────────
     st.divider()
