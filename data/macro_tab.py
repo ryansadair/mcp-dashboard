@@ -137,9 +137,9 @@ ECON_SERIES = {
     "Initial Jobless Claims": {"id": "ICSA", "transform": "level", "freq": "weekly"},
 }
 
-SPREAD_SERIES = {
-    "IG Credit Spread": "BAMLC0A0CM",        # ICE BofA US Corp Index OAS
-    "HY Credit Spread": "BAMLH0A0HYM2",      # ICE BofA US HY Index OAS
+MORTGAGE_SERIES = {
+    "15Y Mortgage": "MORTGAGE15US",
+    "30Y Mortgage": "MORTGAGE30US",
 }
 
 
@@ -304,16 +304,17 @@ def render_macro_tab(qdvd_yield=None):
         else:
             spread_bp = None
 
-        # Credit spreads
-        for name, series_id in SPREAD_SERIES.items():
+        # Mortgage rates
+        for name, series_id in MORTGAGE_SERIES.items():
             latest, prev, date_str = _fred_latest(series_id)
             if latest is not None:
                 chg_str, direction = _fmt_chg(latest, prev, is_bp=True)
                 rates_display.append({
                     "name": name,
-                    "value": f"{latest:.0f}bp",
+                    "value": _fmt_rate(latest) if latest else "—",
                     "chg": chg_str,
                     "direction": direction,
+                    "raw": latest,
                 })
 
     # Extract key rates for use in later sections — fall back to 30Y if 10Y unavailable
@@ -626,13 +627,12 @@ def render_macro_tab(qdvd_yield=None):
         status = "positive" if premium > 0.5 else "neutral"
         val_rows.append(("QDVD Yield Premium", f"+{premium:.2f}%", f"QDVD {qdvd_yield:.2f}% vs S&P {sp_div_pct:.2f}%", status))
 
-    # Credit spreads as valuation context
-    for name, series_id in SPREAD_SERIES.items():
+    # Mortgage rates as context
+    for name, series_id in MORTGAGE_SERIES.items():
         latest, prev, _ = _fred_latest(series_id)
         if latest:
-            status = "tight" if latest < 150 and "HY" in name else "tight" if latest < 100 and "IG" in name else "neutral"
-            avg_label = "Hist avg ~450bp" if "HY" in name else "Hist avg ~130bp"
-            val_rows.append((name, f"{latest:.0f}bp", avg_label, status))
+            status = "positive" if latest < 5.5 else "neutral" if latest < 7.0 else "elevated"
+            val_rows.append((name, f"{latest:.2f}%", "Weekly avg from Freddie Mac", status))
 
     # Render full-width valuation table
     _vtw = "width:100%;border-collapse:collapse;table-layout:fixed"
