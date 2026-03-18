@@ -189,42 +189,6 @@ if _status_parts:
         unsafe_allow_html=True,
     )
 
-    # Refresh button styled to look like inline text link
-    st.markdown("""
-    <style>
-    div[data-testid="stMainBlockContainer"] > div > div > div > div.refresh-area {
-        display: flex;
-        justify-content: flex-end;
-        padding-right: 28px;
-        margin-top: -8px;
-    }
-    .refresh-area .stButton > button {
-        background: none !important;
-        border: none !important;
-        box-shadow: none !important;
-        color: rgba(255,255,255,0.18) !important;
-        font-size: 10px !important;
-        font-weight: 600 !important;
-        letter-spacing: 0.04em !important;
-        text-transform: uppercase !important;
-        padding: 0 !important;
-        min-height: 0 !important;
-        height: 16px !important;
-        line-height: 16px !important;
-    }
-    .refresh-area .stButton > button:hover {
-        color: #C9A84C !important;
-        background: none !important;
-        border: none !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    with st.container():
-        st.markdown('<div class="refresh-area">', unsafe_allow_html=True)
-    if st.button("⟳ refresh", key="refresh_btn"):
-        st.cache_data.clear()
-        st.rerun()
-
 # ── Tamarac data loading (Sprint 5: auto-detect newest file) ─────────────
 import os
 
