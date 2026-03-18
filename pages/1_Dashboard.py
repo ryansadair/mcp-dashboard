@@ -111,8 +111,9 @@ except ImportError:
 if not check_password():
     st.stop()
 
-# ── Auto-refresh ──────────────────────────────────────────────────────────
-# Set to 60s for testing — change to 15*60*1000 (900000) once confirmed working
+# ── Auto-refresh every 60 seconds ─────────────────────────────────────────
+# Page reruns every minute (header time stays current).
+# Market data only re-fetches when @st.cache_data TTL (15 min) expires.
 from streamlit_autorefresh import st_autorefresh
 st_autorefresh(interval=60 * 1000, key="data_refresh")
 
