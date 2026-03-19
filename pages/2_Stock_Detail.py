@@ -54,6 +54,13 @@ try:
 except ImportError:
     _MARKET_DATA_AVAILABLE = False
 
+# Notion proprietary metrics (MCP Target)
+try:
+    from data.notion_metrics import fetch_notion_metrics
+    _NOTION_AVAILABLE = True
+except ImportError:
+    _NOTION_AVAILABLE = False
+
 # ── Supabase config ────────────────────────────────────────────────────────
 SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
 SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # paste your service role key here
@@ -584,10 +591,17 @@ if _FINVIZ_AVAILABLE:
         # ── Row 1: Analyst Consensus ──────────────────────────────────────
         rec_val = fv.get("recommendation")
         rec_label = fv.get("rec_label", "—")
-        target = fv.get("target_price")
-        upside = fv.get("upside_pct")
         rsi = fv.get("rsi_14")
         earnings = fv.get("earnings_date")
+
+        # MCP Target from Notion (replaces Finviz consensus target)
+        _notion_data = fetch_notion_metrics() if _NOTION_AVAILABLE else {}
+        _nm = _notion_data.get(ticker_input.upper(), {})
+        mcp_target = _nm.get("mcp_target")
+        if mcp_target and price and price > 0:
+            upside = round((mcp_target - price) / price * 100, 1)
+        else:
+            upside = None
 
         a1, a2, a3, a4, a5, a6 = st.columns(6)
 
@@ -611,7 +625,7 @@ if _FINVIZ_AVAILABLE:
                 st.metric("Analyst Rating", "—")
 
         with a2:
-            st.metric("Target Price", f"${target:.0f}" if target else "—")
+            st.metric("MCP Target", f"${mcp_target:,.0f}" if mcp_target else "—")
 
         with a3:
             if upside is not None:
@@ -619,12 +633,12 @@ if _FINVIZ_AVAILABLE:
                 _arrow = "▲" if upside >= 0 else "▼"
                 st.markdown(
                     f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
-                    f"letter-spacing:0.06em;margin-bottom:4px;'>Upside to Target</div>"
+                    f"letter-spacing:0.06em;margin-bottom:4px;'>Upside to MCP Target</div>"
                     f"<div style='font-size:20px;font-weight:700;color:{_up_color};'>{_arrow} {upside:+.1f}%</div>",
                     unsafe_allow_html=True,
                 )
             else:
-                st.metric("Upside to Target", "—")
+                st.metric("Upside to MCP Target", "—")
 
         with a4:
             if rsi is not None:
@@ -1181,7 +1195,7 @@ st.markdown(
     "border-top:1px solid rgba(255,255,255,0.04);font-size:11px;color:rgba(255,255,255,0.2);'>"
     "<span>© 2026 Martin Capital Partners LLC</span>"
     "<span style='opacity:0.3;'>|</span>"
-    "<span>Data: yfinance · Finviz · Fish CCC</span>"
+    "<span>Data: yfinance · Finviz · Fish CCC · Notion</span>"
     "<span style='opacity:0.3;'>|</span>"
     "<span>Internal use only</span>"
     "</div>",
