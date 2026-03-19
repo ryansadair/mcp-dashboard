@@ -543,39 +543,32 @@ def render_macro_tab(qdvd_yield=None):
 
             econ_rows.append((name, display_val, display_prev, trend, date_label, signal))
 
-    # Render header row — fixed widths so separate tables align
+    # Render as one single table inside a scroll container for alignment
     _tw = "width:100%;border-collapse:collapse;table-layout:fixed;min-width:580px"
     _th = ("padding:8px 10px;font-size:10px;font-weight:600;"
            "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
            "border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap")
-    st.markdown(
+    _td_nw = "white-space:nowrap;"
+    _coldef = ('<col style="width:25%"><col style="width:15%"><col style="width:15%">'
+               '<col style="width:10%"><col style="width:18%"><col style="width:17%">')
+
+    econ_html = (
         f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
-        f'<table style="{_tw}"><colgroup>'
-        '<col style="width:25%"><col style="width:15%"><col style="width:15%">'
-        '<col style="width:10%"><col style="width:18%"><col style="width:17%">'
-        '</colgroup><thead><tr>'
+        f'<table style="{_tw}"><colgroup>{_coldef}</colgroup>'
+        f'<thead><tr>'
         f'<th style="text-align:left;{_th}">Indicator</th>'
         f'<th style="text-align:right;{_th}">Latest</th>'
         f'<th style="text-align:right;{_th}">Previous</th>'
         f'<th style="text-align:right;{_th}">Trend</th>'
         f'<th style="text-align:right;{_th}">Release</th>'
         f'<th style="text-align:right;{_th}">Signal</th>'
-        '</tr></thead></table>'
-        '</div>',
-        unsafe_allow_html=True,
+        f'</tr></thead><tbody>'
     )
 
-    # Render each row individually — same fixed widths
-    _td_nw = "white-space:nowrap;"
     for name, val, prev, trend, date_label, signal in econ_rows:
         arrow = _trend_arrow(trend)
         badge = _signal_badge(signal)
-        st.markdown(
-            f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
-            f'<table style="{_tw}"><colgroup>'
-            '<col style="width:25%"><col style="width:15%"><col style="width:15%">'
-            '<col style="width:10%"><col style="width:18%"><col style="width:17%">'
-            '</colgroup><tbody>'
+        econ_html += (
             f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03)">'
             f'<td style="text-align:left;padding:10px 10px;font-size:13px;font-weight:600;'
             f'color:rgba(255,255,255,0.8);{_td_nw}">{name}</td>'
@@ -587,10 +580,11 @@ def render_macro_tab(qdvd_yield=None):
             f'<td style="text-align:right;padding:10px 10px;font-size:11px;'
             f'color:rgba(255,255,255,0.3);{_td_nw}">{date_label}</td>'
             f'<td style="text-align:right;padding:10px 10px;{_td_nw}">{badge}</td>'
-            f'</tr></tbody></table>'
-            f'</div>',
-            unsafe_allow_html=True,
+            f'</tr>'
         )
+
+    econ_html += '</tbody></table></div>'
+    st.markdown(econ_html, unsafe_allow_html=True)
 
     # ── Market Valuation — full width ────────────────────────────────────────
     st.markdown(
@@ -639,31 +633,28 @@ def render_macro_tab(qdvd_yield=None):
             status = "positive" if latest < 5.5 else "neutral" if latest < 7.0 else "elevated"
             val_rows.append((name, f"{latest:.2f}%", "Weekly avg from Freddie Mac", status))
 
-    # Render full-width valuation table
+    # Render as one single table inside a scroll container
     _vtw = "width:100%;border-collapse:collapse;table-layout:fixed;min-width:480px"
     _vth = ("padding:8px 10px;font-size:10px;font-weight:600;"
             "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
             "border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap")
-    _vcols = ('<colgroup><col style="width:30%"><col style="width:18%">'
-              '<col style="width:35%"><col style="width:17%"></colgroup>')
-    st.markdown(
+    _vcoldef = '<col style="width:30%"><col style="width:18%"><col style="width:35%"><col style="width:17%">'
+    _vtd_nw = "white-space:nowrap;"
+
+    val_html = (
         f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
-        f'<table style="{_vtw}">{_vcols}<thead><tr>'
+        f'<table style="{_vtw}"><colgroup>{_vcoldef}</colgroup>'
+        f'<thead><tr>'
         f'<th style="text-align:left;{_vth}">Metric</th>'
         f'<th style="text-align:right;{_vth}">Current</th>'
         f'<th style="text-align:right;{_vth}">Context</th>'
         f'<th style="text-align:right;{_vth}">Signal</th>'
-        '</tr></thead></table>'
-        '</div>',
-        unsafe_allow_html=True,
+        f'</tr></thead><tbody>'
     )
 
-    _vtd_nw = "white-space:nowrap;"
     for name, val, note, status in val_rows:
         badge = _signal_badge(status)
-        st.markdown(
-            f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
-            f'<table style="{_vtw}">{_vcols}<tbody>'
+        val_html += (
             f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03)">'
             f'<td style="text-align:left;padding:10px 10px;font-size:13px;font-weight:500;'
             f'color:rgba(255,255,255,0.7);{_vtd_nw}">{name}</td>'
@@ -672,9 +663,10 @@ def render_macro_tab(qdvd_yield=None):
             f'<td style="text-align:right;padding:10px 10px;font-size:12px;'
             f'color:rgba(255,255,255,0.35);{_vtd_nw}">{note}</td>'
             f'<td style="text-align:right;padding:10px 10px;{_vtd_nw}">{badge}</td>'
-            f'</tr></tbody></table>'
-            f'</div>',
-            unsafe_allow_html=True,
+            f'</tr>'
         )
+
+    val_html += '</tbody></table></div>'
+    st.markdown(val_html, unsafe_allow_html=True)
 
     st.caption(f"Data: FRED API · yfinance · {datetime.now().strftime('%I:%M %p')}")
