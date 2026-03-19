@@ -61,7 +61,7 @@ ANNUAL_COL_MAP = {
 
 def _data_unavailable_card(msg="Composite returns data unavailable", detail=None):
     """Show a styled unavailable message."""
-    html = f"""
+    st.markdown(f"""
     <div style="
         background: rgba(255,255,255,0.02);
         border: 1px solid rgba(255,255,255,0.06);
@@ -74,15 +74,10 @@ def _data_unavailable_card(msg="Composite returns data unavailable", detail=None
         <div style="font-size: 15px; color: rgba(255,255,255,0.6); font-weight: 600;">
             {msg}
         </div>
-    """
+    </div>
+    """, unsafe_allow_html=True)
     if detail:
-        html += f"""
-        <div style="font-size: 12px; color: rgba(255,255,255,0.3); margin-top: 8px;">
-            {detail}
-        </div>
-        """
-    html += "</div>"
-    st.markdown(html, unsafe_allow_html=True)
+        st.caption(detail)
 
 
 @st.cache_data(ttl=3600)
