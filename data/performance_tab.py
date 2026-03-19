@@ -21,7 +21,7 @@ from data.composite_returns import (
     build_monthly_heatmap_data,
     COMPOSITE_BLOCKS,
 )
-from utils.config import COLORS, STRATEGIES
+from utils.config import BRAND, STRATEGIES
 from utils.mobile_css import inject_mobile_css
 
 # ── Chart Theme ─────────────────────────────────────────────────────────────
@@ -44,10 +44,10 @@ STRATEGY_NAMES = {
     "OR": "Oregon Dividend",
 }
 STRATEGY_COLORS = {
-    "QDVD": COLORS["green"],
-    "SMID": COLORS["gold"],
-    "DAC": COLORS["blue"],
-    "OR": COLORS["green"],
+    "QDVD": BRAND["green"],
+    "SMID": BRAND["gold"],
+    "DAC": BRAND["blue"],
+    "OR": BRAND["green"],
 }
 
 # Annual returns column name mapping (spreadsheet → strategy key)
@@ -114,7 +114,7 @@ def render_performance_tab(active_strategy):
         return
 
     comp_df = data["composites"][active_strategy]
-    strat_color = STRATEGY_COLORS.get(active_strategy, COLORS["green"])
+    strat_color = STRATEGY_COLORS.get(active_strategy, BRAND["green"])
     strat_name = STRATEGY_NAMES.get(active_strategy, active_strategy)
 
     # As-of date
@@ -168,13 +168,13 @@ def _render_period_returns(data, strategy, color):
 
         bench_val = bench_pr.get(period)
         val_pct = val * 100
-        val_color = COLORS["green"] if val >= 0 else COLORS["red"]
+        val_color = BRAND["green"] if val >= 0 else BRAND["red"]
 
         # Alpha line
         alpha_html = ""
         if bench_val is not None:
             alpha = (val - bench_val) * 100
-            a_color = COLORS["green"] if alpha >= 0 else COLORS["red"]
+            a_color = BRAND["green"] if alpha >= 0 else BRAND["red"]
             a_sign = "+" if alpha >= 0 else ""
             alpha_html = f'<div style="font-size:10px; color:{a_color}; margin-top:2px;">{a_sign}{alpha:.1f}% α</div>'
 
@@ -291,13 +291,13 @@ def _render_risk_metrics(comp_df, strategy, color):
     for label, val in metrics:
         # Color coding for certain metrics
         if label == "Ann. Return":
-            val_color = COLORS["green"] if risk['annualized_return'] >= 0 else COLORS["red"]
+            val_color = BRAND["green"] if risk['annualized_return'] >= 0 else BRAND["red"]
         elif label == "Max Drawdown":
-            val_color = COLORS["red"]
+            val_color = BRAND["red"]
         elif label == "Best Month":
-            val_color = COLORS["green"]
+            val_color = BRAND["green"]
         elif label == "Worst Month":
-            val_color = COLORS["red"]
+            val_color = BRAND["red"]
         else:
             val_color = "rgba(255,255,255,0.85)"
 
@@ -361,11 +361,11 @@ def _render_monthly_heatmap(comp_df, strategy, color):
                 if pct > 0:
                     intensity = min(pct / 8, 1)  # cap at 8% for full green
                     bg = f"rgba(86,149,66,{0.08 + intensity * 0.25})"
-                    txt_color = COLORS["green"]
+                    txt_color = BRAND["green"]
                 elif pct < 0:
                     intensity = min(abs(pct) / 8, 1)
                     bg = f"rgba(196,84,84,{0.08 + intensity * 0.25})"
-                    txt_color = COLORS["red"]
+                    txt_color = BRAND["red"]
                 else:
                     bg = "transparent"
                     txt_color = "rgba(255,255,255,0.5)"
@@ -474,7 +474,7 @@ def _render_annual_returns(data, strategy, color):
         # Strategy cell
         if pd.notna(strat_val):
             pct = strat_val * 100
-            val_color = COLORS["green"] if strat_val >= 0 else COLORS["red"]
+            val_color = BRAND["green"] if strat_val >= 0 else BRAND["red"]
             strat_cell = f'<td style="padding:8px 10px; text-align:center; font-size:12px; font-weight:600; color:{val_color};">{pct:+.1f}%</td>'
         else:
             strat_cell = '<td style="padding:8px 10px; text-align:center; font-size:12px; color:rgba(255,255,255,0.15);">—</td>'
@@ -488,7 +488,7 @@ def _render_annual_returns(data, strategy, color):
                 primary_bench_val = bval
             if pd.notna(bval):
                 bpct = bval * 100
-                bcolor = "rgba(255,255,255,0.6)" if bval >= 0 else COLORS["red"]
+                bcolor = "rgba(255,255,255,0.6)" if bval >= 0 else BRAND["red"]
                 bench_cells += f'<td style="padding:8px 10px; text-align:center; font-size:12px; color:{bcolor};">{bpct:+.1f}%</td>'
             else:
                 bench_cells += '<td style="padding:8px 10px; text-align:center; font-size:12px; color:rgba(255,255,255,0.15);">—</td>'
@@ -496,7 +496,7 @@ def _render_annual_returns(data, strategy, color):
         # Alpha cell
         if pd.notna(strat_val) and pd.notna(primary_bench_val):
             alpha = (strat_val - primary_bench_val) * 100
-            a_color = COLORS["green"] if alpha >= 0 else COLORS["red"]
+            a_color = BRAND["green"] if alpha >= 0 else BRAND["red"]
             a_sign = "+" if alpha >= 0 else ""
             alpha_cell = f'<td style="padding:8px 10px; text-align:center; font-size:12px; font-weight:600; color:{a_color};">{a_sign}{alpha:.1f}%</td>'
         else:
