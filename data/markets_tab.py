@@ -27,6 +27,7 @@ INDICES = [
     ("Russell 1000 Growth","^RLG"),
     ("US Agg Bond",        "AGG"),
     ("Crude Oil",          "CL=F"),
+    ("Brent Crude",        "BZ=F"),
     ("Gold",               "GC=F"),
 ]
 
