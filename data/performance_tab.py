@@ -3,7 +3,7 @@ Martin Capital Partners — Performance Tab
 Composite returns visualization: cumulative chart, period summary,
 monthly heatmap, risk metrics, and annual returns.
 
-Data source: Composite_Returns.xls via data/composite_returns.py
+Data source: composite returns.xls via data/composite returns.py
 """
 
 import streamlit as st
@@ -12,7 +12,7 @@ import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime
 
-from data.composite_returns import (
+from data.composite returns import (
     load_composite_data,
     get_cumulative_series,
     get_benchmark_cumulative,
@@ -101,7 +101,7 @@ def render_performance_tab(active_strategy):
 
     if not data["available"]:
         _data_unavailable_card(
-            detail=data.get("error", "Composite_Returns.xls not found on this machine.")
+            detail=data.get("error", "composite returns.xls not found on this machine.")
         )
         return
 
@@ -109,7 +109,7 @@ def render_performance_tab(active_strategy):
     if active_strategy not in data["composites"]:
         _data_unavailable_card(
             msg=f"No composite data for {active_strategy}",
-            detail="This strategy is not in Composite_Returns.xls."
+            detail="This strategy is not in composite returns.xls."
         )
         return
 
