@@ -61,6 +61,16 @@ STRATEGIES = {
     },
 }
 
+# ── Composite Returns Benchmarks (Sprint 10) ─────────────────────────────
+# Maps each strategy to its authoritative benchmark(s) from
+# Composite_Returns.xls (inline with the composite data — no yfinance needed)
+COMPOSITE_BENCHMARKS = {
+    "QDVD": {"primary": "S&P 500", "secondary": "S&P 500 High Dividend"},
+    "SMID": {"primary": "S&P Mid Cap 400", "secondary": "S&P 400 Aristocrats"},
+    "DAC":  {"primary": "Russell 3000", "secondary": "Dow Jones Select Dividend"},
+    "OR":   {"primary": "S&P 500", "secondary": None},
+}
+
 # ── Sector Colors ─────────────────────────────────────────────────────────
 SECTOR_COLORS = {
     "Healthcare":        "#569542",
