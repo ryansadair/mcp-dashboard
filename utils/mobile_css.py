@@ -49,6 +49,18 @@ def inject_mobile_css():
         max-width: 100% !important;
     }
 
+    /* ── Header: scale down for tablet ──────────────────────────── */
+    .mcp-header {
+        padding: 12px 16px !important;
+    }
+    .mcp-firm-name {
+        font-size: 14px !important;
+        letter-spacing: 0.08em !important;
+    }
+    .mcp-firm-sub {
+        font-size: 10px !important;
+    }
+
     /* Strategy selector: full width */
     [data-testid="stSelectbox"] {
         max-width: 100% !important;
@@ -91,14 +103,37 @@ def inject_mobile_css():
         font-size: 20px !important;
     }
 
-    /* Dataframes: horizontal scroll */
+    /* Dataframes: horizontal scroll — target nested containers too */
     [data-testid="stDataFrame"],
     [data-testid="stTable"] {
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch;
     }
+    [data-testid="stDataFrame"] > div,
+    [data-testid="stDataFrame"] > div > div,
+    [data-testid="stDataFrame"] iframe {
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
     [data-testid="stDataFrame"] table {
         min-width: 600px;
+    }
+
+    /* Scroll hint: subtle right-edge fade on dataframes */
+    [data-testid="stDataFrame"] {
+        position: relative;
+    }
+    [data-testid="stDataFrame"]::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 24px;
+        height: 100%;
+        background: linear-gradient(to left, rgba(12,17,23,0.6), transparent);
+        pointer-events: none;
+        z-index: 1;
     }
 
     /* Plotly charts: let them use their natural height from Python.
@@ -108,12 +143,17 @@ def inject_mobile_css():
         overflow: hidden !important;
     }
 
-    /* Custom HTML tables (markets, alerts): allow scroll */
+    /* Custom HTML tables (markets, alerts, finviz): allow scroll */
     .stMarkdown table {
         display: block;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         white-space: nowrap;
+    }
+    /* HTML table containers: scroll support */
+    .stMarkdown div:has(> table) {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     /* Footer: wrap instead of flex */
@@ -131,6 +171,33 @@ def inject_mobile_css():
     .block-container {
         padding-left: 8px !important;
         padding-right: 8px !important;
+    }
+
+    /* ── Header: stack vertically on phone ───────────────────── */
+    .mcp-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        padding: 12px 12px !important;
+        gap: 6px !important;
+    }
+    .mcp-logo {
+        width: 36px !important;
+        height: 36px !important;
+    }
+    .mcp-firm-name {
+        font-size: 13px !important;
+        letter-spacing: 0.06em !important;
+    }
+    .mcp-firm-sub {
+        font-size: 9px !important;
+    }
+    .mcp-header-right {
+        text-align: left !important;
+        font-size: 11px !important;
+        padding-left: 50px;  /* Align with text next to logo (36px logo + 14px gap) */
+    }
+    .mcp-header-right div:first-child {
+        font-size: 11px !important;
     }
 
     /* Strategy selector: compact */
