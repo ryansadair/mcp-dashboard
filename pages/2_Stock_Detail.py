@@ -237,6 +237,13 @@ inject_global_css()
 render_header()
 render_market_ticker()
 
+# Mobile responsiveness
+try:
+    from utils.mobile_css import inject_mobile_css
+    inject_mobile_css()
+except ImportError:
+    pass
+
 # ── Brand constants ───────────────────────────────────────────────────────
 GREEN = BRAND.get("green", "#569542")
 BLUE = BRAND.get("blue", "#07415A")
@@ -603,79 +610,69 @@ if _FINVIZ_AVAILABLE:
         else:
             upside = None
 
-        a1, a2, a3, a4, a5, a6 = st.columns(6)
+        # ── Row 1: Analyst Consensus (responsive HTML grid) ────────────
+        # Custom HTML grid: 6 cols on desktop, wraps to 3×2 on mobile
+        def _card(label, value_html):
+            return (
+                f'<div style="flex:1 1 130px;min-width:100px;padding:8px 0;">'
+                f'<div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;'
+                f'letter-spacing:0.06em;margin-bottom:4px;">{label}</div>'
+                f'{value_html}</div>'
+            )
 
-        with a1:
-            if rec_val is not None:
-                # Color the metric based on rating
-                if rec_val <= 2.0:
-                    _rec_color = GREEN
-                elif rec_val <= 3.0:
-                    _rec_color = GOLD
-                else:
-                    _rec_color = "#c45454"
-                st.markdown(
-                    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
-                    f"letter-spacing:0.06em;margin-bottom:4px;'>Analyst Rating</div>"
-                    f"<div style='font-size:20px;font-weight:700;color:{_rec_color};'>{rec_val:.1f}</div>"
-                    f"<div style='font-size:11px;color:{_rec_color};font-weight:600;'>{rec_label}</div>",
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.metric("Analyst Rating", "—")
+        # Analyst Rating
+        if rec_val is not None:
+            _rec_color = GREEN if rec_val <= 2.0 else GOLD if rec_val <= 3.0 else "#c45454"
+            card_rating = _card("Analyst Rating",
+                f'<div style="font-size:20px;font-weight:700;color:{_rec_color};">{rec_val:.1f}</div>'
+                f'<div style="font-size:11px;color:{_rec_color};font-weight:600;">{rec_label}</div>')
+        else:
+            card_rating = _card("Analyst Rating", '<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.5);">—</div>')
 
-        with a2:
-            st.metric("MCP Target", f"${mcp_target:,.0f}" if mcp_target else "—")
+        # MCP Target
+        target_str = f"${mcp_target:,.0f}" if mcp_target else "—"
+        card_target = _card("MCP Target",
+            f'<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.9);">{target_str}</div>')
 
-        with a3:
-            if upside is not None:
-                _up_color = GREEN if upside >= 0 else "#c45454"
-                _arrow = "▲" if upside >= 0 else "▼"
-                st.markdown(
-                    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
-                    f"letter-spacing:0.06em;margin-bottom:4px;'>Upside to MCP Target</div>"
-                    f"<div style='font-size:20px;font-weight:700;color:{_up_color};'>{_arrow} {upside:+.1f}%</div>",
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.metric("Upside to MCP Target", "—")
+        # Upside
+        if upside is not None:
+            _up_color = GREEN if upside >= 0 else "#c45454"
+            _arrow = "▲" if upside >= 0 else "▼"
+            card_upside = _card("Upside to MCP Target",
+                f'<div style="font-size:20px;font-weight:700;color:{_up_color};">{_arrow} {upside:+.1f}%</div>')
+        else:
+            card_upside = _card("Upside to MCP Target", '<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.5);">—</div>')
 
-        with a4:
-            if rsi is not None:
-                if rsi >= 70:
-                    _rsi_color = "#c45454"
-                    _rsi_label = "Overbought"
-                elif rsi <= 30:
-                    _rsi_color = GREEN
-                    _rsi_label = "Oversold"
-                else:
-                    _rsi_color = "rgba(255,255,255,0.8)"
-                    _rsi_label = "Neutral"
-                st.markdown(
-                    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
-                    f"letter-spacing:0.06em;margin-bottom:4px;'>RSI (14)</div>"
-                    f"<div style='font-size:20px;font-weight:700;color:{_rsi_color};'>{rsi:.0f}</div>"
-                    f"<div style='font-size:11px;color:{_rsi_color};'>{_rsi_label}</div>",
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.metric("RSI (14)", "—")
+        # RSI
+        if rsi is not None:
+            _rsi_color = "#c45454" if rsi >= 70 else GREEN if rsi <= 30 else "rgba(255,255,255,0.8)"
+            _rsi_label = "Overbought" if rsi >= 70 else "Oversold" if rsi <= 30 else "Neutral"
+            card_rsi = _card("RSI (14)",
+                f'<div style="font-size:20px;font-weight:700;color:{_rsi_color};">{rsi:.0f}</div>'
+                f'<div style="font-size:11px;color:{_rsi_color};">{_rsi_label}</div>')
+        else:
+            card_rsi = _card("RSI (14)", '<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.5);">—</div>')
 
-        with a5:
-            short_fl = fv.get("short_float")
-            if short_fl is not None:
-                _sf_color = "#c45454" if short_fl >= 5 else GOLD if short_fl >= 3 else "rgba(255,255,255,0.8)"
-                st.markdown(
-                    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
-                    f"letter-spacing:0.06em;margin-bottom:4px;'>Short Float</div>"
-                    f"<div style='font-size:20px;font-weight:700;color:{_sf_color};'>{short_fl:.1f}%</div>",
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.metric("Short Float", "—")
+        # Short Float
+        short_fl = fv.get("short_float")
+        if short_fl is not None:
+            _sf_color = "#c45454" if short_fl >= 5 else GOLD if short_fl >= 3 else "rgba(255,255,255,0.8)"
+            card_short = _card("Short Float",
+                f'<div style="font-size:20px;font-weight:700;color:{_sf_color};">{short_fl:.1f}%</div>')
+        else:
+            card_short = _card("Short Float", '<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.5);">—</div>')
 
-        with a6:
-            st.metric("Earnings Date", earnings if earnings else "—")
+        # Earnings
+        earnings_str = earnings if earnings else "—"
+        card_earnings = _card("Earnings Date",
+            f'<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.9);">{earnings_str}</div>')
+
+        st.markdown(
+            f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
+            f'{card_rating}{card_target}{card_upside}{card_rsi}{card_short}{card_earnings}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
         # ── Row 2: SMA Distances ──────────────────────────────────────────
         sma20 = fv.get("sma20_dist")
@@ -687,41 +684,38 @@ if _FINVIZ_AVAILABLE:
 
         st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-        b1, b2, b3, b4, b5, b6 = st.columns(6)
-
-        def _sma_metric(col, label, val):
+        # SMA cards
+        def _sma_card(label, val):
             if val is not None:
                 _color = GREEN if val > 0 else "#c45454" if val < -5 else GOLD
-                col.markdown(
-                    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
-                    f"letter-spacing:0.06em;margin-bottom:4px;'>{label}</div>"
-                    f"<div style='font-size:20px;font-weight:700;color:{_color};'>{val:+.1f}%</div>",
-                    unsafe_allow_html=True,
-                )
-            else:
-                col.metric(label, "—")
+                return _card(label, f'<div style="font-size:20px;font-weight:700;color:{_color};">{val:+.1f}%</div>')
+            return _card(label, '<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.5);">—</div>')
 
-        _sma_metric(b1, "vs 20-SMA", sma20)
-        _sma_metric(b2, "vs 50-SMA", sma50)
-        _sma_metric(b3, "vs 200-SMA", sma200)
+        card_sma20 = _sma_card("vs 20-SMA", sma20)
+        card_sma50 = _sma_card("vs 50-SMA", sma50)
+        card_sma200 = _sma_card("vs 200-SMA", sma200)
 
-        with b4:
-            st.metric("Insider Own", f"{insider_own:.1f}%" if insider_own is not None else "—")
+        insider_str = f"{insider_own:.1f}%" if insider_own is not None else "—"
+        card_insider = _card("Insider Own",
+            f'<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.9);">{insider_str}</div>')
 
-        with b5:
-            st.metric("Inst Own", f"{inst_own:.1f}%" if inst_own is not None else "—")
+        inst_str = f"{inst_own:.1f}%" if inst_own is not None else "—"
+        card_inst = _card("Inst Own",
+            f'<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.9);">{inst_str}</div>')
 
-        with b6:
-            if insider_trans is not None:
-                _it_color = GREEN if insider_trans > 0 else "#c45454" if insider_trans < 0 else "rgba(255,255,255,0.6)"
-                st.markdown(
-                    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
-                    f"letter-spacing:0.06em;margin-bottom:4px;'>Insider Trans</div>"
-                    f"<div style='font-size:20px;font-weight:700;color:{_it_color};'>{insider_trans:+.1f}%</div>",
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.metric("Insider Trans", "—")
+        if insider_trans is not None:
+            _it_color = GREEN if insider_trans > 0 else "#c45454" if insider_trans < 0 else "rgba(255,255,255,0.6)"
+            card_ins_trans = _card("Insider Trans",
+                f'<div style="font-size:20px;font-weight:700;color:{_it_color};">{insider_trans:+.1f}%</div>')
+        else:
+            card_ins_trans = _card("Insider Trans", '<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.5);">—</div>')
+
+        st.markdown(
+            f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
+            f'{card_sma20}{card_sma50}{card_sma200}{card_insider}{card_inst}{card_ins_trans}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
         # ── Performance row ───────────────────────────────────────────────
         perf_ytd = fv.get("perf_ytd")
@@ -734,26 +728,26 @@ if _FINVIZ_AVAILABLE:
         has_perf = any(v is not None for v in [perf_week, perf_month, perf_quarter, perf_half, perf_year, perf_ytd])
         if has_perf:
             st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-            p1, p2, p3, p4, p5, p6 = st.columns(6)
 
-            def _perf_metric(col, label, val):
+            def _perf_card(label, val):
                 if val is not None:
                     _color = GREEN if val >= 0 else "#c45454"
-                    col.markdown(
-                        f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;"
-                        f"letter-spacing:0.06em;margin-bottom:4px;'>{label}</div>"
-                        f"<div style='font-size:16px;font-weight:600;color:{_color};'>{val:+.1f}%</div>",
-                        unsafe_allow_html=True,
-                    )
-                else:
-                    col.metric(label, "—")
+                    return _card(label, f'<div style="font-size:16px;font-weight:600;color:{_color};">{val:+.1f}%</div>')
+                return _card(label, '<div style="font-size:16px;font-weight:600;color:rgba(255,255,255,0.5);">—</div>')
 
-            _perf_metric(p1, "Week", perf_week)
-            _perf_metric(p2, "Month", perf_month)
-            _perf_metric(p3, "Quarter", perf_quarter)
-            _perf_metric(p4, "Half Year", perf_half)
-            _perf_metric(p5, "Year", perf_year)
-            _perf_metric(p6, "YTD", perf_ytd)
+            perf_cards = (
+                _perf_card("Week", perf_week)
+                + _perf_card("Month", perf_month)
+                + _perf_card("Quarter", perf_quarter)
+                + _perf_card("Half Year", perf_half)
+                + _perf_card("Year", perf_year)
+                + _perf_card("YTD", perf_ytd)
+            )
+
+            st.markdown(
+                f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">{perf_cards}</div>',
+                unsafe_allow_html=True,
+            )
 
         st.caption(f"Source: Finviz · Cached 1 hour · Analyst ratings are consensus of Wall Street coverage")
 
@@ -1106,16 +1100,17 @@ if _current_sector and _MARKET_DATA_AVAILABLE and available_tickers:
             # Build comparison table
             _th = ("padding:6px 8px;font-size:10px;font-weight:600;"
                    "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
-                   "border-bottom:1px solid rgba(255,255,255,0.06)")
-            _tw = "width:100%;border-collapse:collapse;table-layout:fixed"
+                   "border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap")
+            _tw = "width:100%;border-collapse:collapse;min-width:680px"
             _cols = ('<colgroup>'
-                     '<col style="width:8%"><col style="width:20%"><col style="width:10%">'
-                     '<col style="width:10%"><col style="width:10%"><col style="width:10%">'
-                     '<col style="width:10%"><col style="width:10%"><col style="width:12%">'
+                     '<col style="width:55px"><col style="width:140px"><col style="width:72px">'
+                     '<col style="width:62px"><col style="width:68px"><col style="width:60px">'
+                     '<col style="width:55px"><col style="width:62px"><col style="width:90px">'
                      '</colgroup>')
 
-            # Header
+            # Header — wrapped in scrollable div
             st.markdown(
+                f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
                 f'<table style="{_tw}">{_cols}<thead><tr>'
                 f'<th style="text-align:left;{_th}">Sym</th>'
                 f'<th style="text-align:left;{_th}">Company</th>'
@@ -1126,7 +1121,8 @@ if _current_sector and _MARKET_DATA_AVAILABLE and available_tickers:
                 f'<th style="text-align:right;{_th}">P/E</th>'
                 f'<th style="text-align:right;{_th}">YTD</th>'
                 f'<th style="text-align:center;{_th}">Analyst</th>'
-                f'</tr></thead></table>',
+                f'</tr></thead></table>'
+                f'</div>',
                 unsafe_allow_html=True,
             )
 
@@ -1170,19 +1166,23 @@ if _current_sector and _MARKET_DATA_AVAILABLE and available_tickers:
                 else:
                     rec_html = '<span style="font-size:11px;color:rgba(255,255,255,0.3);">—</span>'
 
+                _td = "white-space:nowrap;"
+
                 st.markdown(
+                    f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
                     f'<table style="{_tw}">{_cols}<tbody>'
                     f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03);{bg}">'
-                    f'<td style="text-align:left;padding:8px;font-size:12px;font-weight:{sym_weight};color:{sym_color};">{t}</td>'
-                    f'<td style="text-align:left;padding:8px;font-size:11px;color:rgba(255,255,255,0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{_name}</td>'
-                    f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.8);">{price_str}</td>'
-                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{yield_color};">{yield_str}</td>'
-                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{dgr5_color};">{dgr5_str}</td>'
-                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{payout_color};">{payout_str}</td>'
-                    f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.7);">{pe_str}</td>'
-                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{ytd_color};">{ytd_str}</td>'
-                    f'<td style="text-align:center;padding:8px;">{rec_html}</td>'
-                    f'</tr></tbody></table>',
+                    f'<td style="text-align:left;padding:8px;font-size:12px;font-weight:{sym_weight};color:{sym_color};{_td}">{t}</td>'
+                    f'<td style="text-align:left;padding:8px;font-size:11px;color:rgba(255,255,255,0.5);overflow:hidden;text-overflow:ellipsis;{_td}">{_name}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.8);{_td}">{price_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{yield_color};{_td}">{yield_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{dgr5_color};{_td}">{dgr5_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{payout_color};{_td}">{payout_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.7);{_td}">{pe_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{ytd_color};{_td}">{ytd_str}</td>'
+                    f'<td style="text-align:center;padding:8px;{_td}">{rec_html}</td>'
+                    f'</tr></tbody></table>'
+                    f'</div>',
                     unsafe_allow_html=True,
                 )
 
