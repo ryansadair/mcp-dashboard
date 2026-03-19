@@ -297,11 +297,11 @@ tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_ma
     "Overview", "Holdings", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "Alerts"
 ])
 
-# ── Strategy state + data (computed once, rendered per-tab) ───────────────
+# ── Strategy selector ─────────────────────────────────────────────────────
 if "active_strategy" not in st.session_state:
     st.session_state["active_strategy"] = "QDVD"
 
-# Inject selectbox styling once (global CSS)
+# Selectbox styling
 st.markdown("""
 <style>
 [data-testid="stSelectbox"] { max-width: 460px; }
@@ -334,23 +334,24 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Compute strategy data once (shared across all tabs)
 strat_keys   = list(STRATEGIES.keys())
 strat_labels = [f"{STRATEGIES[k]['full_name']}  ({k})" for k in strat_keys]
 
-# We need a unique selectbox key per tab to avoid Streamlit duplicate key errors,
-# but all of them sync to the same session_state value.
+def _on_strategy_change(tab_key):
+    """Callback for strategy selectbox — syncs widget value to session state."""
+    widget_key = f"strategy_select_{tab_key}"
+    selected_label = st.session_state[widget_key]
+    selected_key = strat_keys[strat_labels.index(selected_label)]
+    st.session_state["active_strategy"] = selected_key
+
 def _render_strategy_header(tab_key):
-    """Render strategy selector + KPI cards inside a tab. Call at the top of each strategy-specific tab."""
+    """Render strategy selector + KPI cards inside a tab."""
     current_idx = strat_keys.index(st.session_state["active_strategy"])
-    selected_label = st.selectbox(
+    st.selectbox(
         "Strategy", options=strat_labels, index=current_idx,
         key=f"strategy_select_{tab_key}", label_visibility="collapsed",
+        on_change=_on_strategy_change, args=(tab_key,),
     )
-    selected_key = strat_keys[strat_labels.index(selected_label)]
-    if selected_key != st.session_state["active_strategy"]:
-        st.session_state["active_strategy"] = selected_key
-        st.rerun()
 
     st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
     render_kpi_cards(active, kpis, bench_ytd)
