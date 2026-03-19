@@ -307,7 +307,7 @@ with col_sel:
     ).strip().upper()
 with col_back:
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("← Back to Dashboard", key="back_btn"):
+    if st.button("← Back", key="back_btn", use_container_width=True):
         st.switch_page("pages/1_Dashboard.py")
 
 if not ticker_input:

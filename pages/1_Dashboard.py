@@ -949,8 +949,23 @@ with tab_perf:
     bench_info  = STRATEGY_BENCHMARKS.get(active, {"name": "S&P 500", "ticker": "^GSPC"})
     strat_color = strat["color"]
 
-    # ── Period selector ───────────────────────────────────────────────────
-    period = st.selectbox("Time Period", ["YTD", "1Y", "3Y", "5Y", "ITD"], index=0, key="perf_period")
+    # ── Period selector (button row) ─────────────────────────────────────
+    _perf_periods = ["YTD", "1Y", "3Y", "5Y", "ITD"]
+    if "perf_period" not in st.session_state:
+        st.session_state["perf_period"] = "YTD"
+    # Ensure session state value is valid
+    if st.session_state["perf_period"] not in _perf_periods:
+        st.session_state["perf_period"] = "YTD"
+
+    perf_pcols = st.columns(len(_perf_periods))
+    for i, plabel in enumerate(_perf_periods):
+        with perf_pcols[i]:
+            if st.button(plabel, key=f"perf_period_{plabel}", use_container_width=True,
+                         type="primary" if st.session_state["perf_period"] == plabel else "secondary"):
+                st.session_state["perf_period"] = plabel
+                st.rerun()
+
+    period = st.session_state["perf_period"]
 
     if strat_df is None or strat_df.empty:
         st.info(f"No return data available for {active}. Add data to Strategy_Returns.xlsx.")
