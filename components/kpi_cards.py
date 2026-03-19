@@ -66,14 +66,13 @@ def render_kpi_cards(strategy: str, kpis: dict, bench_ytd: float):
 
     holdings_str = str(holdings)
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-    with c1:
-        st.markdown(_kpi_card("Daily Return", daily_str, daily_color), unsafe_allow_html=True)
-    with c2:
-        st.markdown(_kpi_card(ytd_label, ytd_str, ytd_color), unsafe_allow_html=True)
-    with c3:
-        st.markdown(_kpi_card("Cash", cash_str), unsafe_allow_html=True)
-    with c4:
-        st.markdown(_kpi_card("Dividend Yield", yield_str, yield_color), unsafe_allow_html=True)
-    with c5:
-        st.markdown(_kpi_card("Holdings", holdings_str), unsafe_allow_html=True)
+    cards_html = (
+        f'<div style="display:flex;flex-wrap:wrap;gap:10px;">'
+        f'<div style="flex:1 1 150px;min-width:130px;">{_kpi_card("Daily Return", daily_str, daily_color)}</div>'
+        f'<div style="flex:1 1 150px;min-width:130px;">{_kpi_card(ytd_label, ytd_str, ytd_color)}</div>'
+        f'<div style="flex:1 1 150px;min-width:130px;">{_kpi_card("Cash", cash_str)}</div>'
+        f'<div style="flex:1 1 150px;min-width:130px;">{_kpi_card("Dividend Yield", yield_str, yield_color)}</div>'
+        f'<div style="flex:1 1 150px;min-width:130px;">{_kpi_card("Holdings", holdings_str)}</div>'
+        f'</div>'
+    )
+    st.markdown(cards_html, unsafe_allow_html=True)

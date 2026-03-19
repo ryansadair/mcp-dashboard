@@ -489,14 +489,33 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Quick stats row
-qs1, qs2, qs3, qs4, qs5, qs6 = st.columns(6)
-qs1.metric("Mkt Cap", mc_str)
-qs2.metric("Div Yield", f"{div_yield:.2f}%" if div_yield > 0 else "—")
-qs3.metric("Div Rate", f"${div_rate:.2f}" if div_rate > 0 else "—")
-qs4.metric("P/E", f"{g('trailingPE', 0):.1f}" if g("trailingPE", 0) else "—")
-qs5.metric("52W High", f"${g('fiftyTwoWeekHigh', 0):.2f}" if g("fiftyTwoWeekHigh", 0) else "—")
-qs6.metric("52W Low", f"${g('fiftyTwoWeekLow', 0):.2f}" if g("fiftyTwoWeekLow", 0) else "—")
+# Quick stats row — responsive flex grid
+def _qs_card(label, value):
+    return (
+        f'<div style="flex:1 1 130px;min-width:100px;padding:8px 0;">'
+        f'<div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;'
+        f'letter-spacing:0.06em;margin-bottom:4px;">{label}</div>'
+        f'<div style="font-size:18px;font-weight:700;color:rgba(255,255,255,0.9);">{value}</div>'
+        f'</div>'
+    )
+
+_qs_divyield = f"{div_yield:.2f}%" if div_yield > 0 else "—"
+_qs_divrate = f"${div_rate:.2f}" if div_rate > 0 else "—"
+_qs_pe = f"{g('trailingPE', 0):.1f}" if g("trailingPE", 0) else "—"
+_qs_52hi = f"${g('fiftyTwoWeekHigh', 0):.2f}" if g("fiftyTwoWeekHigh", 0) else "—"
+_qs_52lo = f"${g('fiftyTwoWeekLow', 0):.2f}" if g("fiftyTwoWeekLow", 0) else "—"
+
+st.markdown(
+    f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
+    f'{_qs_card("Mkt Cap", mc_str)}'
+    f'{_qs_card("Div Yield", _qs_divyield)}'
+    f'{_qs_card("Div Rate", _qs_divrate)}'
+    f'{_qs_card("P/E", _qs_pe)}'
+    f'{_qs_card("52W High", _qs_52hi)}'
+    f'{_qs_card("52W Low", _qs_52lo)}'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -522,9 +541,10 @@ st.markdown('<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0
 
 if not hist.empty:
     period_options = {"1M": 21, "3M": 63, "6M": 126, "YTD": None, "1Y": 252, "2Y": 504, "3Y": 756, "5Y": 1260, "Max": 0}
-    period_cols = st.columns(len(period_options))
     if "chart_period" not in st.session_state:
         st.session_state["chart_period"] = "1Y"
+
+    period_cols = st.columns(len(period_options))
     for i, (label, _) in enumerate(period_options.items()):
         with period_cols[i]:
             if st.button(label, key=f"period_{label}", use_container_width=True,
@@ -912,23 +932,39 @@ else:
 st.markdown("---")
 st.markdown('<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">Valuation</div>', unsafe_allow_html=True)
 
-v1, v2, v3, v4, v5, v6 = st.columns(6)
-v1.metric("P/E (TTM)", f"{g('trailingPE', 0):.1f}" if g("trailingPE", 0) else "—")
-v2.metric("Fwd P/E", f"{g('forwardPE', 0):.1f}" if g("forwardPE", 0) else "—")
-v3.metric("PEG Ratio", f"{g('pegRatio', 0):.2f}" if g("pegRatio", 0) else "—")
-v4.metric("P/B", f"{g('priceToBook', 0):.2f}" if g("priceToBook", 0) else "—")
-v5.metric("P/S (TTM)", f"{g('priceToSalesTrailing12Months', 0):.2f}" if g("priceToSalesTrailing12Months", 0) else "—")
-v6.metric("EV/EBITDA", f"{g('enterpriseToEbitda', 0):.1f}" if g("enterpriseToEbitda", 0) else "—")
+v_pe = f"{g('trailingPE', 0):.1f}" if g("trailingPE", 0) else "—"
+v_fpe = f"{g('forwardPE', 0):.1f}" if g("forwardPE", 0) else "—"
+v_peg = f"{g('pegRatio', 0):.2f}" if g("pegRatio", 0) else "—"
+v_pb = f"{g('priceToBook', 0):.2f}" if g("priceToBook", 0) else "—"
+v_ps = f"{g('priceToSalesTrailing12Months', 0):.2f}" if g("priceToSalesTrailing12Months", 0) else "—"
+v_ev = f"{g('enterpriseToEbitda', 0):.1f}" if g("enterpriseToEbitda", 0) else "—"
+
+def _val_card(label, value):
+    return (
+        f'<div style="flex:1 1 130px;min-width:100px;padding:8px 0;">'
+        f'<div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;'
+        f'letter-spacing:0.06em;margin-bottom:4px;">{label}</div>'
+        f'<div style="font-size:18px;font-weight:700;color:rgba(255,255,255,0.9);">{value}</div>'
+        f'</div>'
+    )
+
+st.markdown(
+    f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
+    f'{_val_card("P/E (TTM)", v_pe)}{_val_card("Fwd P/E", v_fpe)}{_val_card("PEG Ratio", v_peg)}'
+    f'{_val_card("P/B", v_pb)}{_val_card("P/S (TTM)", v_ps)}{_val_card("EV/EBITDA", v_ev)}'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 
 # Second row
-vv1, vv2, vv3, vv4, vv5, vv6 = st.columns(6)
-vv1.metric("Beta", f"{g('beta', 0):.2f}" if g("beta", 0) else "—")
+st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+v_beta = f"{g('beta', 0):.2f}" if g("beta", 0) else "—"
 
 payout_raw = g("payoutRatio", 0)
 payout_pct = round(payout_raw * 100, 1) if isinstance(payout_raw, (int, float)) and 0 < payout_raw < 5 else 0
-vv2.metric("Payout Ratio", f"{payout_pct:.1f}%" if payout_pct > 0 else "—")
+v_payout = f"{payout_pct:.1f}%" if payout_pct > 0 else "—"
 
-# EV formatting
 ev_raw = g("enterpriseValue", 0)
 if ev_raw >= 1e12:
     ev_str = f"${ev_raw/1e12:.2f}T"
@@ -936,11 +972,18 @@ elif ev_raw >= 1e9:
     ev_str = f"${ev_raw/1e9:.1f}B"
 else:
     ev_str = "—"
-vv3.metric("Enterprise Value", ev_str)
 
-vv4.metric("ROE", f"{g('returnOnEquity', 0)*100:.1f}%" if isinstance(g("returnOnEquity", 0), (int, float)) and g("returnOnEquity", 0) else "—")
-vv5.metric("Debt/Equity", f"{g('debtToEquity', 0):.0f}%" if g("debtToEquity", 0) else "—")
-vv6.metric("Current Ratio", f"{g('currentRatio', 0):.2f}" if g("currentRatio", 0) else "—")
+v_roe = f"{g('returnOnEquity', 0)*100:.1f}%" if isinstance(g("returnOnEquity", 0), (int, float)) and g("returnOnEquity", 0) else "—"
+v_de = f"{g('debtToEquity', 0):.0f}%" if g("debtToEquity", 0) else "—"
+v_cr = f"{g('currentRatio', 0):.2f}" if g("currentRatio", 0) else "—"
+
+st.markdown(
+    f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
+    f'{_val_card("Beta", v_beta)}{_val_card("Payout Ratio", v_payout)}{_val_card("Enterprise Value", ev_str)}'
+    f'{_val_card("ROE", v_roe)}{_val_card("Debt/Equity", v_de)}{_val_card("Current Ratio", v_cr)}'
+    f'</div>',
+    unsafe_allow_html=True,
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════

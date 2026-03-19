@@ -248,10 +248,21 @@ def inject_mobile_css():
         padding: 6px 12px !important;
     }
 
-    /* Buttons: minimum touch size */
+    /* Buttons: minimum touch size + compact for period selectors */
     .stButton > button {
         min-height: 44px !important;
         min-width: 44px !important;
+        font-size: 11px !important;
+        padding: 6px 8px !important;
+    }
+
+    /* Period button columns: allow wrapping */
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .stButton) {
+        flex-wrap: wrap !important;
+    }
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] .stButton) > [data-testid="stColumn"] {
+        min-width: 0 !important;
+        flex: 0 1 auto !important;
     }
 
     /* Spinner: don't take full width on phone */
