@@ -99,6 +99,13 @@ try:
 except ImportError:
     MOBILE_CSS_AVAILABLE = False
 
+# Composite Returns (Sprint 10)
+try:
+    from data.performance_tab import render_performance_tab
+    COMPOSITE_AVAILABLE = True
+except ImportError:
+    COMPOSITE_AVAILABLE = False
+
 # Monthly YTD returns from Tamarac (separate file Ryan updates)
 try:
     from data.monthly_returns import STRATEGY_YTD, AS_OF_DATE
@@ -940,190 +947,14 @@ with tab_holdings:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# PERFORMANCE — Powered by Strategy_Returns.xlsx
+# PERFORMANCE — Composite Returns (Sprint 10)
 # ══════════════════════════════════════════════════════════════════════════
 with tab_perf:
     _render_strategy_header("perf")
-    from data.performance import load_strategy_returns, get_benchmark_ytd
-
-    all_returns = load_strategy_returns()
-    strat_df    = all_returns.get(active)
-    bench_info  = STRATEGY_BENCHMARKS.get(active, {"name": "S&P 500", "ticker": "^GSPC"})
-    strat_color = strat["color"]
-
-    # ── Period selector (button row) ─────────────────────────────────────
-    _perf_periods = ["YTD", "1Y", "3Y", "5Y", "ITD"]
-    if "perf_period" not in st.session_state:
-        st.session_state["perf_period"] = "YTD"
-    # Ensure session state value is valid
-    if st.session_state["perf_period"] not in _perf_periods:
-        st.session_state["perf_period"] = "YTD"
-
-    perf_pcols = st.columns(len(_perf_periods))
-    for i, plabel in enumerate(_perf_periods):
-        with perf_pcols[i]:
-            if st.button(plabel, key=f"perf_period_{plabel}", use_container_width=True,
-                         type="primary" if st.session_state["perf_period"] == plabel else "secondary"):
-                st.session_state["perf_period"] = plabel
-                st.rerun()
-
-    period = st.session_state["perf_period"]
-
-    if strat_df is None or strat_df.empty:
-        st.info(f"No return data available for {active}. Add data to Strategy_Returns.xlsx.")
+    if COMPOSITE_AVAILABLE:
+        render_performance_tab(active)
     else:
-        # Filter to period
-        today  = pd.Timestamp.today()
-        cutoff = {
-            "YTD": pd.Timestamp(today.year, 1, 1),
-            "1Y":  today - pd.DateOffset(years=1),
-            "3Y":  today - pd.DateOffset(years=3),
-            "5Y":  today - pd.DateOffset(years=5),
-            "ITD": strat_df["date"].min(),
-        }.get(period, pd.Timestamp(today.year, 1, 1))
-
-        pf = strat_df[strat_df["date"] >= cutoff].copy()
-        if pf.empty:
-            st.info(f"No data for {active} in the selected period.")
-        else:
-            # Rebase cumulative from period start
-            pf["strat_cum"] = (1 + pf["ret"]).cumprod()
-            pf["strat_cum"] = (pf["strat_cum"] / pf["strat_cum"].iloc[0] - 1) * 100
-
-            # ── Chart ─────────────────────────────────────────────────────
-            fig2 = go.Figure()
-            r, g, b = int(strat_color[1:3],16), int(strat_color[3:5],16), int(strat_color[5:7],16)
-            fig2.add_trace(go.Scatter(
-                x=pf["date"], y=pf["strat_cum"],
-                name=STRATEGY_NAMES.get(active, active),
-                fill="tozeroy", fillcolor=f"rgba({r},{g},{b},0.08)",
-                line=dict(color=strat_color, width=2.5),
-                hovertemplate="%{x|%b %Y}: %{y:.2f}%<extra></extra>",
-            ))
-
-            # Benchmark from Supabase history
-            try:
-                from data.performance import _sb_get_benchmark_history
-                bench_hist = _sb_get_benchmark_history(bench_info["ticker"])
-                if bench_hist is not None and not bench_hist.empty:
-                    bench_hist["date"] = pd.to_datetime(bench_hist["date"])
-                    bench_hist = bench_hist[bench_hist["date"] >= cutoff].sort_values("date")
-                    if not bench_hist.empty:
-                        bench_hist["bench_cum"] = (bench_hist["close"] / bench_hist["close"].iloc[0] - 1) * 100
-                        fig2.add_trace(go.Scatter(
-                            x=bench_hist["date"], y=bench_hist["bench_cum"],
-                            name=bench_info["name"],
-                            line=dict(color="rgba(255,255,255,0.3)", width=1.5, dash="dot"),
-                            hovertemplate="%{x|%b %Y}: %{y:.2f}%<extra></extra>",
-                        ))
-            except Exception:
-                pass
-
-            fig2.update_layout(
-                title=f"Cumulative Return — {period}",
-                **PLOTLY_DARK,
-                xaxis={**_XAXIS, "fixedrange": True},
-                yaxis={**_YAXIS, "ticksuffix": "%", "fixedrange": True},
-                height=360,
-                hovermode="x unified",
-            )
-            st.plotly_chart(fig2, use_container_width=True, config=PLOTLY_CONFIG_HOVER)
-
-            # ── KPIs ──────────────────────────────────────────────────────
-            port_total  = round(float(pf["strat_cum"].iloc[-1]), 2)
-            bench_ytd   = get_benchmark_ytd(bench_info["ticker"]) if period == "YTD" else 0
-            alpha_val   = round(port_total - bench_ytd, 2) if period == "YTD" else 0
-
-            # Risk metrics from period returns
-            rets        = pf["ret"]
-            ann_vol     = round(float(rets.std() * (4 ** 0.5) * 100), 2)  # quarterly vol annualised
-            ann_return  = round(float((1 + rets).prod() ** (4 / len(rets)) - 1) * 100, 2) if len(rets) > 1 else 0
-            sharpe      = round(ann_return / ann_vol, 2) if ann_vol > 0 else 0
-            cum_w       = (1 + rets).cumprod()
-            run_max     = cum_w.cummax()
-            drawdown    = (cum_w - run_max) / run_max
-            max_dd      = round(float(drawdown.min()) * 100, 2)
-            downside    = rets[rets < 0]
-            ds_std      = float(downside.std() * (4 ** 0.5) * 100) if len(downside) > 1 else 0
-            sortino     = round(ann_return / ds_std, 2) if ds_std > 0 else 0
-
-            m1, m2, m3, m4, m5, m6 = st.columns(6)
-            with m1: st.metric("Strategy Return", f"{port_total:+.2f}%")
-            with m2: st.metric("Benchmark YTD", f"{bench_ytd:+.2f}%" if period == "YTD" else "—")
-            with m3: st.metric("Alpha", f"{alpha_val:+.2f}%" if period == "YTD" else "—")
-            with m4: st.metric("Sharpe", f"{sharpe:.2f}")
-            with m5: st.metric("Max Drawdown", f"{max_dd:.2f}%")
-            with m6: st.metric("Ann. Volatility", f"{ann_vol:.1f}%")
-
-            # ── Risk metrics table ────────────────────────────────────────
-            st.divider()
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown("**Risk Metrics**")
-                st.dataframe(pd.DataFrame({
-                    "Metric": ["Ann. Return","Ann. Volatility","Sharpe Ratio","Sortino Ratio","Max Drawdown"],
-                    "Value":  [f"{ann_return:+.2f}%", f"{ann_vol:.1f}%", f"{sharpe:.2f}", f"{sortino:.2f}", f"{max_dd:.2f}%"],
-                }), hide_index=True, use_container_width=True)
-
-            with c2:
-                st.markdown("**Period Summary**")
-                st.dataframe(pd.DataFrame({
-                    "Metric": ["Periods", "Start Date", "End Date", "Total Return"],
-                    "Value":  [
-                        str(len(pf)),
-                        pf["date"].iloc[0].strftime("%b %Y"),
-                        pf["date"].iloc[-1].strftime("%b %Y"),
-                        f"{port_total:+.2f}%",
-                    ],
-                }), hide_index=True, use_container_width=True)
-
-            # ── Drawdown chart ────────────────────────────────────────────
-            st.divider()
-            st.markdown("**Drawdown**")
-            fig_dd = go.Figure()
-            fig_dd.add_trace(go.Scatter(
-                x=pf["date"], y=drawdown.values * 100,
-                fill="tozeroy", fillcolor="rgba(196,84,84,0.15)",
-                line=dict(color="#c45454", width=1.5), name="Drawdown",
-            ))
-            fig_dd.update_layout(**PLOTLY_DARK, xaxis={**_XAXIS, "fixedrange": True}, yaxis={**_YAXIS, "ticksuffix": "%", "fixedrange": True}, height=220, showlegend=False, hovermode="x unified")
-            st.plotly_chart(fig_dd, use_container_width=True, config=PLOTLY_CONFIG_HOVER)
-
-            # ── Monthly returns heatmap ───────────────────────────────────
-            if len(pf) >= 12:
-                st.divider()
-                st.markdown("**Quarterly Returns**")
-                hm_df = pd.DataFrame({
-                    "Year":    pf["date"].dt.year,
-                    "Quarter": pf["date"].dt.quarter.map({1:"Q1",2:"Q2",3:"Q3",4:"Q4"}),
-                    "Return":  (pf["ret"] * 100).round(2),
-                })
-                pivot = hm_df.pivot_table(index="Year", columns="Quarter", values="Return")
-                pivot = pivot.reindex(columns=["Q1","Q2","Q3","Q4"])
-
-                fig_hm = go.Figure(go.Heatmap(
-                    z=pivot.values,
-                    x=pivot.columns.tolist(),
-                    y=pivot.index.tolist(),
-                    colorscale=[[0,"#c45454"],[0.5,"rgba(255,255,255,0.05)"],[1,"#569542"]],
-                    zmid=0,
-                    text=[[f"{v:.1f}%" if not pd.isna(v) else "" for v in row] for row in pivot.values],
-                    texttemplate="%{text}",
-                    textfont=dict(size=11),
-                    showscale=False,
-                    hovertemplate="Year: %{y}<br>%{x}: %{z:.2f}%<extra></extra>",
-                ))
-                _hm_layout = {**PLOTLY_DARK}
-                _hm_layout["margin"] = dict(l=10, r=10, t=30, b=10)
-                fig_hm.update_layout(
-                    **_hm_layout,
-                    height=max(200, len(pivot) * 28 + 80),
-                    xaxis=dict(side="top", fixedrange=True),
-                    yaxis=dict(autorange="reversed", fixedrange=True),
-                )
-                st.plotly_chart(fig_hm, use_container_width=True, config=PLOTLY_CONFIG_HOVER)
-
-    st.caption(f"Source: Strategy_Returns.xlsx • Quarterly returns • Updated manually")
+        st.info("Performance module not available. Ensure data/composite_returns.py and data/performance_tab.py are present.")
 
 
 # ══════════════════════════════════════════════════════════════════════════
