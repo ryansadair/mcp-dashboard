@@ -35,29 +35,16 @@ def _kpi_card(label, value, color="rgba(255,255,255,0.95)", sub_text=None):
 
 
 def render_kpi_cards(strategy: str, kpis: dict, bench_ytd: float):
-    """Render the 5 KPI metric cards for a strategy."""
+    """Render the 4 KPI metric cards for a strategy."""
     s = STRATEGIES[strategy]
-    ytd = kpis.get("ytd", 0)
     daily_return = kpis.get("daily_return", 0)
     div_yield = kpis.get("div_yield", 0)
     holdings = kpis.get("holdings", 0)
-    ytd_as_of = kpis.get("ytd_as_of", "")
     cash_pct = kpis.get("cash_pct", 0)
 
     # Format values
     daily_str = f"{daily_return:+.2f}%" if daily_return != 0 else "0.00%"
     daily_color = GREEN if daily_return > 0 else RED if daily_return < 0 else "rgba(255,255,255,0.95)"
-
-    ytd_str = f"{ytd:+.2f}%"
-    ytd_color = GREEN if ytd > 0 else RED if ytd < 0 else "rgba(255,255,255,0.95)"
-    ytd_label = "YTD Return"
-    if ytd_as_of:
-        from datetime import datetime
-        try:
-            dt = datetime.strptime(ytd_as_of, "%Y-%m-%d")
-            ytd_label = f"YTD as of {dt.strftime('%b %d')}"
-        except ValueError:
-            ytd_label = f"YTD as of {ytd_as_of}"
 
     cash_str = f"{cash_pct:.1f}%" if cash_pct > 0 else "—"
 
@@ -68,11 +55,10 @@ def render_kpi_cards(strategy: str, kpis: dict, bench_ytd: float):
 
     cards_html = (
         f'<div style="display:flex;flex-wrap:wrap;gap:10px;">'
-        f'<div style="flex:1 1 150px;min-width:130px;">{_kpi_card("Daily Return", daily_str, daily_color)}</div>'
-        f'<div style="flex:1 1 150px;min-width:130px;">{_kpi_card(ytd_label, ytd_str, ytd_color)}</div>'
-        f'<div style="flex:1 1 150px;min-width:130px;">{_kpi_card("Cash", cash_str)}</div>'
-        f'<div style="flex:1 1 150px;min-width:130px;">{_kpi_card("Dividend Yield", yield_str, yield_color)}</div>'
-        f'<div style="flex:1 1 150px;min-width:130px;">{_kpi_card("Holdings", holdings_str)}</div>'
+        f'<div style="flex:1 1 180px;min-width:140px;">{_kpi_card("Daily Return", daily_str, daily_color)}</div>'
+        f'<div style="flex:1 1 180px;min-width:140px;">{_kpi_card("Cash", cash_str)}</div>'
+        f'<div style="flex:1 1 180px;min-width:140px;">{_kpi_card("Dividend Yield", yield_str, yield_color)}</div>'
+        f'<div style="flex:1 1 180px;min-width:140px;">{_kpi_card("Holdings", holdings_str)}</div>'
         f'</div>'
     )
     st.markdown(cards_html, unsafe_allow_html=True)
