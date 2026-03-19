@@ -110,10 +110,16 @@ def inject_mobile_css():
         -webkit-overflow-scrolling: touch;
     }
     [data-testid="stDataFrame"] > div,
-    [data-testid="stDataFrame"] > div > div,
+    [data-testid="stDataFrame"] > div > div {
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    /* Prevent iframe from trapping vertical scroll — let page scroll instead */
     [data-testid="stDataFrame"] iframe {
         max-width: 100% !important;
         overflow-x: auto !important;
+        overflow-y: hidden !important;
         -webkit-overflow-scrolling: touch !important;
     }
     [data-testid="stDataFrame"] table {

@@ -823,9 +823,11 @@ with tab_holdings:
             })
 
             # Row-selection enabled — click a row to navigate to stock detail
+            # Height: generous calculation to prevent internal scrollbar on mobile
+            _df_height = min(80 + len(filtered) * 40, 2000)
             event = st.dataframe(
                 styled, use_container_width=True, hide_index=True,
-                height=(42 + len(filtered) * 36),
+                height=_df_height,
                 selection_mode="single-row",
                 on_select="rerun",
                 key="holdings_table",
@@ -867,7 +869,7 @@ with tab_holdings:
 
                 col_tbl, col_pie = st.columns([3, 2])
                 with col_tbl:
-                    st.dataframe(sect_agg, use_container_width=True, height=(42 + len(sect_agg) * 36), column_config={
+                    st.dataframe(sect_agg, use_container_width=True, height=(80 + len(sect_agg) * 40), column_config={
                         "Holdings": st.column_config.NumberColumn("#", width="small"),
                         "Total_Weight": st.column_config.NumberColumn("Wt %", format="%.1f%%", width="small"),
                         "Avg_Yield": st.column_config.NumberColumn("Avg Yld %", format="%.2f%%", width="small"),
