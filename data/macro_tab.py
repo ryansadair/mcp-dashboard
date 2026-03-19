@@ -544,11 +544,12 @@ def render_macro_tab(qdvd_yield=None):
             econ_rows.append((name, display_val, display_prev, trend, date_label, signal))
 
     # Render header row — fixed widths so separate tables align
-    _tw = "width:100%;border-collapse:collapse;table-layout:fixed"
+    _tw = "width:100%;border-collapse:collapse;table-layout:fixed;min-width:580px"
     _th = ("padding:8px 10px;font-size:10px;font-weight:600;"
            "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
-           "border-bottom:1px solid rgba(255,255,255,0.06)")
+           "border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap")
     st.markdown(
+        f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
         f'<table style="{_tw}"><colgroup>'
         '<col style="width:25%"><col style="width:15%"><col style="width:15%">'
         '<col style="width:10%"><col style="width:18%"><col style="width:17%">'
@@ -559,31 +560,35 @@ def render_macro_tab(qdvd_yield=None):
         f'<th style="text-align:right;{_th}">Trend</th>'
         f'<th style="text-align:right;{_th}">Release</th>'
         f'<th style="text-align:right;{_th}">Signal</th>'
-        '</tr></thead></table>',
+        '</tr></thead></table>'
+        '</div>',
         unsafe_allow_html=True,
     )
 
     # Render each row individually — same fixed widths
+    _td_nw = "white-space:nowrap;"
     for name, val, prev, trend, date_label, signal in econ_rows:
         arrow = _trend_arrow(trend)
         badge = _signal_badge(signal)
         st.markdown(
+            f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
             f'<table style="{_tw}"><colgroup>'
             '<col style="width:25%"><col style="width:15%"><col style="width:15%">'
             '<col style="width:10%"><col style="width:18%"><col style="width:17%">'
             '</colgroup><tbody>'
             f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03)">'
             f'<td style="text-align:left;padding:10px 10px;font-size:13px;font-weight:600;'
-            f'color:rgba(255,255,255,0.8)">{name}</td>'
+            f'color:rgba(255,255,255,0.8);{_td_nw}">{name}</td>'
             f'<td style="text-align:right;padding:10px 10px;font-size:15px;font-weight:700;'
-            f'font-family:\'DM Serif Display\',serif;color:rgba(255,255,255,0.9)">{val}</td>'
+            f'font-family:\'DM Serif Display\',serif;color:rgba(255,255,255,0.9);{_td_nw}">{val}</td>'
             f'<td style="text-align:right;padding:10px 10px;font-size:13px;'
-            f'color:rgba(255,255,255,0.35)">{prev}</td>'
-            f'<td style="text-align:right;padding:10px 10px">{arrow}</td>'
+            f'color:rgba(255,255,255,0.35);{_td_nw}">{prev}</td>'
+            f'<td style="text-align:right;padding:10px 10px;{_td_nw}">{arrow}</td>'
             f'<td style="text-align:right;padding:10px 10px;font-size:11px;'
-            f'color:rgba(255,255,255,0.3)">{date_label}</td>'
-            f'<td style="text-align:right;padding:10px 10px">{badge}</td>'
-            f'</tr></tbody></table>',
+            f'color:rgba(255,255,255,0.3);{_td_nw}">{date_label}</td>'
+            f'<td style="text-align:right;padding:10px 10px;{_td_nw}">{badge}</td>'
+            f'</tr></tbody></table>'
+            f'</div>',
             unsafe_allow_html=True,
         )
 
@@ -635,35 +640,40 @@ def render_macro_tab(qdvd_yield=None):
             val_rows.append((name, f"{latest:.2f}%", "Weekly avg from Freddie Mac", status))
 
     # Render full-width valuation table
-    _vtw = "width:100%;border-collapse:collapse;table-layout:fixed"
+    _vtw = "width:100%;border-collapse:collapse;table-layout:fixed;min-width:480px"
     _vth = ("padding:8px 10px;font-size:10px;font-weight:600;"
             "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
-            "border-bottom:1px solid rgba(255,255,255,0.06)")
+            "border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap")
     _vcols = ('<colgroup><col style="width:30%"><col style="width:18%">'
               '<col style="width:35%"><col style="width:17%"></colgroup>')
     st.markdown(
+        f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
         f'<table style="{_vtw}">{_vcols}<thead><tr>'
         f'<th style="text-align:left;{_vth}">Metric</th>'
         f'<th style="text-align:right;{_vth}">Current</th>'
         f'<th style="text-align:right;{_vth}">Context</th>'
         f'<th style="text-align:right;{_vth}">Signal</th>'
-        '</tr></thead></table>',
+        '</tr></thead></table>'
+        '</div>',
         unsafe_allow_html=True,
     )
 
+    _vtd_nw = "white-space:nowrap;"
     for name, val, note, status in val_rows:
         badge = _signal_badge(status)
         st.markdown(
+            f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
             f'<table style="{_vtw}">{_vcols}<tbody>'
             f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03)">'
             f'<td style="text-align:left;padding:10px 10px;font-size:13px;font-weight:500;'
-            f'color:rgba(255,255,255,0.7)">{name}</td>'
+            f'color:rgba(255,255,255,0.7);{_vtd_nw}">{name}</td>'
             f'<td style="text-align:right;padding:10px 10px;font-size:15px;font-weight:700;'
-            f'font-family:\'DM Serif Display\',serif;color:rgba(255,255,255,0.9)">{val}</td>'
+            f'font-family:\'DM Serif Display\',serif;color:rgba(255,255,255,0.9);{_vtd_nw}">{val}</td>'
             f'<td style="text-align:right;padding:10px 10px;font-size:12px;'
-            f'color:rgba(255,255,255,0.35)">{note}</td>'
-            f'<td style="text-align:right;padding:10px 10px">{badge}</td>'
-            f'</tr></tbody></table>',
+            f'color:rgba(255,255,255,0.35);{_vtd_nw}">{note}</td>'
+            f'<td style="text-align:right;padding:10px 10px;{_vtd_nw}">{badge}</td>'
+            f'</tr></tbody></table>'
+            f'</div>',
             unsafe_allow_html=True,
         )
 
