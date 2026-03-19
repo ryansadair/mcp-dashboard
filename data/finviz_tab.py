@@ -27,16 +27,20 @@ RED   = BRAND["red"]
 BLUE  = BRAND["blue"]
 
 
-def render_finviz_panel(tam_df, price_data):
+def render_finviz_panel(tam_df, price_data, notion_data=None):
     """
     Render the Finviz enrichment panel below the main holdings table.
 
     Args:
         tam_df: DataFrame from get_holdings_for_strategy()
         price_data: dict from fetch_batch_prices()
+        notion_data: dict from fetch_notion_metrics() (optional; provides MCP Target)
     """
     if tam_df.empty:
         return
+
+    if notion_data is None:
+        notion_data = {}
 
     tickers = tuple(tam_df["symbol"].tolist())
 
@@ -54,7 +58,7 @@ def render_finviz_panel(tam_df, price_data):
         '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
         'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
         'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
-        'Analyst Ratings &amp; Price Targets</div>',
+        'Analyst Ratings &amp; MCP Price Targets</div>',
         unsafe_allow_html=True,
     )
 
@@ -70,10 +74,16 @@ def render_finviz_panel(tam_df, price_data):
 
         rec_val = fv.get("recommendation")
         rec_label = fv.get("rec_label", "—")
-        target = fv.get("target_price")
-        upside = fv.get("upside_pct")
         rsi = fv.get("rsi_14")
         price = mkt.get("price", 0) or fv.get("price", 0)
+
+        # MCP Target from Notion (replaces Finviz consensus target)
+        nm = notion_data.get(sym.upper(), {})
+        mcp_target = nm.get("mcp_target")
+        if mcp_target and price and price > 0:
+            upside = round((mcp_target - price) / price * 100, 1)
+        else:
+            upside = None
 
         rows.append({
             "symbol": sym,
@@ -82,7 +92,7 @@ def render_finviz_panel(tam_df, price_data):
             "price": price,
             "rec_val": rec_val,
             "rec_label": rec_label,
-            "target": target,
+            "target": mcp_target,
             "upside": upside,
             "rsi": rsi,
             "sma20": fv.get("sma20_dist"),
@@ -126,9 +136,9 @@ def render_finviz_panel(tam_df, price_data):
             st.metric("Avg Rating", "—")
     with k2:
         if avg_upside is not None:
-            st.metric("Avg Upside to Target", f"{avg_upside:+.1f}%")
+            st.metric("Avg Upside to MCP Target", f"{avg_upside:+.1f}%")
         else:
-            st.metric("Avg Upside to Target", "—")
+            st.metric("Avg Upside to MCP Target", "—")
     with k3:
         st.metric("Buy / Hold / Sell", f"{buys} / {holds} / {sells}")
     with k4:
@@ -157,7 +167,7 @@ def render_finviz_panel(tam_df, price_data):
         f'<th style="text-align:right;{header_style}">Wt%</th>'
         f'<th style="text-align:right;{header_style}">Price</th>'
         f'<th style="text-align:center;{header_style}">Analyst</th>'
-        f'<th style="text-align:right;{header_style}">Target</th>'
+        f'<th style="text-align:right;{header_style}">MCP Target</th>'
         f'<th style="text-align:right;{header_style}">Upside</th>'
         f'<th style="text-align:right;{header_style}">RSI</th>'
         f'<th style="text-align:right;{header_style}">SMA200</th>'
@@ -302,6 +312,7 @@ def render_finviz_panel(tam_df, price_data):
             )
 
     st.caption(
-        f"Source: Finviz · Cached 1 hour · {datetime.now().strftime('%I:%M %p')} · "
+        f"Source: Finviz (analyst ratings, technicals) · Notion (MCP targets) · Cached 1 hour · "
+        f"{datetime.now().strftime('%I:%M %p')} · "
         f"Analyst ratings are consensus of Wall Street coverage"
     )

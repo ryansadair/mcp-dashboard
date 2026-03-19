@@ -778,6 +778,7 @@ with tab_holdings:
                     "Price": mkt.get("price", 0),
                     "Yield on Cost %": round(yoc_pct, 2),
                     "Div Yield %": mkt.get("dividend_yield", 0),
+                    "MCP Target": nm.get("mcp_target") if nm.get("mcp_target") is not None else "—",
                     "Baseline": nm.get("div_baseline") if nm.get("div_baseline") is not None else "—",
                     "Style": nm.get("style_bucket", "—") or "—",
                     "P/E": round(mkt.get("pe_ratio", 0), 1) if mkt.get("pe_ratio") else "—",
@@ -816,6 +817,7 @@ with tab_holdings:
                 "1D Chg %": "{:+.2f}%",
                 "Yield on Cost %": "{:.2f}%",
                 "Div Yield %": "{:.2f}%",
+                "MCP Target": lambda v: f"${v:,.0f}" if isinstance(v, (int, float)) else v,
                 "Unit Cost": "${:.2f}",
                 "% From 52W Hi": "{:+.1f}%",
             })
@@ -836,6 +838,7 @@ with tab_holdings:
                     "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
                     "Yield on Cost %": st.column_config.NumberColumn("Yield on Cost", format="%.2f%%"),
                     "Div Yield %": st.column_config.NumberColumn("Curr Yield", format="%.2f%%"),
+                    "MCP Target": st.column_config.TextColumn("MCP Target", width="small"),
                     "Baseline": st.column_config.TextColumn("Baseline", width="small"),
                     "Style": st.column_config.TextColumn("Style", width="small"),
                     "P/E": st.column_config.NumberColumn("P/E"),
@@ -894,7 +897,7 @@ with tab_holdings:
             # ── Finviz Analyst Enrichment (Sprint 7) ─────────────────
             if FINVIZ_AVAILABLE:
                 st.divider()
-                render_finviz_panel(tam_df, price_data)
+                render_finviz_panel(tam_df, price_data, notion_data=notion_data)
 
             st.caption(f"Tamarac export + yfinance live prices • {datetime.now().strftime('%I:%M %p')}")
 
