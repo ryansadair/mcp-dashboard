@@ -1,11 +1,11 @@
 """
 Martin Capital Partners — Composite Returns Parser
-Reads Composite_Returns.xls from OneDrive and extracts monthly/quarterly
+Reads Composite Returns.xls from OneDrive and extracts monthly/quarterly
 returns, cumulative values, and benchmark data for each equity strategy.
 
-Source file: Composite_Returns.xls (Tamarac/Black Diamond export)
+Source file: Composite Returns.xls (Tamarac/Black Diamond export)
 OneDrive path: C:/Users/RyanAdair/Martin Capital Partners LLC/
-               Eugene - Documents/Performance/Composite Returns/Composite_Returns.xls
+               Eugene - Documents/Performance/Composite Returns/Composite Returns.xls
 
 Strategies parsed: QDVD, SMID, DAC, OR (equity composites only)
 """
@@ -29,13 +29,13 @@ logger = logging.getLogger(__name__)
 ONEDRIVE_PATH = (
     r"C:\Users\RyanAdair\Martin Capital Partners LLC"
     r"\Eugene - Documents\Performance\Composite Returns"
-    r"\Composite_Returns.xls"
+    r"\Composite Returns.xls"
 )
 
 # Fallback: check data/ folder (for Streamlit Cloud if file is committed)
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(_THIS_DIR)
-DATA_FOLDER_PATH = os.path.join(_THIS_DIR, "Composite_Returns.xls")
+DATA_FOLDER_PATH = os.path.join(_THIS_DIR, "Composite Returns.xls")
 
 
 # ── Strategy Block Definitions ──────────────────────────────────────────────
@@ -121,14 +121,14 @@ PERIOD_COLS = {
 # ── Helper Functions ────────────────────────────────────────────────────────
 
 def _find_composite_file():
-    """Locate Composite_Returns.xls — OneDrive first, then data/ fallback."""
+    """Locate Composite Returns.xls — OneDrive first, then data/ fallback."""
     if os.path.isfile(ONEDRIVE_PATH):
         logger.info(f"Composite returns found at OneDrive path")
         return ONEDRIVE_PATH
     if os.path.isfile(DATA_FOLDER_PATH):
         logger.info(f"Composite returns found in data/ folder")
         return DATA_FOLDER_PATH
-    logger.warning("Composite_Returns.xls not found in any expected location")
+    logger.warning("Composite Returns.xls not found in any expected location")
     return None
 
 
@@ -290,7 +290,7 @@ def _parse_annual_returns(ws, datemode):
 
 def load_composite_data():
     """
-    Load all composite return data from Composite_Returns.xls.
+    Load all composite return data from Composite Returns.xls.
 
     Returns:
         dict with keys:
@@ -320,7 +320,7 @@ def load_composite_data():
     filepath = _find_composite_file()
     if filepath is None:
         result["error"] = (
-            "Composite_Returns.xls not found. "
+            "Composite Returns.xls not found. "
             "Expected at OneDrive path or in data/ folder."
         )
         return result
@@ -360,7 +360,7 @@ def load_composite_data():
                      f"as of {result['as_of']}")
 
     except Exception as e:
-        result["error"] = f"Error reading Composite_Returns.xls: {e}"
+        result["error"] = f"Error reading Composite Returns.xls: {e}"
         logger.error(result["error"])
 
     return result
