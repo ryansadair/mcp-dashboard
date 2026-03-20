@@ -119,10 +119,8 @@ def render_performance_tab(active_strategy):
     _render_period_returns(data, active_strategy, strat_color)
     _render_cumulative_chart(comp_df, active_strategy, strat_color, strat_name)
 
-    # Heatmap first (full width), then risk metrics below
-    _render_monthly_heatmap(comp_df, active_strategy, strat_color)
-
     _render_risk_metrics(comp_df, active_strategy, strat_color)
+    _render_monthly_heatmap(comp_df, active_strategy, strat_color)
 
     _render_annual_returns(data, active_strategy, strat_color)
 
@@ -313,14 +311,16 @@ def _render_monthly_heatmap(comp_df, strategy, color):
     ))
 
     _hm_layout = {**PLOTLY_DARK}
-    _hm_layout["margin"] = dict(l=10, r=10, t=40, b=10)
+    _hm_layout["margin"] = dict(l=40, r=10, t=30, b=10)
     fig.update_layout(
         **_hm_layout,
-        title="Monthly Returns Heatmap (Gross)",
         height=chart_height,
-        xaxis=dict(side="top", fixedrange=True),
-        yaxis=dict(autorange="reversed", fixedrange=True, dtick=1),
+        xaxis=dict(side="top", fixedrange=True, tickfont=dict(size=10)),
+        yaxis=dict(autorange="reversed", fixedrange=True, dtick=1, tickfont=dict(size=10)),
     )
+
+    # Title outside chart so it never overlaps month labels
+    st.markdown("""<div style="font-size:13px; font-weight:700; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:0.04em; margin-top:16px; margin-bottom:4px;">Monthly Returns Heatmap (Gross)</div>""", unsafe_allow_html=True)
 
     # Wrap in a scrollable container so mobile doesn't squish columns
     st.markdown(
