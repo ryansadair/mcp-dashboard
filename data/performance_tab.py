@@ -119,11 +119,10 @@ def render_performance_tab(active_strategy):
     _render_period_returns(data, active_strategy, strat_color)
     _render_cumulative_chart(comp_df, active_strategy, strat_color, strat_name)
 
-    col_left, col_right = st.columns([1, 2])
-    with col_left:
-        _render_risk_metrics(comp_df, active_strategy, strat_color)
-    with col_right:
-        _render_monthly_heatmap(comp_df, active_strategy, strat_color)
+    # Heatmap first (full width), then risk metrics below
+    _render_monthly_heatmap(comp_df, active_strategy, strat_color)
+
+    _render_risk_metrics(comp_df, active_strategy, strat_color)
 
     _render_annual_returns(data, active_strategy, strat_color)
 
@@ -228,7 +227,7 @@ def _render_cumulative_chart(comp_df, strategy, color, name):
 # ── Risk Metrics ────────────────────────────────────────────────────────────
 
 def _render_risk_metrics(comp_df, strategy, color):
-    """Render risk metrics — one st.markdown per metric row."""
+    """Render risk metrics as a compact flex grid — fits full page width."""
     risk = compute_risk_metrics(comp_df, return_type="gross")
 
     if risk is None:
@@ -251,11 +250,20 @@ def _render_risk_metrics(comp_df, strategy, color):
 
     st.markdown("""<div style="font-size:13px; font-weight:700; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px;">Risk Metrics</div>""", unsafe_allow_html=True)
 
+    # Build cards in a flex grid — wraps naturally on all screen sizes
+    cards_html = ""
     for label, val, val_color in metrics:
-        st.markdown(f"""<div style="display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
-            <span style="font-size:12px; color:rgba(255,255,255,0.5);">{label}</span>
-            <span style="font-size:12px; font-weight:600; color:{val_color};">{val}</span>
-        </div>""", unsafe_allow_html=True)
+        cards_html += f"""<div style="
+            flex:1 1 130px; min-width:100px;
+            background:rgba(255,255,255,0.02);
+            border:1px solid rgba(255,255,255,0.05);
+            border-radius:8px; padding:10px 12px;
+        ">
+            <div style="font-size:10px; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:3px;">{label}</div>
+            <div style="font-size:16px; font-weight:700; color:{val_color};">{val}</div>
+        </div>"""
+
+    st.markdown(f"""<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">{cards_html}</div>""", unsafe_allow_html=True)
 
     st.caption("Based on monthly gross returns · Risk-free rate: 4%")
 
@@ -263,7 +271,10 @@ def _render_risk_metrics(comp_df, strategy, color):
 # ── Monthly Returns Heatmap ─────────────────────────────────────────────────
 
 def _render_monthly_heatmap(comp_df, strategy, color):
-    """Render heatmap using Plotly (avoids HTML size limit)."""
+    """Render heatmap using Plotly (avoids HTML size limit).
+    Uses a minimum width of 760px so the 13-column grid never gets
+    squeezed — on narrow screens the chart container scrolls horizontally.
+    """
     hm = build_monthly_heatmap_data(comp_df, return_type="gross")
 
     if hm.empty:
@@ -280,6 +291,10 @@ def _render_monthly_heatmap(comp_df, strategy, color):
     for row in z_data:
         text.append([f"{v*100:+.1f}%" if not pd.isna(v) else "" for v in row])
 
+    # Minimum width ensures cells stay readable; container scrolls on mobile
+    min_width = max(760, len(available_months) * 62)
+    chart_height = max(280, len(years) * 30 + 100)
+
     fig = go.Figure(go.Heatmap(
         z=z_data * 100,
         x=available_months,
@@ -292,7 +307,7 @@ def _render_monthly_heatmap(comp_df, strategy, color):
         zmid=0,
         text=text,
         texttemplate="%{text}",
-        textfont=dict(size=10),
+        textfont=dict(size=11),
         showscale=False,
         hovertemplate="Year: %{y}<br>%{x}: %{z:.1f}%<extra></extra>",
     ))
@@ -302,11 +317,18 @@ def _render_monthly_heatmap(comp_df, strategy, color):
     fig.update_layout(
         **_hm_layout,
         title="Monthly Returns Heatmap (Gross)",
-        height=max(250, len(years) * 26 + 100),
+        height=chart_height,
         xaxis=dict(side="top", fixedrange=True),
         yaxis=dict(autorange="reversed", fixedrange=True, dtick=1),
     )
+
+    # Wrap in a scrollable container so mobile doesn't squish columns
+    st.markdown(
+        '<div class="heatmap-scroll-wrapper" style="overflow-x:auto; -webkit-overflow-scrolling:touch;">',
+        unsafe_allow_html=True,
+    )
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ── Annual Returns Table ────────────────────────────────────────────────────
