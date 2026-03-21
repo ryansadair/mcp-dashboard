@@ -1140,30 +1140,30 @@ if _current_sector and _MARKET_DATA_AVAILABLE and available_tickers:
                     except Exception:
                         compare_fish[t] = {}
 
-            # Build comparison table
-            _th = ("padding:6px 8px;font-size:10px;font-weight:600;"
-                   "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
-                   "border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap")
-            _tw = "width:100%;border-collapse:collapse;min-width:680px"
-            _cols = ('<colgroup>'
-                     '<col style="width:55px"><col style="width:140px"><col style="width:72px">'
-                     '<col style="width:62px"><col style="width:68px"><col style="width:60px">'
-                     '<col style="width:55px"><col style="width:62px"><col style="width:90px">'
-                     '</colgroup>')
+            # Build comparison table — each row is a separate st.markdown
+            # so we MUST use table-layout:fixed + explicit cell widths to align
+            _tw = "width:100%;border-collapse:collapse;table-layout:fixed;min-width:680px"
+            # Column widths: sym, company, price, yield, 5y dgr, payout, p/e, ytd, analyst
+            _cw = ["7%", "21%", "11%", "9%", "10%", "9%", "8%", "10%", "15%"]
+
+            _th_base = ("font-size:10px;font-weight:600;"
+                        "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
+                        "border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap;"
+                        "overflow:hidden;text-overflow:ellipsis;padding:6px 8px")
 
             # Header — wrapped in scrollable div
             st.markdown(
                 f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
-                f'<table style="{_tw}">{_cols}<thead><tr>'
-                f'<th style="text-align:left;{_th}">Sym</th>'
-                f'<th style="text-align:left;{_th}">Company</th>'
-                f'<th style="text-align:right;{_th}">Price</th>'
-                f'<th style="text-align:right;{_th}">Yield</th>'
-                f'<th style="text-align:right;{_th}">5Y DGR</th>'
-                f'<th style="text-align:right;{_th}">Payout</th>'
-                f'<th style="text-align:right;{_th}">P/E</th>'
-                f'<th style="text-align:right;{_th}">YTD</th>'
-                f'<th style="text-align:center;{_th}">Analyst</th>'
+                f'<table style="{_tw}"><thead><tr>'
+                f'<th style="text-align:left;width:{_cw[0]};{_th_base}">Sym</th>'
+                f'<th style="text-align:left;width:{_cw[1]};{_th_base}">Company</th>'
+                f'<th style="text-align:right;width:{_cw[2]};{_th_base}">Price</th>'
+                f'<th style="text-align:right;width:{_cw[3]};{_th_base}">Yield</th>'
+                f'<th style="text-align:right;width:{_cw[4]};{_th_base}">5Y DGR</th>'
+                f'<th style="text-align:right;width:{_cw[5]};{_th_base}">Payout</th>'
+                f'<th style="text-align:right;width:{_cw[6]};{_th_base}">P/E</th>'
+                f'<th style="text-align:right;width:{_cw[7]};{_th_base}">YTD</th>'
+                f'<th style="text-align:center;width:{_cw[8]};{_th_base}">Analyst</th>'
                 f'</tr></thead></table>'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -1209,21 +1209,21 @@ if _current_sector and _MARKET_DATA_AVAILABLE and available_tickers:
                 else:
                     rec_html = '<span style="font-size:11px;color:rgba(255,255,255,0.3);">—</span>'
 
-                _td = "white-space:nowrap;"
+                _td = "white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
 
                 st.markdown(
                     f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
-                    f'<table style="{_tw}">{_cols}<tbody>'
+                    f'<table style="{_tw}"><tbody>'
                     f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03);{bg}">'
-                    f'<td style="text-align:left;padding:8px;font-size:12px;font-weight:{sym_weight};color:{sym_color};{_td}">{t}</td>'
-                    f'<td style="text-align:left;padding:8px;font-size:11px;color:rgba(255,255,255,0.5);overflow:hidden;text-overflow:ellipsis;{_td}">{_name}</td>'
-                    f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.8);{_td}">{price_str}</td>'
-                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{yield_color};{_td}">{yield_str}</td>'
-                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{dgr5_color};{_td}">{dgr5_str}</td>'
-                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{payout_color};{_td}">{payout_str}</td>'
-                    f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.7);{_td}">{pe_str}</td>'
-                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{ytd_color};{_td}">{ytd_str}</td>'
-                    f'<td style="text-align:center;padding:8px;{_td}">{rec_html}</td>'
+                    f'<td style="text-align:left;width:{_cw[0]};padding:8px;font-size:12px;font-weight:{sym_weight};color:{sym_color};{_td}">{t}</td>'
+                    f'<td style="text-align:left;width:{_cw[1]};padding:8px;font-size:11px;color:rgba(255,255,255,0.5);{_td}">{_name}</td>'
+                    f'<td style="text-align:right;width:{_cw[2]};padding:8px;font-size:12px;color:rgba(255,255,255,0.8);{_td}">{price_str}</td>'
+                    f'<td style="text-align:right;width:{_cw[3]};padding:8px;font-size:12px;color:{yield_color};{_td}">{yield_str}</td>'
+                    f'<td style="text-align:right;width:{_cw[4]};padding:8px;font-size:12px;color:{dgr5_color};{_td}">{dgr5_str}</td>'
+                    f'<td style="text-align:right;width:{_cw[5]};padding:8px;font-size:12px;color:{payout_color};{_td}">{payout_str}</td>'
+                    f'<td style="text-align:right;width:{_cw[6]};padding:8px;font-size:12px;color:rgba(255,255,255,0.7);{_td}">{pe_str}</td>'
+                    f'<td style="text-align:right;width:{_cw[7]};padding:8px;font-size:12px;color:{ytd_color};{_td}">{ytd_str}</td>'
+                    f'<td style="text-align:center;width:{_cw[8]};padding:8px;{_td}">{rec_html}</td>'
                     f'</tr></tbody></table>'
                     f'</div>',
                     unsafe_allow_html=True,
