@@ -1141,10 +1141,13 @@ if _current_sector and _MARKET_DATA_AVAILABLE and available_tickers:
                         compare_fish[t] = {}
 
             # Build comparison table — each row is a separate st.markdown
-            # so we MUST use table-layout:fixed + explicit cell widths to align
-            _tw = "width:100%;border-collapse:collapse;table-layout:fixed;min-width:680px"
-            # Column widths: sym, company, price, yield, 5y dgr, payout, p/e, ytd, analyst
-            _cw = ["7%", "21%", "11%", "9%", "10%", "9%", "8%", "10%", "15%"]
+            # so we MUST use table-layout:fixed + explicit pixel widths to align.
+            # Pixel widths eliminate rounding drift that % widths cause on mobile
+            # when min-width forces a fixed pixel total.
+            _tw = "width:100%;border-collapse:collapse;table-layout:fixed;min-width:720px"
+            # Column widths in px — must sum to 720 (the min-width)
+            # sym(50) + company(150) + price(80) + yield(65) + dgr(70) + payout(65) + pe(55) + ytd(70) + analyst(115) = 720
+            _cw = ["50px", "150px", "80px", "65px", "70px", "65px", "55px", "70px", "115px"]
 
             _th_base = ("font-size:10px;font-weight:600;"
                         "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
