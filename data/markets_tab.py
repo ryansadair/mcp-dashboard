@@ -26,9 +26,6 @@ INDICES = [
     ("Russell 1000 Value", "^RLV"),
     ("Russell 1000 Growth","^RLG"),
     ("US Agg Bond",        "AGG"),
-    ("Crude Oil",          "CL=F"),
-    ("Brent Crude",        "BZ=F"),
-    ("Gold",               "GC=F"),
 ]
 
 DIVIDEND_BENCHMARKS = [
@@ -85,12 +82,12 @@ GLOBAL_EMERGING = [
 ]
 
 COMMODITIES = [
-    ("Gold",        "GLD"),
-    ("Crude Oil",   "USO"),
-    ("Brent Crude", "BNO"),
-    ("Natural Gas", "UNG"),
-    ("Silver",      "SLV"),
-    ("Copper",      "CPER"),
+    ("Gold",        "GC=F"),
+    ("Silver",      "SI=F"),
+    ("Crude Oil",   "CL=F"),
+    ("Brent Crude", "BZ=F"),
+    ("Natural Gas", "NG=F"),
+    ("Copper",      "HG=F"),
 ]
 
 # Collect all tickers for batch fetch
