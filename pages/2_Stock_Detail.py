@@ -1140,39 +1140,17 @@ if _current_sector and _MARKET_DATA_AVAILABLE and available_tickers:
                     except Exception:
                         compare_fish[t] = {}
 
-            # Build comparison table — each row is a separate st.markdown
-            # so we MUST use table-layout:fixed + explicit pixel widths to align.
-            # Pixel widths eliminate rounding drift that % widths cause on mobile
-            # when min-width forces a fixed pixel total.
-            _tw = "width:100%;border-collapse:collapse;table-layout:fixed;min-width:720px"
-            # Column widths in px — must sum to 720 (the min-width)
-            # sym(50) + company(150) + price(80) + yield(65) + dgr(70) + payout(65) + pe(55) + ytd(70) + analyst(115) = 720
-            _cw = ["50px", "150px", "80px", "65px", "70px", "65px", "55px", "70px", "115px"]
-
+            # Build comparison table — single table, single st.markdown call.
+            # Max 9 rows (current ticker + 8 peers) keeps HTML well under
+            # Streamlit Cloud's silent-fail size limit.
+            _tw = "width:100%;border-collapse:collapse;min-width:720px"
             _th_base = ("font-size:10px;font-weight:600;"
                         "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
                         "border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap;"
-                        "overflow:hidden;text-overflow:ellipsis;padding:6px 8px")
+                        "padding:6px 8px")
 
-            # Header — wrapped in scrollable div
-            st.markdown(
-                f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
-                f'<table style="{_tw}"><thead><tr>'
-                f'<th style="text-align:left;width:{_cw[0]};{_th_base}">Sym</th>'
-                f'<th style="text-align:left;width:{_cw[1]};{_th_base}">Company</th>'
-                f'<th style="text-align:right;width:{_cw[2]};{_th_base}">Price</th>'
-                f'<th style="text-align:right;width:{_cw[3]};{_th_base}">Yield</th>'
-                f'<th style="text-align:right;width:{_cw[4]};{_th_base}">5Y DGR</th>'
-                f'<th style="text-align:right;width:{_cw[5]};{_th_base}">Payout</th>'
-                f'<th style="text-align:right;width:{_cw[6]};{_th_base}">P/E</th>'
-                f'<th style="text-align:right;width:{_cw[7]};{_th_base}">YTD</th>'
-                f'<th style="text-align:center;width:{_cw[8]};{_th_base}">Analyst</th>'
-                f'</tr></thead></table>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
-            # Rows
+            # Build all rows first
+            rows_html = ""
             for t in all_compare:
                 p = compare_prices.get(t, {})
                 fv = compare_fv.get(t, {})
@@ -1214,23 +1192,37 @@ if _current_sector and _MARKET_DATA_AVAILABLE and available_tickers:
 
                 _td = "white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
 
-                st.markdown(
-                    f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
-                    f'<table style="{_tw}"><tbody>'
+                rows_html += (
                     f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03);{bg}">'
-                    f'<td style="text-align:left;width:{_cw[0]};padding:8px;font-size:12px;font-weight:{sym_weight};color:{sym_color};{_td}">{t}</td>'
-                    f'<td style="text-align:left;width:{_cw[1]};padding:8px;font-size:11px;color:rgba(255,255,255,0.5);{_td}">{_name}</td>'
-                    f'<td style="text-align:right;width:{_cw[2]};padding:8px;font-size:12px;color:rgba(255,255,255,0.8);{_td}">{price_str}</td>'
-                    f'<td style="text-align:right;width:{_cw[3]};padding:8px;font-size:12px;color:{yield_color};{_td}">{yield_str}</td>'
-                    f'<td style="text-align:right;width:{_cw[4]};padding:8px;font-size:12px;color:{dgr5_color};{_td}">{dgr5_str}</td>'
-                    f'<td style="text-align:right;width:{_cw[5]};padding:8px;font-size:12px;color:{payout_color};{_td}">{payout_str}</td>'
-                    f'<td style="text-align:right;width:{_cw[6]};padding:8px;font-size:12px;color:rgba(255,255,255,0.7);{_td}">{pe_str}</td>'
-                    f'<td style="text-align:right;width:{_cw[7]};padding:8px;font-size:12px;color:{ytd_color};{_td}">{ytd_str}</td>'
-                    f'<td style="text-align:center;width:{_cw[8]};padding:8px;{_td}">{rec_html}</td>'
-                    f'</tr></tbody></table>'
-                    f'</div>',
-                    unsafe_allow_html=True,
+                    f'<td style="text-align:left;padding:8px;font-size:12px;font-weight:{sym_weight};color:{sym_color};{_td}">{t}</td>'
+                    f'<td style="text-align:left;padding:8px;font-size:11px;color:rgba(255,255,255,0.5);{_td}">{_name}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.8);{_td}">{price_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{yield_color};{_td}">{yield_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{dgr5_color};{_td}">{dgr5_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{payout_color};{_td}">{payout_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.7);{_td}">{pe_str}</td>'
+                    f'<td style="text-align:right;padding:8px;font-size:12px;color:{ytd_color};{_td}">{ytd_str}</td>'
+                    f'<td style="text-align:center;padding:8px;{_td}">{rec_html}</td>'
+                    f'</tr>'
                 )
+
+            # Single table: header + all rows in one st.markdown call
+            st.markdown(
+                f'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'
+                f'<table style="{_tw}"><thead><tr>'
+                f'<th style="text-align:left;{_th_base}">Sym</th>'
+                f'<th style="text-align:left;{_th_base}">Company</th>'
+                f'<th style="text-align:right;{_th_base}">Price</th>'
+                f'<th style="text-align:right;{_th_base}">Yield</th>'
+                f'<th style="text-align:right;{_th_base}">5Y DGR</th>'
+                f'<th style="text-align:right;{_th_base}">Payout</th>'
+                f'<th style="text-align:right;{_th_base}">P/E</th>'
+                f'<th style="text-align:right;{_th_base}">YTD</th>'
+                f'<th style="text-align:center;{_th_base}">Analyst</th>'
+                f'</tr></thead><tbody>{rows_html}</tbody></table>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
             st.caption(f"Peers: MCP holdings in {_current_sector} · Finviz + Fish CCC · {datetime.now().strftime('%I:%M %p')}")
 
