@@ -328,8 +328,16 @@ if default_ticker:
             _default_idx = i
             break
 
-col_sel, col_back = st.columns([5, 1])
+col_sel, col_back = st.columns([4, 1.5])
 with col_sel:
+    # Truncate long option text in the selectbox on narrow screens
+    st.markdown("""<style>
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div:first-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    </style>""", unsafe_allow_html=True)
     selected_option = st.selectbox(
         "Select or Search Ticker",
         options=_display_options,
