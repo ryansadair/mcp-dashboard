@@ -291,8 +291,25 @@ try:
 except Exception:
     pass
 
+# ── Build ticker lookup with company names ────────────────────────────────
+# Fetches names from market_data cache so the selectbox shows "MSFT — Microsoft Corp"
+_ticker_labels = {}
+if available_tickers and _MARKET_DATA_AVAILABLE:
+    try:
+        _name_data = fetch_batch_prices(tuple(available_tickers))
+        for t in available_tickers:
+            name = _name_data.get(t, {}).get("name", "")
+            _ticker_labels[t] = f"{t}  —  {name}" if name else t
+    except Exception:
+        _ticker_labels = {t: t for t in available_tickers}
+else:
+    _ticker_labels = {t: t for t in available_tickers}
+
+# Sorted display list with a blank entry at the top for manual typing
+_display_options = [""] + [_ticker_labels.get(t, t) for t in available_tickers]
+
 # ── Ticker Selector ───────────────────────────────────────────────────────
-col_sel, col_back = st.columns([3, 1])
+col_sel, col_manual, col_back = st.columns([3, 2, 1])
 with col_sel:
     # Check if coming from Holdings tab with a pre-selected ticker
     default_ticker = (
@@ -300,16 +317,43 @@ with col_sel:
         or st.session_state.get("detail_ticker")
         or ""
     ).upper()
-    ticker_input = st.text_input(
-        "Enter Ticker Symbol",
-        value=default_ticker,
-        placeholder="e.g. AMGN, MSFT, JNJ...",
-        key="detail_ticker_input",
+
+    # Find default index in display options
+    _default_idx = 0
+    if default_ticker:
+        for i, opt in enumerate(_display_options):
+            if opt.startswith(default_ticker + " ") or opt == default_ticker:
+                _default_idx = i
+                break
+
+    selected_option = st.selectbox(
+        "Search Holdings",
+        options=_display_options,
+        index=_default_idx,
+        placeholder="Type ticker or company name...",
+        key="detail_ticker_select",
+    )
+
+with col_manual:
+    manual_ticker = st.text_input(
+        "Or enter any ticker",
+        value=default_ticker if _default_idx == 0 and default_ticker else "",
+        placeholder="e.g. NVDA, META...",
+        key="detail_ticker_manual",
     ).strip().upper()
+
 with col_back:
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("← Back", key="back_btn", use_container_width=True):
         st.switch_page("pages/1_Dashboard.py")
+
+# Resolve ticker: selectbox takes priority if set, otherwise manual input
+if selected_option:
+    ticker_input = selected_option.split("  —  ")[0].strip().upper()
+elif manual_ticker:
+    ticker_input = manual_ticker
+else:
+    ticker_input = ""
 
 if not ticker_input:
     st.info("Enter a ticker symbol above to view stock details.")
