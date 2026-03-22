@@ -493,31 +493,66 @@ def fetch_mcp_thesis(ticker):
     except Exception:
         return ""
 
-    # Step 3: Look for callout blocks first (the 💡 thesis block),
-    # then fall back to paragraphs containing "Thesis"
-    thesis_html = ""
+    # Step 3: Find the first callout block (the 💡 thesis), then collect
+    # all following paragraph/bulleted_list blocks until we hit another
+    # callout, heading, or divider (which marks the start of an older thesis).
+    thesis_parts = []
+    collecting = False
 
     for block in blocks:
         btype = block.get("type", "")
         bdata = block.get(btype, {})
 
-        if btype == "callout":
+        # Skip child_page blocks (subpage links like "Dividend Commentary")
+        if btype == "child_page":
+            continue
+
+        if btype == "callout" and not collecting:
+            # First callout — this is the thesis header
             rich = bdata.get("rich_text", [])
             text_html = _extract_rich_text_html(rich)
             if text_html.strip():
-                thesis_html = text_html
-                break  # First callout is the thesis
+                thesis_parts.append(f"<strong>{text_html}</strong>")
+                collecting = True
+            continue
 
-    # Fallback: look for a paragraph starting with "Thesis"
-    if not thesis_html:
-        for block in blocks:
-            btype = block.get("type", "")
-            bdata = block.get(btype, {})
+        if collecting:
+            # Stop collecting at the next callout, heading, or divider
+            if btype in ("callout", "divider") or btype.startswith("heading"):
+                break
+
             if btype == "paragraph":
                 rich = bdata.get("rich_text", [])
-                plain = _extract_rich_text_plain(rich)
-                if plain.strip().lower().startswith("thesis"):
-                    thesis_html = _extract_rich_text_html(rich)
-                    break
+                text_html = _extract_rich_text_html(rich)
+                if text_html.strip():
+                    thesis_parts.append(text_html)
+                # Empty paragraphs are spacing — add a small break
+                elif thesis_parts:
+                    thesis_parts.append("<br>")
 
-    return thesis_html
+            elif btype == "bulleted_list_item":
+                rich = bdata.get("rich_text", [])
+                text_html = _extract_rich_text_html(rich)
+                if text_html.strip():
+                    thesis_parts.append(f"• {text_html}")
+
+            elif btype == "numbered_list_item":
+                rich = bdata.get("rich_text", [])
+                text_html = _extract_rich_text_html(rich)
+                if text_html.strip():
+                    thesis_parts.append(text_html)
+
+    if thesis_parts:
+        return "<br>".join(thesis_parts)
+
+    # Fallback: look for a paragraph starting with "Thesis"
+    for block in blocks:
+        btype = block.get("type", "")
+        bdata = block.get(btype, {})
+        if btype == "paragraph":
+            rich = bdata.get("rich_text", [])
+            plain = _extract_rich_text_plain(rich)
+            if plain.strip().lower().startswith("thesis"):
+                return _extract_rich_text_html(rich)
+
+    return ""
