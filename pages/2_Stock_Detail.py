@@ -55,9 +55,9 @@ try:
 except ImportError:
     _MARKET_DATA_AVAILABLE = False
 
-# Notion proprietary metrics (MCP Target)
+# Notion proprietary metrics (MCP Target) + Dividend Commentary
 try:
-    from data.notion_metrics import fetch_notion_metrics
+    from data.notion_metrics import fetch_notion_metrics, fetch_dividend_commentary
     _NOTION_AVAILABLE = True
 except ImportError:
     _NOTION_AVAILABLE = False
@@ -1228,6 +1228,35 @@ if annual_divs is not None and len(annual_divs) >= 2:
 
 else:
     st.info("No dividend history available for this ticker.")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 8. DIVIDEND COMMENTARY (from Notion Wiki)
+# ══════════════════════════════════════════════════════════════════════════
+if _NOTION_AVAILABLE:
+    try:
+        commentary_blocks = fetch_dividend_commentary(ticker_input)
+        if commentary_blocks:
+            st.markdown("---")
+            st.markdown(
+                f'<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);'
+                f'text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">'
+                f'Dividend Commentary — {ticker_input}</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
+                "Source: MCP internal research notes (Notion)"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+            # Render each block as its own st.markdown call
+            # (avoids Streamlit Cloud HTML size limit on large commentaries)
+            for block_html in commentary_blocks:
+                st.markdown(block_html, unsafe_allow_html=True)
+    except Exception:
+        pass  # Silently skip if commentary fetch fails
 
 
 # ── Footer ────────────────────────────────────────────────────────────────

@@ -179,3 +179,194 @@ def get_metrics_for_tickers(tickers):
     """
     data = fetch_notion_metrics()
     return {t: data.get(t.upper(), {}) for t in tickers}
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DIVIDEND COMMENTARY — fetched from MCP Wiki child pages
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _extract_rich_text_plain(rich_text_list):
+    """Extract plain text from a Notion rich_text array, preserving line breaks."""
+    if not rich_text_list:
+        return ""
+    return "".join(rt.get("plain_text", "") for rt in rich_text_list)
+
+
+def _extract_rich_text_html(rich_text_list):
+    """
+    Convert a Notion rich_text array to styled HTML, preserving
+    bold, italic, underline, and links.
+    """
+    if not rich_text_list:
+        return ""
+    parts = []
+    for rt in rich_text_list:
+        text = rt.get("plain_text", "")
+        if not text:
+            continue
+        # Escape HTML entities
+        text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        # Preserve newlines
+        text = text.replace("\n", "<br>")
+
+        annotations = rt.get("annotations", {})
+        href = rt.get("href")
+
+        if annotations.get("bold"):
+            text = f"<strong>{text}</strong>"
+        if annotations.get("italic"):
+            text = f"<em>{text}</em>"
+        if annotations.get("underline"):
+            text = f"<u>{text}</u>"
+        if annotations.get("strikethrough"):
+            text = f"<s>{text}</s>"
+        if href:
+            text = f'<a href="{href}" style="color:#C9A84C;" target="_blank">{text}</a>'
+
+        parts.append(text)
+    return "".join(parts)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_dividend_commentary(ticker):
+    """
+    Search Notion for a page titled '{TICKER} - Dividend Commentary'
+    and return its block content as a list of HTML strings.
+
+    Returns:
+        list[str] — each entry is one block rendered as HTML, or
+        empty list if page not found or token unavailable.
+    """
+    token = _get_notion_token()
+    if not token:
+        return []
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Notion-Version": NOTION_API_VERSION,
+        "Content-Type": "application/json",
+    }
+
+    # Step 1: Search for the commentary page by title
+    search_title = f"{ticker.upper()} - Dividend Commentary"
+    try:
+        search_resp = requests.post(
+            f"{NOTION_BASE_URL}/search",
+            headers=headers,
+            json={
+                "query": search_title,
+                "filter": {"value": "page", "property": "object"},
+                "page_size": 5,
+            },
+            timeout=15,
+        )
+        search_resp.raise_for_status()
+        search_data = search_resp.json()
+    except Exception:
+        return []
+
+    # Find exact title match among results
+    page_id = None
+    for result in search_data.get("results", []):
+        props = result.get("properties", {})
+        # Wiki pages use "title" property
+        for prop_val in props.values():
+            if prop_val.get("type") == "title":
+                title_text = _extract_title(prop_val)
+                if title_text.upper() == search_title.upper():
+                    page_id = result["id"]
+                    break
+        if page_id:
+            break
+
+    if not page_id:
+        return []
+
+    # Step 2: Fetch all blocks from the page
+    blocks = []
+    has_more = True
+    start_cursor = None
+
+    try:
+        while has_more:
+            url = f"{NOTION_BASE_URL}/blocks/{page_id}/children?page_size=100"
+            if start_cursor:
+                url += f"&start_cursor={start_cursor}"
+
+            resp = requests.get(url, headers=headers, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+
+            blocks.extend(data.get("results", []))
+            has_more = data.get("has_more", False)
+            start_cursor = data.get("next_cursor")
+    except Exception:
+        return []
+
+    # Step 3: Convert blocks to HTML
+    html_parts = []
+    for block in blocks:
+        btype = block.get("type", "")
+        bdata = block.get(btype, {})
+
+        if btype in ("paragraph", "quote", "callout"):
+            rich = bdata.get("rich_text", [])
+            text_html = _extract_rich_text_html(rich)
+            if text_html.strip():
+                if btype == "quote":
+                    html_parts.append(
+                        f'<div style="border-left:3px solid #C9A84C; padding-left:12px; '
+                        f'margin:8px 0; font-style:italic; color:rgba(255,255,255,0.6);">'
+                        f'{text_html}</div>'
+                    )
+                else:
+                    html_parts.append(
+                        f'<div style="margin:8px 0; color:rgba(255,255,255,0.65); '
+                        f'line-height:1.6; font-size:13px;">{text_html}</div>'
+                    )
+
+        elif btype.startswith("heading"):
+            rich = bdata.get("rich_text", [])
+            text_html = _extract_rich_text_html(rich)
+            if text_html.strip():
+                if btype == "heading_1":
+                    # Skip the page title heading (redundant)
+                    continue
+                elif btype == "heading_2":
+                    html_parts.append(
+                        f'<div style="margin:16px 0 6px; font-size:13px; font-weight:700; '
+                        f'color:rgba(255,255,255,0.75); border-bottom:1px solid rgba(255,255,255,0.06); '
+                        f'padding-bottom:4px;">{text_html}</div>'
+                    )
+                else:  # heading_3
+                    html_parts.append(
+                        f'<div style="margin:12px 0 4px; font-size:12px; font-weight:600; '
+                        f'color:rgba(255,255,255,0.7);">{text_html}</div>'
+                    )
+
+        elif btype == "bulleted_list_item":
+            rich = bdata.get("rich_text", [])
+            text_html = _extract_rich_text_html(rich)
+            if text_html.strip():
+                html_parts.append(
+                    f'<div style="margin:4px 0 4px 16px; color:rgba(255,255,255,0.6); '
+                    f'font-size:13px; line-height:1.5;">• {text_html}</div>'
+                )
+
+        elif btype == "numbered_list_item":
+            rich = bdata.get("rich_text", [])
+            text_html = _extract_rich_text_html(rich)
+            if text_html.strip():
+                html_parts.append(
+                    f'<div style="margin:4px 0 4px 16px; color:rgba(255,255,255,0.6); '
+                    f'font-size:13px; line-height:1.5;">{text_html}</div>'
+                )
+
+        elif btype == "divider":
+            html_parts.append(
+                '<div style="border-top:1px solid rgba(255,255,255,0.06); margin:12px 0;"></div>'
+            )
+
+        # Skip unsupported block types (images, embeds, etc.) silently
+
+    return html_parts
