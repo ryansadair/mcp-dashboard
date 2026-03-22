@@ -55,9 +55,9 @@ try:
 except ImportError:
     _MARKET_DATA_AVAILABLE = False
 
-# Notion proprietary metrics (MCP Target) + Dividend Commentary
+# Notion proprietary metrics (MCP Target) + Dividend Commentary + Thesis
 try:
-    from data.notion_metrics import fetch_notion_metrics, fetch_dividend_commentary
+    from data.notion_metrics import fetch_notion_metrics, fetch_dividend_commentary, fetch_mcp_thesis
     _NOTION_AVAILABLE = True
 except ImportError:
     _NOTION_AVAILABLE = False
@@ -579,6 +579,26 @@ if desc:
         ed1.metric("Employees", f"{employees:,}" if employees else "—")
         ed2.metric("Country", g("country", "—"))
         ed3.metric("Website", g("website", "—"))
+
+# ══════════════════════════════════════════════════════════════════════════
+# 2b. MCP INVESTMENT THESIS (from Notion Wiki)
+# ══════════════════════════════════════════════════════════════════════════
+if _NOTION_AVAILABLE:
+    try:
+        _thesis_html = fetch_mcp_thesis(ticker_input)
+        if _thesis_html:
+            st.markdown(
+                f'<div style="background:rgba(201,168,76,0.04); border:1px solid rgba(201,168,76,0.12); '
+                f'border-radius:10px; padding:16px 20px; margin:12px 0 4px;">'
+                f'<div style="font-size:11px; font-weight:700; color:{GOLD}; text-transform:uppercase; '
+                f'letter-spacing:0.06em; margin-bottom:8px;">MCP Investment Thesis</div>'
+                f'<div style="font-size:13px; color:rgba(255,255,255,0.65); line-height:1.7;">'
+                f'{_thesis_html}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+    except Exception:
+        pass
 
 # ══════════════════════════════════════════════════════════════════════════
 # 3. PRICE CHART WITH MOVING AVERAGES

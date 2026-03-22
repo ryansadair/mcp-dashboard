@@ -391,3 +391,133 @@ def fetch_dividend_commentary(ticker):
         # Skip unsupported block types (images, embeds, etc.) silently
 
     return html_parts
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MCP THESIS — fetched from main ticker page in Active Holdings wiki
+# ═══════════════════════════════════════════════════════════════════════════
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_mcp_thesis(ticker):
+    """
+    Search Notion for the main ticker page (e.g. 'AMGN - Amgen') under
+    Active Holdings and extract the thesis callout block.
+
+    The thesis is typically a callout (💡) block on the main ticker page.
+    Falls back to any paragraph block containing 'Thesis' if no callout found.
+
+    Returns:
+        str — HTML-rendered thesis text, or empty string if not found.
+    """
+    token = _get_notion_token()
+    if not token:
+        return ""
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Notion-Version": NOTION_API_VERSION,
+        "Content-Type": "application/json",
+    }
+
+    # Step 1: Search for the main ticker page (e.g. "AMGN - Amgen")
+    # Search with just the ticker to cast a wide net, then match pages
+    # whose title starts with "{TICKER} - "
+    ticker_upper = ticker.upper()
+    page_id = None
+
+    try:
+        has_more = True
+        start_cursor = None
+        pages_checked = 0
+
+        while has_more and pages_checked < 200:
+            payload = {
+                "query": ticker_upper,
+                "filter": {"value": "page", "property": "object"},
+                "page_size": 100,
+            }
+            if start_cursor:
+                payload["start_cursor"] = start_cursor
+
+            resp = requests.post(
+                f"{NOTION_BASE_URL}/search",
+                headers=headers,
+                json=payload,
+                timeout=15,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+            for result in data.get("results", []):
+                pages_checked += 1
+                props = result.get("properties", {})
+
+                # Look for title property
+                for prop_val in props.values():
+                    if prop_val.get("type") == "title":
+                        title_text = _extract_title(prop_val)
+                        # Match "{TICKER} - {Company Name}" pattern
+                        # but NOT subpages like "{TICKER} - Dividend Commentary"
+                        if (title_text.upper().startswith(f"{ticker_upper} - ")
+                                and "dividend" not in title_text.lower()
+                                and "commentary" not in title_text.lower()
+                                and "increases" not in title_text.lower()
+                                and "business updates" not in title_text.lower()
+                                and "wiki notes" not in title_text.lower()
+                                and "pre 20" not in title_text.lower()):
+                            # Verify it's a wiki page (parent is a page, not a database)
+                            parent = result.get("parent", {})
+                            if parent.get("type") == "page_id":
+                                page_id = result["id"]
+                                break
+                if page_id:
+                    break
+
+            if page_id:
+                break
+
+            has_more = data.get("has_more", False)
+            start_cursor = data.get("next_cursor")
+    except Exception:
+        return ""
+
+    if not page_id:
+        return ""
+
+    # Step 2: Fetch blocks from the ticker page and find the thesis
+    try:
+        blocks_url = f"{NOTION_BASE_URL}/blocks/{page_id}/children?page_size=100"
+        resp = requests.get(blocks_url, headers=headers, timeout=15)
+        resp.raise_for_status()
+        blocks = resp.json().get("results", [])
+    except Exception:
+        return ""
+
+    # Step 3: Look for callout blocks first (the 💡 thesis block),
+    # then fall back to paragraphs containing "Thesis"
+    thesis_html = ""
+
+    for block in blocks:
+        btype = block.get("type", "")
+        bdata = block.get(btype, {})
+
+        if btype == "callout":
+            rich = bdata.get("rich_text", [])
+            text_html = _extract_rich_text_html(rich)
+            if text_html.strip():
+                thesis_html = text_html
+                break  # First callout is the thesis
+
+    # Fallback: look for a paragraph starting with "Thesis"
+    if not thesis_html:
+        for block in blocks:
+            btype = block.get("type", "")
+            bdata = block.get(btype, {})
+            if btype == "paragraph":
+                rich = bdata.get("rich_text", [])
+                plain = _extract_rich_text_plain(rich)
+                if plain.strip().lower().startswith("thesis"):
+                    thesis_html = _extract_rich_text_html(rich)
+                    break
+
+    return thesis_html
