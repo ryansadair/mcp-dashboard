@@ -892,6 +892,40 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
 def _render_safety_growth(edf, active_strategy, strat_color):
     """Growth tier distribution, safety scores, payout trends, risk monitor."""
 
+    with st.expander("How are safety grades calculated?"):
+        st.markdown("""
+<div style="font-size:12px; color:rgba(255,255,255,0.65); line-height:1.7;">
+
+Each holding receives a composite score (0–15 pts) from three equally weighted inputs, then mapped to a letter grade.
+
+**Payout Ratio** — lower is safer (source: Fish CCC, fallback Supabase/yfinance)
+
+<div style="margin-left:12px; color:rgba(255,255,255,0.5);">
+&lt;40% → 5 pts &nbsp;·&nbsp; 40–55% → 4 pts &nbsp;·&nbsp; 55–70% → 3 pts &nbsp;·&nbsp; 70–85% → 2 pts &nbsp;·&nbsp; 85%+ → 1 pt &nbsp;·&nbsp; No data → 2 pts
+</div>
+
+**5-Year Dividend Growth Rate** — higher is safer (source: Fish CCC, fallback yfinance)
+
+<div style="margin-left:12px; color:rgba(255,255,255,0.5);">
+10%+ → 5 pts &nbsp;·&nbsp; 5–10% → 4 pts &nbsp;·&nbsp; 2–5% → 3 pts &nbsp;·&nbsp; 0–2% → 2 pts &nbsp;·&nbsp; Negative → 0 pts
+<br>Non-Fish tickers (ADRs, foreign): mild negatives score 2 pts (FX/special div noise)
+</div>
+
+**Consecutive Years of Increases** — longer streak is safer (source: Fish CCC)
+
+<div style="margin-left:12px; color:rgba(255,255,255,0.5);">
+25+ yrs → 5 pts &nbsp;·&nbsp; 15–24 → 4 pts &nbsp;·&nbsp; 10–14 → 3 pts &nbsp;·&nbsp; 5–9 → 2 pts &nbsp;·&nbsp; &lt;5 → 1 pt &nbsp;·&nbsp; No data → 3 pts
+</div>
+
+**Grade Scale** (sum of three scores)
+
+<div style="margin-left:12px; color:rgba(255,255,255,0.5);">
+A+ = 14–15 &nbsp;·&nbsp; A = 12–13 &nbsp;·&nbsp; A- = 10–11 &nbsp;·&nbsp; B+ = 8–9 &nbsp;·&nbsp; B = 6–7 &nbsp;·&nbsp; B- = 4–5 &nbsp;·&nbsp; C = 0–3
+</div>
+
+</div>
+""", unsafe_allow_html=True)
+
     col_left, col_right = st.columns(2)
 
     # ── Growth Tier Distribution ───────────────────────────────────────────
