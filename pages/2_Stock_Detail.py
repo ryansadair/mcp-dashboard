@@ -287,6 +287,8 @@ try:
                 elif isinstance(strat_data, dict) and "holdings" in strat_data:
                     available_tickers.extend([h["symbol"] for h in strat_data["holdings"]])
             available_tickers = sorted(set(available_tickers))
+            # Remove non-equity entries (e.g. CASH from Tamarac)
+            available_tickers = [t for t in available_tickers if t not in ("CASH",)]
             break
 except Exception:
     pass
