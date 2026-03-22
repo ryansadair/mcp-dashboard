@@ -1259,6 +1259,42 @@ if _NOTION_AVAILABLE:
         pass  # Silently skip if commentary fetch fails
 
 
+# ── TEMP DEBUG — remove after testing ─────────────────────────────────────
+if _NOTION_AVAILABLE:
+    import requests as _dbg_requests
+    _dbg_tok = None
+    try:
+        _dbg_tok = st.secrets["notion"]["token"]
+    except Exception:
+        try:
+            _dbg_tok = st.secrets["NOTION_TOKEN"]
+        except Exception:
+            pass
+    if _dbg_tok:
+        _dbg_search_title = f"{ticker_input.upper()} - Dividend Commentary"
+        try:
+            _dbg_resp = _dbg_requests.post(
+                "https://api.notion.com/v1/search",
+                headers={
+                    "Authorization": f"Bearer {_dbg_tok}",
+                    "Notion-Version": "2022-06-28",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "query": _dbg_search_title,
+                    "filter": {"value": "page", "property": "object"},
+                    "page_size": 5,
+                },
+                timeout=15,
+            )
+            _dbg_data = _dbg_resp.json()
+            with st.expander(f"DEBUG: Notion search for '{_dbg_search_title}'"):
+                st.json(_dbg_data)
+        except Exception as _dbg_e:
+            st.caption(f"DEBUG: Search failed — {_dbg_e}")
+# ── END TEMP DEBUG ────────────────────────────────────────────────────────
+
+
 # ── Footer ────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='display:flex;gap:12px;justify-content:center;padding:16px 28px;margin-top:20px;"
