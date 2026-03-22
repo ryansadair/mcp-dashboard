@@ -112,7 +112,7 @@ def _fetch_market_quotes():
         tickers_str = " ".join(_ALL_TICKERS)
         data = yf.download(
             tickers_str,
-            period="5d",
+            period="1y",
             interval="1d",
             group_by="ticker",
             progress=False,
@@ -128,13 +128,13 @@ def _fetch_market_quotes():
                     df = data[ticker] if ticker in data.columns.get_level_values(0) else None
 
                 if df is None or df.empty:
-                    result[ticker] = {"price": 0, "change": 0, "change_pct": 0}
+                    result[ticker] = {"price": 0, "change": 0, "change_pct": 0, "high_52w": 0, "pct_from_high": 0}
                     continue
 
                 # Drop NaN rows
                 df = df.dropna(subset=["Close"])
                 if len(df) < 1:
-                    result[ticker] = {"price": 0, "change": 0, "change_pct": 0}
+                    result[ticker] = {"price": 0, "change": 0, "change_pct": 0, "high_52w": 0, "pct_from_high": 0}
                     continue
 
                 close = float(df["Close"].iloc[-1])
@@ -142,17 +142,23 @@ def _fetch_market_quotes():
                 chg = close - prev
                 chg_pct = (chg / prev * 100) if prev != 0 else 0
 
+                # 52-week high from the full year of data
+                high_52w = float(df["High"].max()) if "High" in df.columns else close
+                pct_from_high = ((close - high_52w) / high_52w * 100) if high_52w > 0 else 0
+
                 result[ticker] = {
                     "price": round(close, 2),
                     "change": round(chg, 2),
                     "change_pct": round(chg_pct, 2),
+                    "high_52w": round(high_52w, 2),
+                    "pct_from_high": round(pct_from_high, 1),
                 }
             except Exception:
-                result[ticker] = {"price": 0, "change": 0, "change_pct": 0}
+                result[ticker] = {"price": 0, "change": 0, "change_pct": 0, "high_52w": 0, "pct_from_high": 0}
 
         return result
     except Exception:
-        return {t: {"price": 0, "change": 0, "change_pct": 0} for t in _ALL_TICKERS}
+        return {t: {"price": 0, "change": 0, "change_pct": 0, "high_52w": 0, "pct_from_high": 0} for t in _ALL_TICKERS}
 
 
 # ── Rendering Helpers ──────────────────────────────────────────────────────
@@ -169,11 +175,12 @@ def _chg_color(val):
 def _render_market_table(items, quotes, show_pct=True, section_label=None):
     """
     Render a compact HTML table for a list of (name, ticker) items.
+    Includes a '% From High' column showing distance from 52-week high.
     """
     # Header
     header_cols = (
-        '<col style="width:40%"><col style="width:15%">'
-        '<col style="width:22%"><col style="width:23%">'
+        '<col style="width:34%"><col style="width:12%">'
+        '<col style="width:18%"><col style="width:20%"><col style="width:16%">'
     )
     th_style = (
         "padding:6px 8px;font-size:10px;font-weight:600;"
@@ -187,6 +194,7 @@ def _render_market_table(items, quotes, show_pct=True, section_label=None):
     html += f'<th style="text-align:right;{th_style}">Ticker</th>'
     html += f'<th style="text-align:right;{th_style}">Price</th>'
     html += f'<th style="text-align:right;{th_style}">Chg / %</th>'
+    html += f'<th style="text-align:right;{th_style}">% From High</th>'
     html += '</tr></thead><tbody>'
 
     for name, ticker in items:
@@ -194,6 +202,7 @@ def _render_market_table(items, quotes, show_pct=True, section_label=None):
         price = q.get("price", 0)
         chg = q.get("change", 0)
         pct = q.get("change_pct", 0)
+        pct_from_high = q.get("pct_from_high", 0)
         color = _chg_color(pct)
 
         # Format price
@@ -207,6 +216,23 @@ def _render_market_table(items, quotes, show_pct=True, section_label=None):
         # Format change
         chg_str = f"{chg:+.2f}"
         pct_str = f"{pct:+.1f}%"
+
+        # Format % from high — always negative or zero
+        if pct_from_high == 0 and price > 0:
+            from_high_str = "AT HIGH"
+            from_high_color = "#569542"
+        elif pct_from_high != 0:
+            from_high_str = f"{pct_from_high:.1f}%"
+            # Gradient: near high = mild, far from high = deep red
+            if pct_from_high >= -5:
+                from_high_color = "rgba(255,255,255,0.5)"
+            elif pct_from_high >= -15:
+                from_high_color = "#C9A84C"
+            else:
+                from_high_color = "#c45454"
+        else:
+            from_high_str = "—"
+            from_high_color = "rgba(255,255,255,0.3)"
 
         # Highlight background for big movers (>2%)
         bg = ""
@@ -224,6 +250,8 @@ def _render_market_table(items, quotes, show_pct=True, section_label=None):
             f'color:rgba(255,255,255,0.9)">{price_str}</td>'
             f'<td style="text-align:right;padding:8px 8px;font-size:12px;font-weight:500;'
             f'color:{color}">{chg_str}&nbsp;&nbsp;{pct_str}</td>'
+            f'<td style="text-align:right;padding:8px 8px;font-size:12px;font-weight:500;'
+            f'color:{from_high_color}">{from_high_str}</td>'
             f'</tr>'
         )
 
