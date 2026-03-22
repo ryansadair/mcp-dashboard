@@ -493,54 +493,94 @@ def fetch_mcp_thesis(ticker):
     except Exception:
         return ""
 
-    # Step 3: Find the first callout block (the 💡 thesis), then collect
-    # all following paragraph/bulleted_list blocks until we hit another
-    # callout, heading, or divider (which marks the start of an older thesis).
+    # Step 3: Find the first callout block (the 💡 thesis).
+    # The thesis body may be stored as:
+    #   a) Child blocks nested inside the callout (common), OR
+    #   b) Paragraph blocks immediately following the callout on the page
+    # We check for children first, then fall back to collecting siblings.
     thesis_parts = []
-    collecting = False
+    callout_block_id = None
 
     for block in blocks:
         btype = block.get("type", "")
         bdata = block.get(btype, {})
 
-        # Skip child_page blocks (subpage links like "Dividend Commentary")
         if btype == "child_page":
             continue
 
-        if btype == "callout" and not collecting:
-            # First callout — this is the thesis header
+        if btype == "callout":
             rich = bdata.get("rich_text", [])
             text_html = _extract_rich_text_html(rich)
             if text_html.strip():
                 thesis_parts.append(f"<strong>{text_html}</strong>")
-                collecting = True
-            continue
-
-        if collecting:
-            # Stop collecting at the next callout, heading, or divider
-            if btype in ("callout", "divider") or btype.startswith("heading"):
+                # Check if callout has children
+                if block.get("has_children", False):
+                    callout_block_id = block["id"]
                 break
 
-            if btype == "paragraph":
-                rich = bdata.get("rich_text", [])
-                text_html = _extract_rich_text_html(rich)
-                if text_html.strip():
-                    thesis_parts.append(text_html)
-                # Empty paragraphs are spacing — add a small break
-                elif thesis_parts:
-                    thesis_parts.append("<br>")
+    # Fetch callout's child blocks if they exist
+    if callout_block_id:
+        try:
+            children_url = f"{NOTION_BASE_URL}/blocks/{callout_block_id}/children?page_size=100"
+            child_resp = requests.get(children_url, headers=headers, timeout=15)
+            child_resp.raise_for_status()
+            child_blocks = child_resp.json().get("results", [])
 
-            elif btype == "bulleted_list_item":
-                rich = bdata.get("rich_text", [])
-                text_html = _extract_rich_text_html(rich)
-                if text_html.strip():
-                    thesis_parts.append(f"• {text_html}")
+            for cb in child_blocks:
+                cb_type = cb.get("type", "")
+                cb_data = cb.get(cb_type, {})
+                if cb_type in ("paragraph", "quote"):
+                    rich = cb_data.get("rich_text", [])
+                    text_html = _extract_rich_text_html(rich)
+                    if text_html.strip():
+                        thesis_parts.append(text_html)
+                    elif thesis_parts:
+                        thesis_parts.append("<br>")
+                elif cb_type == "bulleted_list_item":
+                    rich = cb_data.get("rich_text", [])
+                    text_html = _extract_rich_text_html(rich)
+                    if text_html.strip():
+                        thesis_parts.append(f"• {text_html}")
+                elif cb_type == "numbered_list_item":
+                    rich = cb_data.get("rich_text", [])
+                    text_html = _extract_rich_text_html(rich)
+                    if text_html.strip():
+                        thesis_parts.append(text_html)
+        except Exception:
+            pass  # If children fetch fails, we still have the callout header
 
-            elif btype == "numbered_list_item":
-                rich = bdata.get("rich_text", [])
-                text_html = _extract_rich_text_html(rich)
-                if text_html.strip():
-                    thesis_parts.append(text_html)
+    # If no children found, collect sibling blocks after the callout
+    if len(thesis_parts) <= 1 and thesis_parts:
+        collecting = True
+        found_callout = False
+        for block in blocks:
+            btype = block.get("type", "")
+            bdata = block.get(btype, {})
+
+            if btype == "child_page":
+                continue
+
+            if btype == "callout" and not found_callout:
+                found_callout = True
+                continue
+
+            if found_callout:
+                # Stop at the next callout, heading, or divider
+                if btype in ("callout", "divider") or btype.startswith("heading"):
+                    break
+
+                if btype == "paragraph":
+                    rich = bdata.get("rich_text", [])
+                    text_html = _extract_rich_text_html(rich)
+                    if text_html.strip():
+                        thesis_parts.append(text_html)
+                    elif len(thesis_parts) > 1:
+                        thesis_parts.append("<br>")
+                elif btype == "bulleted_list_item":
+                    rich = bdata.get("rich_text", [])
+                    text_html = _extract_rich_text_html(rich)
+                    if text_html.strip():
+                        thesis_parts.append(f"• {text_html}")
 
     if thesis_parts:
         return "<br>".join(thesis_parts)
