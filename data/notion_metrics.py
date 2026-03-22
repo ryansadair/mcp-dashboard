@@ -257,6 +257,11 @@ def fetch_dividend_commentary(ticker):
     search_title = f"{ticker_upper} - Dividend Commentary"
     page_id = None
 
+    def _normalize_title(t):
+        """Normalize spacing around dashes for fuzzy title matching."""
+        import re
+        return re.sub(r'\s*[-–—]\s*', ' - ', t.strip()).upper()
+
     # ── Approach 1: Find parent ticker page, then navigate to commentary child ──
     try:
         has_more = True
@@ -319,7 +324,7 @@ def fetch_dividend_commentary(ticker):
             for cb in child_blocks:
                 if cb.get("type") == "child_page":
                     child_title = cb.get("child_page", {}).get("title", "")
-                    if child_title.upper() == search_title.upper():
+                    if _normalize_title(child_title) == _normalize_title(search_title):
                         page_id = cb["id"]
                         break
     except Exception:
@@ -356,7 +361,7 @@ def fetch_dividend_commentary(ticker):
                     for prop_val in props.values():
                         if prop_val.get("type") == "title":
                             title_text = _extract_title(prop_val)
-                            if title_text.upper() == search_title.upper():
+                            if _normalize_title(title_text) == _normalize_title(search_title):
                                 page_id = result["id"]
                                 break
                     if page_id:
