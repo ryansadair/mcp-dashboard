@@ -328,7 +328,7 @@ if default_ticker:
             _default_idx = i
             break
 
-col_sel, col_back = st.columns([4, 1.5])
+col_sel, col_back = st.columns([6, 1])
 with col_sel:
     # Truncate long option text in the selectbox on narrow screens
     st.markdown("""<style>
@@ -336,6 +336,17 @@ with col_sel:
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+    }
+    /* Ensure back button doesn't get crushed on mobile */
+    @media screen and (max-width: 480px) {
+        [data-testid="stHorizontalBlock"]:has(#back_btn) > [data-testid="stColumn"]:last-child {
+            min-width: 70px !important;
+            flex: 0 0 70px !important;
+        }
+        [data-testid="stHorizontalBlock"]:has(#back_btn) > [data-testid="stColumn"]:first-child {
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+        }
     }
     </style>""", unsafe_allow_html=True)
     selected_option = st.selectbox(
