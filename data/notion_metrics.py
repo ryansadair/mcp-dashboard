@@ -230,11 +230,14 @@ def _extract_rich_text_html(rich_text_list):
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_dividend_commentary(ticker):
     """
-    Search Notion for a page titled '{TICKER} - Dividend Commentary'
-    and return its block content as a list of HTML strings.
+    Find the dividend commentary for a ticker by:
+      1. Searching for the main ticker page (e.g. 'AMGN - Amgen')
+      2. Getting its child pages
+      3. Finding the one titled '{TICKER} - Dividend Commentary'
+      4. Fetching that page's block content
 
-    Uses paginated search to handle Notion's relevance-based ordering,
-    which can bury exact title matches behind loosely related pages.
+    Falls back to a direct search for '{TICKER} - Dividend Commentary'
+    if the parent-child approach doesn't find it.
 
     Returns:
         list[str] — each entry is one block rendered as HTML, or
@@ -250,55 +253,122 @@ def fetch_dividend_commentary(ticker):
         "Content-Type": "application/json",
     }
 
-    # Step 1: Search for the commentary page by title.
-    # Notion search is fuzzy/relevance-ranked, so we paginate through
-    # results looking for an exact title match.
-    search_title = f"{ticker.upper()} - Dividend Commentary"
+    ticker_upper = ticker.upper()
+    search_title = f"{ticker_upper} - Dividend Commentary"
     page_id = None
 
+    # ── Approach 1: Find parent ticker page, then navigate to commentary child ──
     try:
         has_more = True
         start_cursor = None
+        parent_page_id = None
         pages_checked = 0
-        max_pages = 200  # safety limit
 
-        while has_more and pages_checked < max_pages:
+        while has_more and pages_checked < 200:
             payload = {
-                "query": search_title,
+                "query": ticker_upper,
                 "filter": {"value": "page", "property": "object"},
                 "page_size": 100,
             }
             if start_cursor:
                 payload["start_cursor"] = start_cursor
 
-            search_resp = requests.post(
+            resp = requests.post(
                 f"{NOTION_BASE_URL}/search",
                 headers=headers,
                 json=payload,
                 timeout=15,
             )
-            search_resp.raise_for_status()
-            search_data = search_resp.json()
+            resp.raise_for_status()
+            data = resp.json()
 
-            for result in search_data.get("results", []):
+            for result in data.get("results", []):
                 pages_checked += 1
                 props = result.get("properties", {})
                 for prop_val in props.values():
                     if prop_val.get("type") == "title":
                         title_text = _extract_title(prop_val)
-                        if title_text.upper() == search_title.upper():
-                            page_id = result["id"]
-                            break
+                        # Match main ticker page: "{TICKER} - {Company Name}"
+                        # Exclude subpages
+                        if (title_text.upper().startswith(f"{ticker_upper} - ")
+                                and "dividend" not in title_text.lower()
+                                and "commentary" not in title_text.lower()
+                                and "increases" not in title_text.lower()
+                                and "business updates" not in title_text.lower()
+                                and "wiki notes" not in title_text.lower()
+                                and "pre 20" not in title_text.lower()):
+                            parent = result.get("parent", {})
+                            if parent.get("type") == "page_id":
+                                parent_page_id = result["id"]
+                                break
+                if parent_page_id:
+                    break
+
+            if parent_page_id:
+                break
+            has_more = data.get("has_more", False)
+            start_cursor = data.get("next_cursor")
+
+        # Now get children of the parent page and find the commentary subpage
+        if parent_page_id:
+            children_url = f"{NOTION_BASE_URL}/blocks/{parent_page_id}/children?page_size=100"
+            child_resp = requests.get(children_url, headers=headers, timeout=15)
+            child_resp.raise_for_status()
+            child_blocks = child_resp.json().get("results", [])
+
+            for cb in child_blocks:
+                if cb.get("type") == "child_page":
+                    child_title = cb.get("child_page", {}).get("title", "")
+                    if child_title.upper() == search_title.upper():
+                        page_id = cb["id"]
+                        break
+    except Exception:
+        pass
+
+    # ── Approach 2: Fallback — direct search for the commentary page title ──
+    if not page_id:
+        try:
+            has_more = True
+            start_cursor = None
+            pages_checked = 0
+
+            while has_more and pages_checked < 200:
+                payload = {
+                    "query": search_title,
+                    "filter": {"value": "page", "property": "object"},
+                    "page_size": 100,
+                }
+                if start_cursor:
+                    payload["start_cursor"] = start_cursor
+
+                search_resp = requests.post(
+                    f"{NOTION_BASE_URL}/search",
+                    headers=headers,
+                    json=payload,
+                    timeout=15,
+                )
+                search_resp.raise_for_status()
+                search_data = search_resp.json()
+
+                for result in search_data.get("results", []):
+                    pages_checked += 1
+                    props = result.get("properties", {})
+                    for prop_val in props.values():
+                        if prop_val.get("type") == "title":
+                            title_text = _extract_title(prop_val)
+                            if title_text.upper() == search_title.upper():
+                                page_id = result["id"]
+                                break
+                    if page_id:
+                        break
+
                 if page_id:
                     break
 
-            if page_id:
-                break
-
-            has_more = search_data.get("has_more", False)
-            start_cursor = search_data.get("next_cursor")
-    except Exception:
-        return []
+                has_more = search_data.get("has_more", False)
+                start_cursor = search_data.get("next_cursor")
+        except Exception:
+            return []
 
     if not page_id:
         return []
