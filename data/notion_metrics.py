@@ -233,6 +233,9 @@ def fetch_dividend_commentary(ticker):
     Search Notion for a page titled '{TICKER} - Dividend Commentary'
     and return its block content as a list of HTML strings.
 
+    Uses paginated search to handle Notion's relevance-based ordering,
+    which can bury exact title matches behind loosely related pages.
+
     Returns:
         list[str] — each entry is one block rendered as HTML, or
         empty list if page not found or token unavailable.
@@ -247,37 +250,55 @@ def fetch_dividend_commentary(ticker):
         "Content-Type": "application/json",
     }
 
-    # Step 1: Search for the commentary page by title
+    # Step 1: Search for the commentary page by title.
+    # Notion search is fuzzy/relevance-ranked, so we paginate through
+    # results looking for an exact title match.
     search_title = f"{ticker.upper()} - Dividend Commentary"
+    page_id = None
+
     try:
-        search_resp = requests.post(
-            f"{NOTION_BASE_URL}/search",
-            headers=headers,
-            json={
+        has_more = True
+        start_cursor = None
+        pages_checked = 0
+        max_pages = 200  # safety limit
+
+        while has_more and pages_checked < max_pages:
+            payload = {
                 "query": search_title,
                 "filter": {"value": "page", "property": "object"},
-                "page_size": 5,
-            },
-            timeout=15,
-        )
-        search_resp.raise_for_status()
-        search_data = search_resp.json()
+                "page_size": 100,
+            }
+            if start_cursor:
+                payload["start_cursor"] = start_cursor
+
+            search_resp = requests.post(
+                f"{NOTION_BASE_URL}/search",
+                headers=headers,
+                json=payload,
+                timeout=15,
+            )
+            search_resp.raise_for_status()
+            search_data = search_resp.json()
+
+            for result in search_data.get("results", []):
+                pages_checked += 1
+                props = result.get("properties", {})
+                for prop_val in props.values():
+                    if prop_val.get("type") == "title":
+                        title_text = _extract_title(prop_val)
+                        if title_text.upper() == search_title.upper():
+                            page_id = result["id"]
+                            break
+                if page_id:
+                    break
+
+            if page_id:
+                break
+
+            has_more = search_data.get("has_more", False)
+            start_cursor = search_data.get("next_cursor")
     except Exception:
         return []
-
-    # Find exact title match among results
-    page_id = None
-    for result in search_data.get("results", []):
-        props = result.get("properties", {})
-        # Wiki pages use "title" property
-        for prop_val in props.values():
-            if prop_val.get("type") == "title":
-                title_text = _extract_title(prop_val)
-                if title_text.upper() == search_title.upper():
-                    page_id = result["id"]
-                    break
-        if page_id:
-            break
 
     if not page_id:
         return []

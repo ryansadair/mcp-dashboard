@@ -1283,13 +1283,27 @@ if _NOTION_AVAILABLE:
                 json={
                     "query": _dbg_search_title,
                     "filter": {"value": "page", "property": "object"},
-                    "page_size": 5,
+                    "page_size": 100,
                 },
                 timeout=15,
             )
             _dbg_data = _dbg_resp.json()
-            with st.expander(f"DEBUG: Notion search for '{_dbg_search_title}'"):
-                st.json(_dbg_data)
+            # Extract just titles for quick scan
+            _dbg_titles = []
+            for _r in _dbg_data.get("results", []):
+                _p = _r.get("properties", {})
+                for _pv in _p.values():
+                    if _pv.get("type") == "title":
+                        _t_parts = _pv.get("title", [])
+                        _t_text = "".join(x.get("plain_text", "") for x in _t_parts)
+                        _dbg_titles.append({"title": _t_text, "id": _r["id"]})
+            with st.expander(f"DEBUG: Notion search for '{_dbg_search_title}' — {len(_dbg_data.get('results',[]))} results, has_more={_dbg_data.get('has_more')}"):
+                st.write("Page titles found:")
+                st.json(_dbg_titles)
+
+            # Also test the actual function
+            _dbg_blocks = fetch_dividend_commentary(ticker_input)
+            st.caption(f"DEBUG: fetch_dividend_commentary returned {len(_dbg_blocks)} blocks")
         except Exception as _dbg_e:
             st.caption(f"DEBUG: Search failed — {_dbg_e}")
 # ── END TEMP DEBUG ────────────────────────────────────────────────────────
