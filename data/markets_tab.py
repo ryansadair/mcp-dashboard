@@ -26,6 +26,7 @@ INDICES = [
     ("Russell 1000 Value", "^RLV"),
     ("Russell 1000 Growth","^RLG"),
     ("US Agg Bond",        "AGG"),
+    ("Bitcoin",            "BTC-USD"),
 ]
 
 DIVIDEND_BENCHMARKS = [
@@ -223,13 +224,7 @@ def _render_market_table(items, quotes, show_pct=True, section_label=None):
             from_high_color = "#569542"
         elif pct_from_high != 0:
             from_high_str = f"{pct_from_high:.1f}%"
-            # Gradient: near high = mild, far from high = deep red
-            if pct_from_high >= -5:
-                from_high_color = "rgba(255,255,255,0.5)"
-            elif pct_from_high >= -15:
-                from_high_color = "#C9A84C"
-            else:
-                from_high_color = "#c45454"
+            from_high_color = "#c45454"
         else:
             from_high_str = "—"
             from_high_color = "rgba(255,255,255,0.3)"
