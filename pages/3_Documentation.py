@@ -103,6 +103,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── Header ────────────────────────────────────────────────────────────────
+st.markdown(
+    '<a href="/Dashboard" target="_self" style="display:inline-block;font-size:12px;'
+    'color:#C9A84C;text-decoration:none;margin-bottom:16px;letter-spacing:0.04em;">'
+    '← Back to Dashboard</a>',
+    unsafe_allow_html=True,
+)
 st.markdown('<div class="doc-title">Portfolio Intelligence Dashboard</div>', unsafe_allow_html=True)
 st.markdown('<div class="doc-subtitle">Data sources, calculations, and methodology reference — Martin Capital Partners LLC</div>', unsafe_allow_html=True)
 
