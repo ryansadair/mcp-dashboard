@@ -316,75 +316,62 @@ def _proximity_alerts(tickers, price_data, threshold_pct=5.0):
 # RENDERING
 # ══════════════════════════════════════════════════════════════════════════
 
-def _render_alert_card(alert):
-    """Render a single alert as a styled HTML card."""
-    sev = SEVERITY_STYLES.get(alert["severity"], SEVERITY_STYLES["info"])
+def _render_alert_row(alert):
+    """Render a single alert as a clean table-style row."""
+    # Ticker color: subtle gold for recognition, not severity-based
+    ticker = alert.get("ticker", "")
+    title = alert["title"]
+    detail = alert["detail"]
+    atype = alert.get("type", "")
+
+    # Type label styling — all muted
+    type_labels = {
+        "price": "PRICE",
+        "dividend": "DIVIDEND",
+        "earnings": "EARNINGS",
+        "52w": "52-WEEK",
+    }
+    type_str = type_labels.get(atype, atype.upper())
+
     return (
-        f'<div style="padding:12px 14px;margin-bottom:8px;border-radius:8px;'
-        f'background:{sev["bg"]};border-left:3px solid {sev["dot"]};">'
-        f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
-        f'<div>'
-        f'<div style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.85);">'
-        f'{sev["icon"]} {alert["title"]}</div>'
-        f'<div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:3px;">'
-        f'{alert["detail"]}</div>'
-        f'</div>'
-        f'<div style="font-size:10px;color:rgba(255,255,255,0.25);text-transform:uppercase;'
-        f'letter-spacing:0.06em;white-space:nowrap;margin-left:12px;">'
-        f'{alert["type"]}</div>'
-        f'</div>'
-        f'</div>'
+        f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">'
+        f'<td style="padding:9px 10px;font-size:12px;font-weight:600;color:#C9A84C;'
+        f'white-space:nowrap;vertical-align:top;width:60px;">{ticker}</td>'
+        f'<td style="padding:9px 10px;vertical-align:top;">'
+        f'<div style="font-size:13px;color:rgba(255,255,255,0.8);line-height:1.4;">{title}</div>'
+        f'<div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:2px;">{detail}</div>'
+        f'</td>'
+        f'<td style="padding:9px 10px;font-size:10px;color:rgba(255,255,255,0.2);'
+        f'text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap;'
+        f'vertical-align:top;text-align:right;width:70px;">{type_str}</td>'
+        f'</tr>'
     )
 
 
 def _render_alert_section(title, alerts):
-    """Render a section header + list of alerts."""
+    """Render a section header + table of alerts."""
     if not alerts:
         return
 
     st.markdown(
-        f'<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
-        f'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
-        f'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
+        f'<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);'
+        f'text-transform:uppercase;letter-spacing:0.08em;padding:18px 0 8px;'
+        f'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:0">'
         f'{title}'
-        f'<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.3);'
+        f'<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.2);'
         f'margin-left:8px;">{len(alerts)}</span>'
         f'</div>',
         unsafe_allow_html=True,
     )
 
-    # Render each alert individually to avoid HTML size limits
-    for alert in alerts:
-        st.markdown(_render_alert_card(alert), unsafe_allow_html=True)
-
-
-def _render_summary_bar(all_alerts):
-    """Render a summary bar with alert counts by severity."""
-    counts = {"critical": 0, "warning": 0, "positive": 0, "info": 0}
-    for a in all_alerts:
-        counts[a["severity"]] = counts.get(a["severity"], 0) + 1
-
-    parts = []
-    for sev, count in counts.items():
-        if count > 0:
-            s = SEVERITY_STYLES[sev]
-            parts.append(
-                f'<div style="display:flex;align-items:center;gap:6px;'
-                f'padding:8px 14px;border-radius:6px;background:{s["bg"]};'
-                f'border:1px solid {s["border"]};">'
-                f'<span style="font-size:16px;">{s["icon"]}</span>'
-                f'<span style="font-size:18px;font-weight:700;font-family:\'DM Serif Display\',serif;'
-                f'color:rgba(255,255,255,0.9);">{count}</span>'
-                f'<span style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;'
-                f'letter-spacing:0.06em;">{sev}</span>'
-                f'</div>'
-            )
-
-    if parts:
-        st.markdown(
-            f'<div style="display:flex;gap:12px;margin-bottom:16px;">{"".join(parts)}</div>',
-            unsafe_allow_html=True,
-        )
+    # Render as a clean table
+    rows = "".join(_render_alert_row(a) for a in alerts)
+    html = (
+        f'<table style="width:100%;border-collapse:collapse;">'
+        f'<tbody>{rows}</tbody>'
+        f'</table>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -469,9 +456,9 @@ def _render_news_section():
     headlines = _fetch_news_headlines()
 
     st.markdown(
-        '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
-        'text-transform:uppercase;letter-spacing:0.06em;padding:0 0 8px;'
-        'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
+        '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);'
+        'text-transform:uppercase;letter-spacing:0.08em;padding:0 0 8px;'
+        'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:0">'
         'Market Headlines'
         '</div>',
         unsafe_allow_html=True,
@@ -479,40 +466,42 @@ def _render_news_section():
 
     if not headlines:
         st.markdown(
-            '<div style="font-size:12px;color:rgba(255,255,255,0.35);padding:12px 0;">'
-            'Unable to load news feeds. Check that <code>feedparser</code> is in requirements.txt.'
+            '<div style="font-size:12px;color:rgba(255,255,255,0.3);padding:12px 0;">'
+            'Unable to load news feeds. Ensure <code>feedparser</code> is in requirements.txt.'
             '</div>',
             unsafe_allow_html=True,
         )
         return
 
-    # Render headlines as compact cards
+    # Render as a clean table — same structure as alerts
+    rows = ""
     for h in headlines:
-        src_color = h.get("source_color", "rgba(255,255,255,0.3)")
-        html = (
-            f'<div style="padding:10px 14px;margin-bottom:6px;border-radius:6px;'
-            f'background:rgba(255,255,255,0.02);border-left:3px solid {src_color};'
-            f'display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">'
-            f'<div style="flex:1;min-width:0;">'
+        rows += (
+            f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">'
+            f'<td style="padding:9px 10px;vertical-align:top;">'
             f'<a href="{h["link"]}" target="_blank" rel="noopener" style="'
-            f'font-size:13px;font-weight:500;color:rgba(255,255,255,0.82);'
-            f'text-decoration:none;line-height:1.4;display:block;'
-            f'overflow:hidden;text-overflow:ellipsis;">{h["title"]}</a>'
-            f'</div>'
-            f'<div style="display:flex;flex-direction:column;align-items:flex-end;'
-            f'flex-shrink:0;gap:2px;">'
-            f'<span style="font-size:10px;font-weight:600;color:{src_color};'
-            f'text-transform:uppercase;letter-spacing:0.04em;">{h["source"]}</span>'
-            f'<span style="font-size:10px;color:rgba(255,255,255,0.25);">'
-            f'{h["published"]}</span>'
-            f'</div>'
-            f'</div>'
+            f'font-size:13px;color:rgba(255,255,255,0.8);text-decoration:none;'
+            f'line-height:1.4;">{h["title"]}</a>'
+            f'</td>'
+            f'<td style="padding:9px 10px;text-align:right;vertical-align:top;'
+            f'white-space:nowrap;width:110px;">'
+            f'<div style="font-size:10px;color:rgba(255,255,255,0.25);'
+            f'text-transform:uppercase;letter-spacing:0.04em;">{h["source"]}</div>'
+            f'<div style="font-size:10px;color:rgba(255,255,255,0.15);margin-top:1px;">'
+            f'{h["published"]}</div>'
+            f'</td>'
+            f'</tr>'
         )
-        st.markdown(html, unsafe_allow_html=True)
+
+    html = (
+        f'<table style="width:100%;border-collapse:collapse;">'
+        f'<tbody>{rows}</tbody>'
+        f'</table>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
 
     st.markdown(
-        '<div style="height:12px;border-bottom:1px solid rgba(255,255,255,0.04);'
-        'margin-bottom:12px;"></div>',
+        '<div style="height:8px;"></div>',
         unsafe_allow_html=True,
     )
 
@@ -523,32 +512,17 @@ def _render_news_section():
 
 def render_alerts_tab(tamarac_parsed, active_strategy):
     """
-    Render the full Alerts & Activity tab.
+    Render the full News & Alerts tab.
 
     Args:
         tamarac_parsed: dict from parse_tamarac_excel()
         active_strategy: str, e.g. "QDVD"
     """
 
-    st.markdown(
-        '<div style="font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:12px">'
-        'Market news · portfolio alerts · computed from RSS feeds + Supabase data'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
     # ── News Headlines (top section) ─────────────────────────────────────
     _render_news_section()
 
     # ── Portfolio Alerts (bottom section) ─────────────────────────────────
-    st.markdown(
-        '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
-        'text-transform:uppercase;letter-spacing:0.06em;padding:0 0 8px;'
-        'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
-        'Portfolio Alerts'
-        '</div>',
-        unsafe_allow_html=True,
-    )
 
     # ── Scope selector ────────────────────────────────────────────────────
     scope = st.radio(
@@ -572,7 +546,7 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
         scope_label = STRATEGY_NAMES.get(active_strategy, active_strategy)
 
     # ── Fetch data ────────────────────────────────────────────────────────
-    with st.spinner(f"Scanning {len(tickers)} holdings for alerts..."):
+    with st.spinner(f"Scanning {len(tickers)} holdings..."):
         price_data = fetch_batch_prices(tuple(tickers))
 
         div_data = {}
@@ -587,20 +561,30 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
 
     all_alerts = price_alerts + div_alerts + earnings_alerts + proximity_alerts
 
-    # ── Summary bar ───────────────────────────────────────────────────────
+    # ── Section header with count ─────────────────────────────────────────
     st.markdown(
-        f"**{len(all_alerts)} alerts** across {len(tickers)} holdings in {scope_label}",
+        f'<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);'
+        f'text-transform:uppercase;letter-spacing:0.08em;padding:0 0 8px;'
+        f'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:0">'
+        f'Portfolio Alerts'
+        f'<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.2);'
+        f'margin-left:8px;">{len(all_alerts)} across {len(tickers)} holdings in {scope_label}</span>'
+        f'</div>',
+        unsafe_allow_html=True,
     )
-    _render_summary_bar(all_alerts)
 
     if not all_alerts:
-        st.success("✅ No alerts — all holdings within normal ranges.")
-        st.caption(f"Checked: ±2% price moves, ex-dividend dates, earnings dates, 52-week proximity")
+        st.markdown(
+            '<div style="padding:16px 0;font-size:13px;color:rgba(255,255,255,0.35);">'
+            'No alerts — all holdings within normal ranges.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         return
 
     # ── Render sections ───────────────────────────────────────────────────
     if price_alerts:
-        _render_alert_section("Price Movers (±2%+ Today)", price_alerts)
+        _render_alert_section("Price Movers", price_alerts)
 
     if div_alerts:
         _render_alert_section("Dividend Events", div_alerts)
@@ -613,6 +597,6 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
 
     # ── Footer ────────────────────────────────────────────────────────────
     st.caption(
-        f"Alerts computed live from Supabase · {len(tickers)} tickers · "
+        f"News: RSS feeds (15-min cache) · Alerts: Supabase + yfinance · "
         f"{datetime.now().strftime('%I:%M %p')}"
     )

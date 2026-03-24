@@ -1046,7 +1046,6 @@ with tab_markets:
 # NEWS & ALERTS
 # ══════════════════════════════════════════════════════════════════════════
 with tab_alerts:
-    _render_strategy_header("alerts")
     if ALERTS_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed:
         render_alerts_tab(tamarac_parsed, active)
     elif not ALERTS_AVAILABLE:
