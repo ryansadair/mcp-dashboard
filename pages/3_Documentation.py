@@ -8,12 +8,19 @@ and linked in the dashboard footer.
 """
 
 import streamlit as st
+from utils.auth import check_password
+from utils.styles import inject_global_css
 
 st.set_page_config(
     page_title="Documentation — Martin Capital",
     page_icon="📖",
     layout="wide",
 )
+
+if not check_password():
+    st.stop()
+
+inject_global_css()
 
 # ── Branding ──────────────────────────────────────────────────────────────
 st.markdown("""
