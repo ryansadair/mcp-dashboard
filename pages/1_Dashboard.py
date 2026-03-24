@@ -1066,8 +1066,9 @@ st.markdown(
     "<span>Data: yfinance · FRED · Notion · Finviz</span>"
     "<span style='opacity:0.3;'>|</span>"
     "<span>Internal use only</span>"
-    "<span style='opacity:0.3;'>|</span>"
-    "<a href='/Documentation' target='_self' style='color:rgba(201,168,76,0.5);text-decoration:none;'>Documentation</a>"
     "</div>",
     unsafe_allow_html=True
 )
+_fc1, _fc2, _fc3 = st.columns([2, 1, 2])
+with _fc2:
+    st.page_link("pages/3_Documentation.py", label="Documentation", icon="📖")
