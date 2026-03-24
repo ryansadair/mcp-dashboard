@@ -1069,40 +1069,43 @@ st.markdown(
     "</div>",
     unsafe_allow_html=True
 )
-# Minimal page_link styled to blend with footer
+# Documentation link — styled button that looks like footer text
 st.markdown("""
 <style>
-    /* Target the last page_link in the page — the footer Documentation link */
-    [data-testid="stPageLink-nav"]:last-of-type {
-        text-align: center;
-        margin-top: -12px;
-        margin-bottom: 8px;
+    div.footer-doc-link {
+        display: flex;
+        justify-content: center;
+        margin-top: -8px;
     }
-    [data-testid="stPageLink-nav"]:last-of-type a {
-        font-size: 11px !important;
-        color: rgba(201,168,76,0.5) !important;
+    div.footer-doc-link + div button {
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
-        padding: 0 4px !important;
-        text-decoration: none !important;
+        color: rgba(201,168,76,0.5) !important;
+        font-size: 11px !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        height: auto !important;
         font-weight: 400 !important;
     }
-    [data-testid="stPageLink-nav"]:last-of-type a:hover {
+    div.footer-doc-link + div button:hover {
         color: rgba(201,168,76,0.8) !important;
         background: transparent !important;
+        border: none !important;
     }
-    [data-testid="stPageLink-nav"]:last-of-type a p {
+    div.footer-doc-link + div button p {
         font-size: 11px !important;
         color: rgba(201,168,76,0.5) !important;
     }
-    [data-testid="stPageLink-nav"]:last-of-type a:hover p {
+    div.footer-doc-link + div button:hover p {
         color: rgba(201,168,76,0.8) !important;
     }
-    [data-testid="stPageLink-nav"]:last-of-type a svg,
-    [data-testid="stPageLink-nav"]:last-of-type a img {
-        display: none !important;
+    div.footer-doc-link + div {
+        display: flex;
+        justify-content: center;
     }
 </style>
+<div class="footer-doc-link"></div>
 """, unsafe_allow_html=True)
-st.page_link("pages/3_Documentation.py", label="Documentation")
+if st.button("Documentation", key="footer_docs_btn"):
+    st.switch_page("pages/3_Documentation.py")
