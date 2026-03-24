@@ -36,7 +36,7 @@ def render_header():
             <img class="mcp-logo" src="data:image/png;base64,{logo_b64}" style="width:40px;height:40px;border-radius:8px;object-fit:contain;flex-shrink:0;"/>
             <div style="min-width:0;">
                 <div class="mcp-firm-name" style="font-size:16px;font-weight:700;letter-spacing:0.12em;color:#fff;white-space:nowrap;">MARTIN CAPITAL PARTNERS</div>
-                <div class="mcp-firm-sub" style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:0.06em;margin-top:1px;">Portfolio Intelligence</div>
+                <div class="mcp-firm-sub" style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:0.06em;margin-top:1px;">Portfolio Dashboard</div>
             </div>
         </div>
         <div class="mcp-header-right" style="text-align:right;">
