@@ -672,10 +672,10 @@ if not hist.empty:
         height=350,
         hovermode="x unified",
         yaxis_title="Price ($)",
-        xaxis=dict(fixedrange=True, **_SPIKE),
-        yaxis=dict(fixedrange=True, **_SPIKE),
         dragmode=False,
     )
+    fig_price.update_xaxes(fixedrange=True, **_SPIKE)
+    fig_price.update_yaxes(fixedrange=True, **_SPIKE)
     st.plotly_chart(fig_price, use_container_width=True, config=PLOTLY_CONFIG)
 else:
     st.info("No price history available.")
@@ -977,10 +977,10 @@ if not financials.empty:
                     barmode="group",
                     showlegend=True,
                     hovermode="x unified",
-                    xaxis=dict(fixedrange=True, **_SPIKE),
-                    yaxis=dict(fixedrange=True),
                     dragmode=False,
                 )
+                fig_fin.update_xaxes(fixedrange=True, **_SPIKE)
+                fig_fin.update_yaxes(fixedrange=True)
                 st.plotly_chart(fig_fin, use_container_width=True, config=PLOTLY_CONFIG)
 
             with col_margin:
@@ -1278,10 +1278,10 @@ if annual_divs is not None and len(annual_divs) >= 2:
         yaxis_title="$/Share",
         showlegend=False,
         hovermode="x unified",
-        xaxis=dict(fixedrange=True, **_SPIKE),
-        yaxis=dict(fixedrange=True),
         dragmode=False,
     )
+    fig_div.update_xaxes(fixedrange=True, **_SPIKE)
+    fig_div.update_yaxes(fixedrange=True)
     st.plotly_chart(fig_div, use_container_width=True, config=PLOTLY_CONFIG)
 
     # ── Year-over-Year Growth Table (newest to oldest) ────────────────────
