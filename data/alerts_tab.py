@@ -524,26 +524,8 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
 
     # ── Portfolio Alerts (bottom section) ─────────────────────────────────
 
-    # ── Scope selector ────────────────────────────────────────────────────
-    scope = st.radio(
-        "Alert scope",
-        ["Current strategy", "All strategies"],
-        horizontal=True,
-        key="alerts_scope",
-        label_visibility="collapsed",
-    )
-
-    # ── Gather tickers ────────────────────────────────────────────────────
-    if scope == "All strategies":
-        tickers = sorted(get_all_unique_tickers(tamarac_parsed))
-        scope_label = "all strategies"
-    else:
-        tam_df = get_holdings_for_strategy(tamarac_parsed, active_strategy)
-        if tam_df.empty:
-            st.info("No holdings for this strategy in Tamarac file.")
-            return
-        tickers = tam_df["symbol"].tolist()
-        scope_label = STRATEGY_NAMES.get(active_strategy, active_strategy)
+    # ── Gather tickers (all strategies) ───────────────────────────────────
+    tickers = sorted(get_all_unique_tickers(tamarac_parsed))
 
     # ── Fetch data ────────────────────────────────────────────────────────
     with st.spinner(f"Scanning {len(tickers)} holdings..."):
@@ -568,7 +550,7 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
         f'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:0">'
         f'Portfolio Alerts'
         f'<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.2);'
-        f'margin-left:8px;">{len(all_alerts)} across {len(tickers)} holdings in {scope_label}</span>'
+        f'margin-left:8px;">{len(all_alerts)} across {len(tickers)} holdings</span>'
         f'</div>',
         unsafe_allow_html=True,
     )
