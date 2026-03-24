@@ -551,54 +551,26 @@ def render_macro_tab(qdvd_yield=None):
             curve_color_s = "#569542" if spread_bp > 0 else "#c45454"
             sentiment_items.append(("Yield Curve", f"{curve_label_s} ({spread_bp:+d}bp)", curve_color_s))
 
-        for name, val, color in sentiment_items:
-            st.markdown(f'''
-            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
-                        border-radius:8px;padding:12px 16px;margin-bottom:6px;
-                        display:flex;justify-content:space-between;align-items:center">
-                <span style="font-size:13px;color:rgba(255,255,255,0.6)">{name}</span>
-                <span style="font-size:16px;font-weight:700;font-family:'DM Serif Display',serif;
-                             color:{color}">{val}</span>
-            </div>
-            ''', unsafe_allow_html=True)
+        # Render all sentiment items as a single card to match Dividend Context height
+        sent_rows_html = ""
+        for i, (name, val, color) in enumerate(sentiment_items):
+            border = "border-bottom:1px solid rgba(255,255,255,0.04);" if i < len(sentiment_items) - 1 else ""
+            sent_rows_html += (
+                f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                f'padding:16px 0;{border}">'
+                f'<span style="font-size:13px;color:rgba(255,255,255,0.6)">{name}</span>'
+                f'<span style="font-size:16px;font-weight:700;font-family:\'DM Serif Display\',serif;'
+                f'color:{color}">{val}</span>'
+                f'</div>'
+            )
 
-        # ── Fear & Greed Gauge ────────────────────────────────────────────
-        fg_score, fg_components = _compute_fear_greed()
-        if fg_score is not None:
-            fg_label, fg_color = _fear_greed_label(fg_score)
-
-            # Needle position as percentage
-            needle_pct = max(0, min(100, fg_score))
-
-            # Build component breakdown string
-            comp_str = " · ".join(f"{name} {score}" for name, score in fg_components)
-
-            st.markdown(f'''
-            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
-                        border-radius:8px;padding:14px 16px;margin-top:6px">
-                <div style="display:flex;justify-content:space-between;align-items:baseline;
-                            margin-bottom:10px">
-                    <span style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
-                                 letter-spacing:0.06em">Fear & Greed</span>
-                    <span style="font-size:20px;font-weight:700;font-family:'DM Serif Display',serif;
-                                 color:{fg_color}">{fg_score}</span>
-                </div>
-                <div style="position:relative;height:8px;border-radius:4px;
-                            background:linear-gradient(to right, #c45454, #C9A84C 45%, #C9A84C 55%, #569542);
-                            margin-bottom:6px">
-                    <div style="position:absolute;top:-3px;left:{needle_pct}%;
-                                transform:translateX(-50%);width:3px;height:14px;
-                                background:rgba(255,255,255,0.9);border-radius:2px"></div>
-                </div>
-                <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-                    <span style="font-size:9px;color:rgba(255,255,255,0.2)">Fear</span>
-                    <span style="font-size:11px;font-weight:600;color:{fg_color}">{fg_label}</span>
-                    <span style="font-size:9px;color:rgba(255,255,255,0.2)">Greed</span>
-                </div>
-                <div style="font-size:9px;color:rgba(255,255,255,0.2);line-height:1.5">
-                    {comp_str}</div>
-            </div>
-            ''', unsafe_allow_html=True)
+        st.markdown(f'''
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+                    border-radius:8px;padding:4px 16px;min-height:180px;
+                    display:flex;flex-direction:column;justify-content:center">
+            {sent_rows_html}
+        </div>
+        ''', unsafe_allow_html=True)
 
     with col_fed:
         st.markdown("**Fed Meeting Calendar**")
@@ -631,6 +603,46 @@ def render_macro_tab(qdvd_yield=None):
             </div>
             ''')
         st.markdown("".join(fed_html), unsafe_allow_html=True)
+
+    # ── Fear & Greed Gauge — spans Dividend Context + Sentiment width ─────
+    fg_score, fg_components = _compute_fear_greed()
+    if fg_score is not None:
+        fg_label, fg_color = _fear_greed_label(fg_score)
+        needle_pct = max(0, min(100, fg_score))
+        comp_str = " · ".join(f"{name} {score}" for name, score in fg_components)
+
+        col_fg, col_fg_spacer = st.columns([3, 1])
+        with col_fg:
+            st.markdown(f'''
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+                        border-radius:8px;padding:16px 20px;margin-top:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;
+                            margin-bottom:12px">
+                    <span style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);
+                                 text-transform:uppercase;letter-spacing:0.08em">Fear & Greed Index</span>
+                    <div style="display:flex;align-items:baseline;gap:10px">
+                        <span style="font-size:13px;font-weight:600;color:{fg_color}">{fg_label}</span>
+                        <span style="font-size:24px;font-weight:700;font-family:'DM Serif Display',serif;
+                                     color:{fg_color}">{fg_score}</span>
+                    </div>
+                </div>
+                <div style="position:relative;height:10px;border-radius:5px;
+                            background:linear-gradient(to right, #c45454 0%, #C9A84C 40%, #C9A84C 60%, #569542 100%);
+                            margin-bottom:8px">
+                    <div style="position:absolute;top:-4px;left:{needle_pct}%;
+                                transform:translateX(-50%);width:4px;height:18px;
+                                background:rgba(255,255,255,0.95);border-radius:2px;
+                                box-shadow:0 0 4px rgba(0,0,0,0.4)"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                    <span style="font-size:10px;color:rgba(255,255,255,0.2)">Extreme Fear</span>
+                    <span style="font-size:10px;color:rgba(255,255,255,0.2)">Neutral</span>
+                    <span style="font-size:10px;color:rgba(255,255,255,0.2)">Extreme Greed</span>
+                </div>
+                <div style="font-size:10px;color:rgba(255,255,255,0.2);margin-top:8px;
+                            text-align:center">{comp_str}</div>
+            </div>
+            ''', unsafe_allow_html=True)
 
     # ── Economic Indicators ────────────────────────────────────────────────
     st.markdown(
