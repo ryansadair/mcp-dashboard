@@ -545,9 +545,9 @@ def render_macro_tab(qdvd_yield=None):
     col_left_panel, col_fed = st.columns([3, 1])
 
     with col_left_panel:
+        # Part 1: Dividend Context + Sentiment (two-column grid)
         st.markdown(f'''
         <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
-            <!-- Dividend Context (left) -->
             <div>
                 <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);
                             text-transform:uppercase;letter-spacing:0.06em;padding:0 0 8px;
@@ -587,7 +587,6 @@ def render_macro_tab(qdvd_yield=None):
                     </div>
                 </div>
             </div>
-            <!-- Sentiment (right) -->
             <div>
                 <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);
                             text-transform:uppercase;letter-spacing:0.06em;padding:0 0 8px;
@@ -599,12 +598,16 @@ def render_macro_tab(qdvd_yield=None):
                     {sent_rows_html}
                 </div>
             </div>
-            <!-- Fear & Greed (spans both columns) -->
-            <div style="grid-column:1 / -1;margin-top:4px">
-                {fg_html}
-            </div>
         </div>
         ''', unsafe_allow_html=True)
+
+        # Part 2: Fear & Greed (separate call to stay under Streamlit HTML size limit)
+        if fg_html:
+            st.markdown(f'''
+            <div style="margin-top:12px">
+                {fg_html}
+            </div>
+            ''', unsafe_allow_html=True)
 
     with col_fed:
         st.markdown("**Fed Meeting Calendar**")
