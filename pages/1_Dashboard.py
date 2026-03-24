@@ -1069,43 +1069,9 @@ st.markdown(
     "</div>",
     unsafe_allow_html=True
 )
-# Documentation link — styled button that looks like footer text
-st.markdown("""
-<style>
-    div.footer-doc-link {
-        display: flex;
-        justify-content: center;
-        margin-top: -8px;
-    }
-    div.footer-doc-link + div button {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        color: rgba(201,168,76,0.5) !important;
-        font-size: 11px !important;
-        padding: 0 !important;
-        min-height: 0 !important;
-        height: auto !important;
-        font-weight: 400 !important;
-    }
-    div.footer-doc-link + div button:hover {
-        color: rgba(201,168,76,0.8) !important;
-        background: transparent !important;
-        border: none !important;
-    }
-    div.footer-doc-link + div button p {
-        font-size: 11px !important;
-        color: rgba(201,168,76,0.5) !important;
-    }
-    div.footer-doc-link + div button:hover p {
-        color: rgba(201,168,76,0.8) !important;
-    }
-    div.footer-doc-link + div {
-        display: flex;
-        justify-content: center;
-    }
-</style>
-<div class="footer-doc-link"></div>
-""", unsafe_allow_html=True)
-if st.button("Documentation", key="footer_docs_btn"):
-    st.switch_page("pages/3_Documentation.py")
+# Documentation link — centered below footer
+st.markdown("<div style='margin-top:-16px'></div>", unsafe_allow_html=True)
+_doc_l, _doc_c, _doc_r = st.columns([5, 1, 5])
+with _doc_c:
+    if st.button("Documentation", key="footer_docs_btn"):
+        st.switch_page("pages/3_Documentation.py")
