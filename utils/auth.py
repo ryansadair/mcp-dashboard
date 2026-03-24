@@ -40,7 +40,7 @@ def check_password() -> bool:
                 MARTIN CAPITAL PARTNERS
             </div>
             <div style="font-size:12px;color:rgba(255,255,255,0.4);letter-spacing:0.06em;margin-top:4px;">
-                Portfolio Intelligence
+                Portfolio Dashboard
             </div>
         </div>
         """, unsafe_allow_html=True)
