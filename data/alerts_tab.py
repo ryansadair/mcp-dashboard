@@ -83,11 +83,12 @@ def _price_mover_alerts(tickers, price_data, threshold=2.0):
         if abs(chg) >= threshold:
             direction = "up" if chg > 0 else "down"
             severity = "positive" if chg > 0 else "warning" if chg > -5 else "critical"
+            chg_color = "#569542" if chg > 0 else "#c45454"
             alerts.append({
                 "type": "price",
                 "severity": severity,
                 "ticker": ticker,
-                "title": f"{ticker} {'▲' if chg > 0 else '▼'} {chg:+.2f}%",
+                "title": f"{ticker} {'▲' if chg > 0 else '▼'} <span style='color:{chg_color}'>{chg:+.2f}%</span>",
                 "detail": f"{name} — ${price:.2f}",
                 "value": chg,
                 "sort_key": abs(chg),
@@ -162,7 +163,7 @@ def _dividend_alerts(tickers, price_data, div_data):
                 "type": "dividend",
                 "severity": "positive",
                 "ticker": ticker,
-                "title": f"{ticker} dividend grew {growth_1y:+.1f}% (1Y)",
+                "title": f"{ticker} dividend grew <span style='color:#569542'>{growth_1y:+.1f}%</span> (1Y)",
                 "detail": f"{name} — strong dividend growth ({_source})",
                 "value": growth_1y,
                 "sort_key": 100 - growth_1y,
@@ -173,7 +174,7 @@ def _dividend_alerts(tickers, price_data, div_data):
                 "type": "dividend",
                 "severity": "critical",
                 "ticker": ticker,
-                "title": f"{ticker} dividend declined {growth_1y:+.1f}% (1Y)",
+                "title": f"{ticker} dividend declined <span style='color:#c45454'>{growth_1y:+.1f}%</span> (1Y)",
                 "detail": f"{name} — potential dividend cut ({_source})",
                 "value": growth_1y,
                 "sort_key": 0,
@@ -184,7 +185,7 @@ def _dividend_alerts(tickers, price_data, div_data):
                 "type": "dividend",
                 "severity": "warning",
                 "ticker": ticker,
-                "title": f"{ticker} dividend may have declined {growth_1y:+.1f}% (1Y)",
+                "title": f"{ticker} dividend may have declined <span style='color:#c45454'>{growth_1y:+.1f}%</span> (1Y)",
                 "detail": f"{name} — verify manually (may be ADR FX effect or special div drop)",
                 "value": growth_1y,
                 "sort_key": 1,
@@ -292,7 +293,7 @@ def _proximity_alerts(tickers, price_data, threshold_pct=5.0):
                 "type": "52w",
                 "severity": "positive",
                 "ticker": ticker,
-                "title": f"{ticker} near 52-week high ({pct_from_hi:+.1f}%)",
+                "title": f"{ticker} near 52-week high (<span style='color:#569542'>{pct_from_hi:+.1f}%</span>)",
                 "detail": f"{name} — ${price:.2f} vs high ${hi:.2f}",
                 "value": pct_from_hi,
                 "sort_key": abs(pct_from_hi),
@@ -302,7 +303,7 @@ def _proximity_alerts(tickers, price_data, threshold_pct=5.0):
                 "type": "52w",
                 "severity": "warning",
                 "ticker": ticker,
-                "title": f"{ticker} near 52-week low (+{pct_from_lo:.1f}% from low)",
+                "title": f"{ticker} near 52-week low (<span style='color:#c45454'>+{pct_from_lo:.1f}%</span> from low)",
                 "detail": f"{name} — ${price:.2f} vs low ${lo:.2f}",
                 "value": pct_from_lo,
                 "sort_key": pct_from_lo,
