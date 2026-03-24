@@ -611,11 +611,14 @@ def render_macro_tab(qdvd_yield=None):
         needle_pct = max(0, min(100, fg_score))
         comp_str = " · ".join(f"{name} {score}" for name, score in fg_components)
 
+        # Pull up to close the Streamlit column gap
+        st.markdown('<div style="margin-top:-1rem"></div>', unsafe_allow_html=True)
+
         col_fg, col_fg_spacer = st.columns([3, 1])
         with col_fg:
             st.markdown(f'''
             <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
-                        border-radius:8px;padding:16px 20px;margin-top:8px">
+                        border-radius:8px;padding:16px 20px">
                 <div style="display:flex;justify-content:space-between;align-items:center;
                             margin-bottom:12px">
                     <span style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);
