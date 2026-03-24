@@ -513,7 +513,41 @@ def render_macro_tab(qdvd_yield=None):
     with col_left_panel:
         # Part 1: Dividend Context + Sentiment (two-column grid)
         st.markdown(f'''
-        <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
+        <style>
+            .mcp-ctx-grid {{
+                display: grid;
+                grid-template-columns: 2fr 1fr;
+                gap: 12px;
+            }}
+            .mcp-ctx-sub {{
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }}
+            .mcp-sent-card {{
+                background: rgba(255,255,255,0.02);
+                border: 1px solid rgba(255,255,255,0.05);
+                border-radius: 8px;
+                padding: 4px 16px;
+                height: calc(100% - 40px);
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }}
+            @media (max-width: 640px) {{
+                .mcp-ctx-grid {{
+                    grid-template-columns: 1fr;
+                }}
+                .mcp-ctx-sub {{
+                    grid-template-columns: 1fr;
+                }}
+                .mcp-sent-card {{
+                    height: auto;
+                    padding: 8px 16px;
+                }}
+            }}
+        </style>
+        <div class="mcp-ctx-grid">
             <div>
                 <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);
                             text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;
@@ -532,7 +566,7 @@ def render_macro_tab(qdvd_yield=None):
                     <div style="font-size:11px;color:rgba(255,255,255,0.30);margin-top:4px">
                         QDVD yield premium supports quality dividend positioning</div>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div class="mcp-ctx-sub">
                     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
                                 border-radius:8px;padding:14px 16px">
                         <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
@@ -558,9 +592,7 @@ def render_macro_tab(qdvd_yield=None):
                             text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;
                             border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">
                     Sentiment</div>
-                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
-                            border-radius:8px;padding:4px 16px;height:calc(100% - 40px);
-                            display:flex;flex-direction:column;justify-content:center">
+                <div class="mcp-sent-card">
                     {sent_rows_html}
                 </div>
             </div>
