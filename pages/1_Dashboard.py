@@ -1069,25 +1069,38 @@ st.markdown(
     "</div>",
     unsafe_allow_html=True
 )
-# Style the page_link to look like a subtle footer link
+# Minimal page_link styled to blend with footer
 st.markdown("""
 <style>
-    div[data-testid="stPageLink-nav"] {
-        display: flex;
-        justify-content: center;
+    /* Target the last page_link in the page — the footer Documentation link */
+    [data-testid="stPageLink-nav"]:last-of-type {
+        text-align: center;
+        margin-top: -12px;
+        margin-bottom: 8px;
     }
-    div[data-testid="stPageLink-nav"] a {
+    [data-testid="stPageLink-nav"]:last-of-type a {
         font-size: 11px !important;
         color: rgba(201,168,76,0.5) !important;
-        background: none !important;
+        background: transparent !important;
         border: none !important;
-        padding: 0 !important;
-        margin-top: -8px !important;
+        box-shadow: none !important;
+        padding: 0 4px !important;
+        text-decoration: none !important;
+        font-weight: 400 !important;
     }
-    div[data-testid="stPageLink-nav"] a:hover {
+    [data-testid="stPageLink-nav"]:last-of-type a:hover {
+        color: rgba(201,168,76,0.8) !important;
+        background: transparent !important;
+    }
+    [data-testid="stPageLink-nav"]:last-of-type a p {
+        font-size: 11px !important;
+        color: rgba(201,168,76,0.5) !important;
+    }
+    [data-testid="stPageLink-nav"]:last-of-type a:hover p {
         color: rgba(201,168,76,0.8) !important;
     }
-    div[data-testid="stPageLink-nav"] a svg {
+    [data-testid="stPageLink-nav"]:last-of-type a svg,
+    [data-testid="stPageLink-nav"]:last-of-type a img {
         display: none !important;
     }
 </style>
