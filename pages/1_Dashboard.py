@@ -1071,7 +1071,5 @@ st.markdown(
 )
 # Documentation link — centered below footer
 st.markdown("<div style='margin-top:-16px'></div>", unsafe_allow_html=True)
-_doc_l, _doc_c, _doc_r = st.columns([2, 1, 2])
-with _doc_c:
-    if st.button("Documentation", key="footer_docs_btn"):
-        st.switch_page("pages/3_Documentation.py")
+if st.button("Documentation", key="footer_docs_btn", use_container_width=True):
+    st.switch_page("pages/3_Documentation.py")
