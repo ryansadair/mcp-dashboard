@@ -119,6 +119,108 @@ def _yf_sp500_metrics():
 
 # ── FRED Series IDs ────────────────────────────────────────────────────────
 
+# ── Fear & Greed Composite ────────────────────────────────────────────────
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _compute_fear_greed():
+    """
+    Compute a 0-100 Fear & Greed composite from available data.
+    0 = Extreme Fear, 50 = Neutral, 100 = Extreme Greed.
+
+    Components (equally weighted):
+      1. VIX level           — <12 = 100, >35 = 0
+      2. Market momentum     — S&P 500 vs 125-day MA
+      3. UMich Sentiment     — <50 = 0, >100 = 100
+      4. S&P 500 breadth     — RSP (equal-wt) vs SPY ratio as proxy
+    """
+    scores = []
+
+    # 1. VIX — inverse scale
+    try:
+        import yfinance as yf
+        vix = yf.Ticker("^VIX")
+        vix_price = getattr(vix.fast_info, "last_price", None)
+        if vix_price:
+            # Map VIX 10-40 to score 100-0 (clamped)
+            s = max(0, min(100, (40 - vix_price) / 30 * 100))
+            scores.append(("VIX", round(s)))
+    except Exception:
+        pass
+
+    # 2. Market momentum — SPY price vs 125-day SMA
+    try:
+        import yfinance as yf
+        spy = yf.download("SPY", period="7mo", interval="1d", progress=False)
+        if spy is not None and len(spy) >= 125:
+            # Handle both single and multi-level columns
+            close = spy["Close"]
+            if hasattr(close, "columns"):
+                close = close.iloc[:, 0]
+            current = float(close.iloc[-1])
+            sma_125 = float(close.tail(125).mean())
+            if sma_125 > 0:
+                pct_above = ((current / sma_125) - 1) * 100
+                # Map -10% to +10% → 0 to 100
+                s = max(0, min(100, (pct_above + 10) / 20 * 100))
+                scores.append(("Momentum", round(s)))
+    except Exception:
+        pass
+
+    # 3. UMich Sentiment — scale 50-100 to 0-100
+    try:
+        obs = _fred("UMCSENT", limit=3)
+        if obs:
+            um_val = float(obs[0]["value"])
+            s = max(0, min(100, (um_val - 50) / 50 * 100))
+            scores.append(("Sentiment", round(s)))
+    except Exception:
+        pass
+
+    # 4. Breadth proxy — RSP/SPY ratio trend (equal-weight vs cap-weight)
+    try:
+        import yfinance as yf
+        data = yf.download("RSP SPY", period="3mo", interval="1d", progress=False, group_by="ticker")
+        if data is not None and not data.empty:
+            rsp_close = data["RSP"]["Close"]
+            spy_close = data["SPY"]["Close"]
+            if hasattr(rsp_close, "columns"):
+                rsp_close = rsp_close.iloc[:, 0]
+            if hasattr(spy_close, "columns"):
+                spy_close = spy_close.iloc[:, 0]
+            ratio = rsp_close / spy_close
+            ratio = ratio.dropna()
+            if len(ratio) >= 20:
+                current_ratio = float(ratio.iloc[-1])
+                avg_ratio = float(ratio.tail(60).mean())
+                if avg_ratio > 0:
+                    pct_diff = ((current_ratio / avg_ratio) - 1) * 100
+                    # Map -3% to +3% → 0 to 100
+                    s = max(0, min(100, (pct_diff + 3) / 6 * 100))
+                    scores.append(("Breadth", round(s)))
+    except Exception:
+        pass
+
+    if not scores:
+        return None, []
+
+    composite = round(sum(s for _, s in scores) / len(scores))
+    return composite, scores
+
+
+def _fear_greed_label(score):
+    """Return label and color for a Fear & Greed score."""
+    if score is None:
+        return "—", "rgba(255,255,255,0.4)"
+    if score >= 75:
+        return "Extreme Greed", "#569542"
+    if score >= 55:
+        return "Greed", "#569542"
+    if score >= 45:
+        return "Neutral", "#C9A84C"
+    if score >= 25:
+        return "Fear", "#c45454"
+    return "Extreme Fear", "#c45454"
+
 RATES_SERIES = {
     "Fed Funds Rate": "DFEDTARU",       # Fed Funds upper target
     "2-Year Treasury": "DGS2",
@@ -457,6 +559,44 @@ def render_macro_tab(qdvd_yield=None):
                 <span style="font-size:13px;color:rgba(255,255,255,0.6)">{name}</span>
                 <span style="font-size:16px;font-weight:700;font-family:'DM Serif Display',serif;
                              color:{color}">{val}</span>
+            </div>
+            ''', unsafe_allow_html=True)
+
+        # ── Fear & Greed Gauge ────────────────────────────────────────────
+        fg_score, fg_components = _compute_fear_greed()
+        if fg_score is not None:
+            fg_label, fg_color = _fear_greed_label(fg_score)
+
+            # Needle position as percentage
+            needle_pct = max(0, min(100, fg_score))
+
+            # Build component breakdown string
+            comp_str = " · ".join(f"{name} {score}" for name, score in fg_components)
+
+            st.markdown(f'''
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+                        border-radius:8px;padding:14px 16px;margin-top:6px">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;
+                            margin-bottom:10px">
+                    <span style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
+                                 letter-spacing:0.06em">Fear & Greed</span>
+                    <span style="font-size:20px;font-weight:700;font-family:'DM Serif Display',serif;
+                                 color:{fg_color}">{fg_score}</span>
+                </div>
+                <div style="position:relative;height:8px;border-radius:4px;
+                            background:linear-gradient(to right, #c45454, #C9A84C 45%, #C9A84C 55%, #569542);
+                            margin-bottom:6px">
+                    <div style="position:absolute;top:-3px;left:{needle_pct}%;
+                                transform:translateX(-50%);width:3px;height:14px;
+                                background:rgba(255,255,255,0.9);border-radius:2px"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                    <span style="font-size:9px;color:rgba(255,255,255,0.2)">Fear</span>
+                    <span style="font-size:11px;font-weight:600;color:{fg_color}">{fg_label}</span>
+                    <span style="font-size:9px;color:rgba(255,255,255,0.2)">Greed</span>
+                </div>
+                <div style="font-size:9px;color:rgba(255,255,255,0.2);line-height:1.5">
+                    {comp_str}</div>
             </div>
             ''', unsafe_allow_html=True)
 
