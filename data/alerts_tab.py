@@ -1,9 +1,14 @@
 """
-Martin Capital Partners — Alerts & Activity Tab
+Martin Capital Partners — News & Alerts Tab
 data/alerts_tab.py
 
-Computes alerts live from Supabase data (prices + dividends tables).
-No pre-computation needed — reads the latest data each page load.
+Top section: Market news headlines from RSS feeds (CNBC, MarketWatch).
+Bottom section: Portfolio alerts computed live from Supabase data.
+
+News sources (RSS, no API keys needed):
+  - MarketWatch Top Stories
+  - CNBC Top News
+  - CNBC Economy
 
 Alert types:
   1. Price Movers     — holdings with ±2% daily change
@@ -12,6 +17,7 @@ Alert types:
   4. 52-Week Extremes — holdings within 5% of 52-week high or low
 
 Data sources:
+  - RSS feeds via feedparser (cached 15 min)
   - Supabase prices table (change_1d_pct, week52_high, week52_low, price)
   - Supabase dividends table (ex_dividend_date, div_growth_1y, dividend_rate)
   - yfinance earnings dates (fetched live, cached 1hr)
@@ -382,6 +388,136 @@ def _render_summary_bar(all_alerts):
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# NEWS HEADLINES (RSS)
+# ══════════════════════════════════════════════════════════════════════════
+
+# RSS feed sources — free, no API keys, reliable
+_NEWS_FEEDS = [
+    {
+        "name": "MarketWatch",
+        "url": "https://feeds.marketwatch.com/marketwatch/topstories/",
+        "color": GREEN,
+    },
+    {
+        "name": "CNBC",
+        "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+        "color": BLUE,
+    },
+    {
+        "name": "CNBC Economy",
+        "url": "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+        "color": GOLD,
+    },
+]
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _fetch_news_headlines(max_per_feed=5, max_total=12):
+    """
+    Fetch headlines from RSS feeds. Cached 15 min.
+    Returns list of dicts: [{title, link, source, published, source_color}]
+    """
+    try:
+        import feedparser
+    except ImportError:
+        return []
+
+    headlines = []
+
+    for feed_cfg in _NEWS_FEEDS:
+        try:
+            feed = feedparser.parse(feed_cfg["url"])
+            for entry in feed.entries[:max_per_feed]:
+                # Parse published date
+                pub_str = ""
+                if hasattr(entry, "published_parsed") and entry.published_parsed:
+                    try:
+                        from time import mktime
+                        pub_dt = datetime.fromtimestamp(mktime(entry.published_parsed))
+                        # Relative time
+                        delta = datetime.now() - pub_dt
+                        if delta.total_seconds() < 3600:
+                            pub_str = f"{int(delta.total_seconds() / 60)}m ago"
+                        elif delta.total_seconds() < 86400:
+                            pub_str = f"{int(delta.total_seconds() / 3600)}h ago"
+                        else:
+                            pub_str = pub_dt.strftime("%b %d")
+                    except Exception:
+                        pub_str = entry.get("published", "")[:16]
+
+                headlines.append({
+                    "title": entry.get("title", "").strip(),
+                    "link": entry.get("link", ""),
+                    "source": feed_cfg["name"],
+                    "source_color": feed_cfg["color"],
+                    "published": pub_str,
+                    "sort_ts": getattr(entry, "published_parsed", None),
+                })
+        except Exception:
+            continue
+
+    # Sort by publish time (newest first), then cap total
+    headlines.sort(
+        key=lambda h: h.get("sort_ts") or (0, 0, 0, 0, 0, 0, 0, 0, 0),
+        reverse=True,
+    )
+    return headlines[:max_total]
+
+
+def _render_news_section():
+    """Render the news headlines section."""
+    headlines = _fetch_news_headlines()
+
+    st.markdown(
+        '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
+        'text-transform:uppercase;letter-spacing:0.06em;padding:0 0 8px;'
+        'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
+        'Market Headlines'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if not headlines:
+        st.markdown(
+            '<div style="font-size:12px;color:rgba(255,255,255,0.35);padding:12px 0;">'
+            'Unable to load news feeds. Check that <code>feedparser</code> is in requirements.txt.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    # Render headlines as compact cards
+    for h in headlines:
+        src_color = h.get("source_color", "rgba(255,255,255,0.3)")
+        html = (
+            f'<div style="padding:10px 14px;margin-bottom:6px;border-radius:6px;'
+            f'background:rgba(255,255,255,0.02);border-left:3px solid {src_color};'
+            f'display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">'
+            f'<div style="flex:1;min-width:0;">'
+            f'<a href="{h["link"]}" target="_blank" rel="noopener" style="'
+            f'font-size:13px;font-weight:500;color:rgba(255,255,255,0.82);'
+            f'text-decoration:none;line-height:1.4;display:block;'
+            f'overflow:hidden;text-overflow:ellipsis;">{h["title"]}</a>'
+            f'</div>'
+            f'<div style="display:flex;flex-direction:column;align-items:flex-end;'
+            f'flex-shrink:0;gap:2px;">'
+            f'<span style="font-size:10px;font-weight:600;color:{src_color};'
+            f'text-transform:uppercase;letter-spacing:0.04em;">{h["source"]}</span>'
+            f'<span style="font-size:10px;color:rgba(255,255,255,0.25);">'
+            f'{h["published"]}</span>'
+            f'</div>'
+            f'</div>'
+        )
+        st.markdown(html, unsafe_allow_html=True)
+
+    st.markdown(
+        '<div style="height:12px;border-bottom:1px solid rgba(255,255,255,0.04);'
+        'margin-bottom:12px;"></div>',
+        unsafe_allow_html=True,
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # MAIN RENDER
 # ══════════════════════════════════════════════════════════════════════════
 
@@ -396,7 +532,20 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
 
     st.markdown(
         '<div style="font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:12px">'
-        'Live alerts across your portfolio · computed from latest Supabase data'
+        'Market news · portfolio alerts · computed from RSS feeds + Supabase data'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── News Headlines (top section) ─────────────────────────────────────
+    _render_news_section()
+
+    # ── Portfolio Alerts (bottom section) ─────────────────────────────────
+    st.markdown(
+        '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
+        'text-transform:uppercase;letter-spacing:0.06em;padding:0 0 8px;'
+        'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
+        'Portfolio Alerts'
         '</div>',
         unsafe_allow_html=True,
     )
