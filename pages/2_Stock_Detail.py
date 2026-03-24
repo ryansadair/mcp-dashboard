@@ -266,8 +266,11 @@ PLOTLY_CONFIG = {
     "scrollZoom": False,
     "doubleClick": False,
     "showTips": False,
-    "staticPlot": True,
+    "staticPlot": False,
 }
+
+# Crosshair spike settings — reusable across all charts
+_SPIKE = dict(showspikes=True, spikecolor="rgba(255,255,255,0.15)", spikethickness=1, spikemode="across", spikedash="solid")
 
 # ── Get all holdings tickers for the selector ─────────────────────────────
 available_tickers = []
@@ -669,6 +672,9 @@ if not hist.empty:
         height=350,
         hovermode="x unified",
         yaxis_title="Price ($)",
+        xaxis=dict(fixedrange=True, **_SPIKE),
+        yaxis=dict(fixedrange=True, **_SPIKE),
+        dragmode=False,
     )
     st.plotly_chart(fig_price, use_container_width=True, config=PLOTLY_CONFIG)
 else:
@@ -970,6 +976,10 @@ if not financials.empty:
                     title="Revenue & Net Income ($B)",
                     barmode="group",
                     showlegend=True,
+                    hovermode="x unified",
+                    xaxis=dict(fixedrange=True, **_SPIKE),
+                    yaxis=dict(fixedrange=True),
+                    dragmode=False,
                 )
                 st.plotly_chart(fig_fin, use_container_width=True, config=PLOTLY_CONFIG)
 
@@ -1267,6 +1277,10 @@ if annual_divs is not None and len(annual_divs) >= 2:
         title="Annual Dividends Per Share",
         yaxis_title="$/Share",
         showlegend=False,
+        hovermode="x unified",
+        xaxis=dict(fixedrange=True, **_SPIKE),
+        yaxis=dict(fixedrange=True),
+        dragmode=False,
     )
     st.plotly_chart(fig_div, use_container_width=True, config=PLOTLY_CONFIG)
 

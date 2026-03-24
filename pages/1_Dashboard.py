@@ -294,7 +294,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
-    "Overview", "Holdings", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "News & Alerts"
+    "Overview", "Holdings", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "Alerts"
 ])
 
 # ── Strategy selector ─────────────────────────────────────────────────────
@@ -627,11 +627,13 @@ with tab_overview:
             fig.update_layout(
                 title="YTD Cumulative Performance",
                 **PLOTLY_DARK,
-                xaxis=_XAXIS,
-                yaxis={**_YAXIS, "ticksuffix": "%"},
+                xaxis={**_XAXIS, "fixedrange": True, "showspikes": True, "spikecolor": "rgba(255,255,255,0.15)", "spikethickness": 1, "spikemode": "across", "spikedash": "solid"},
+                yaxis={**_YAXIS, "ticksuffix": "%", "fixedrange": True, "showspikes": True, "spikecolor": "rgba(255,255,255,0.15)", "spikethickness": 1, "spikemode": "across", "spikedash": "solid"},
                 height=280,
+                hovermode="x unified",
+                dragmode=False,
             )
-            st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+            st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG_HOVER)
 
     with right:
         st.markdown("<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:12px;'>Sector Allocation</div>", unsafe_allow_html=True)
@@ -1043,9 +1045,10 @@ with tab_markets:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# NEWS & ALERTS
+# ALERTS
 # ══════════════════════════════════════════════════════════════════════════
 with tab_alerts:
+    _render_strategy_header("alerts")
     if ALERTS_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed:
         render_alerts_tab(tamarac_parsed, active)
     elif not ALERTS_AVAILABLE:
@@ -1063,8 +1066,6 @@ st.markdown(
     "<span>Data: yfinance · FRED · Notion · Finviz</span>"
     "<span style='opacity:0.3;'>|</span>"
     "<span>Internal use only</span>"
-    "<span style='opacity:0.3;'>|</span>"
-    "<a href='/Documentation' target='_self' style='color:rgba(201,168,76,0.5);text-decoration:none;'>Documentation</a>"
     "</div>",
     unsafe_allow_html=True
 )
