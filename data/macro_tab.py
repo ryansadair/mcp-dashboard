@@ -516,7 +516,7 @@ def render_macro_tab(qdvd_yield=None):
         <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
             <div>
                 <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);
-                            text-transform:uppercase;letter-spacing:0.06em;padding:0 0 8px;
+                            text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;
                             border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">
                     Dividend Strategy Context</div>
                 <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
@@ -555,7 +555,7 @@ def render_macro_tab(qdvd_yield=None):
             </div>
             <div>
                 <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);
-                            text-transform:uppercase;letter-spacing:0.06em;padding:0 0 8px;
+                            text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;
                             border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">
                     Sentiment</div>
                 <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
