@@ -1069,6 +1069,27 @@ st.markdown(
     "</div>",
     unsafe_allow_html=True
 )
-_fc1, _fc2, _fc3 = st.columns([2, 1, 2])
-with _fc2:
-    st.page_link("pages/3_Documentation.py", label="Documentation", icon="📖")
+# Style the page_link to look like a subtle footer link
+st.markdown("""
+<style>
+    div[data-testid="stPageLink-nav"] {
+        display: flex;
+        justify-content: center;
+    }
+    div[data-testid="stPageLink-nav"] a {
+        font-size: 11px !important;
+        color: rgba(201,168,76,0.5) !important;
+        background: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin-top: -8px !important;
+    }
+    div[data-testid="stPageLink-nav"] a:hover {
+        color: rgba(201,168,76,0.8) !important;
+    }
+    div[data-testid="stPageLink-nav"] a svg {
+        display: none !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+st.page_link("pages/3_Documentation.py", label="Documentation")
