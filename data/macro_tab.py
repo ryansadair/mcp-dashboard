@@ -446,129 +446,163 @@ def render_macro_tab(qdvd_yield=None):
             </div>
             ''', unsafe_allow_html=True)
 
-    # ── Dividend Context + Sentiment + Fed Calendar ─────────────────────────
-    col_ctx, col_sent_top, col_fed = st.columns([2, 1, 1])
-
+    # ── Dividend Context + Sentiment + Fear & Greed + Fed Calendar ──────────
     # Pre-fetch valuation data needed for context box
     spy_data = _yf_sp500_metrics()
     fwd_pe = spy_data.get("fwd_pe") or spy_data.get("trailing_pe")
     sp_div = spy_data.get("div_yield")
     sp_div_pct = (sp_div * 100 if sp_div and sp_div < 1 else sp_div) if sp_div else None
 
-    with col_ctx:
-        st.markdown(
-            '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
-            'text-transform:uppercase;letter-spacing:0.06em;padding:12px 0 8px;'
-            'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">'
-            'Dividend Strategy Context</div>',
-            unsafe_allow_html=True,
+    # Pre-compute values for the HTML block
+    ten_y_str = f"{ten_y:.2f}%" if ten_y else "—"
+    sp_yield_str = f"{sp_div_pct:.2f}%" if sp_div_pct else "—"
+    qdvd_str = f"{qdvd_yield:.2f}%" if qdvd_yield else "—"
+
+    erp_val = ""
+    erp_color = "rgba(255,255,255,0.95)"
+    if fwd_pe and fwd_pe > 0 and ten_y:
+        ey = (1 / fwd_pe) * 100
+        erp = ey - ten_y
+        erp_bp = round(erp * 100)
+        erp_val = f"{erp_bp:+d}bp"
+        erp_color = "#c45454" if erp < 0.5 else "#C9A84C" if erp < 1.5 else "#569542"
+
+    curve_color = "#569542" if spread_bp and spread_bp > 0 else "#c45454" if spread_bp else "rgba(255,255,255,0.95)"
+    curve_label = f"{spread_bp:+d}bp" if spread_bp is not None else "—"
+    curve_note = "Normal curve" if spread_bp and spread_bp > 0 else "Inverted" if spread_bp and spread_bp <= 0 else ""
+
+    # VIX
+    vix_data = _yf_quote("^VIX")
+    vix_price = vix_data.get("price")
+    sentiment_items = []
+    if vix_price:
+        vix_color = "#569542" if vix_price < 16 else "#C9A84C" if vix_price < 25 else "#c45454"
+        sentiment_items.append(("VIX", f"{vix_price:.2f}", vix_color))
+
+    # UMich Sentiment
+    um_latest, um_prev, _ = _fred_latest("UMCSENT")
+    if um_latest:
+        um_color = "#569542" if um_latest > 80 else "#C9A84C" if um_latest > 60 else "#c45454"
+        sentiment_items.append(("UMich Sentiment", f"{um_latest:.1f}", um_color))
+
+    # Yield curve signal
+    if spread_bp is not None:
+        curve_label_s = "Normal" if spread_bp > 0 else "Inverted"
+        curve_color_s = "#569542" if spread_bp > 0 else "#c45454"
+        sentiment_items.append(("Yield Curve", f"{curve_label_s} ({spread_bp:+d}bp)", curve_color_s))
+
+    # Build sentiment rows HTML
+    sent_rows_html = ""
+    for i, (name, val, color) in enumerate(sentiment_items):
+        border = "border-bottom:1px solid rgba(255,255,255,0.04);" if i < len(sentiment_items) - 1 else ""
+        sent_rows_html += (
+            f'<div style="display:flex;justify-content:space-between;align-items:center;'
+            f'padding:16px 0;{border}">'
+            f'<span style="font-size:13px;color:rgba(255,255,255,0.6)">{name}</span>'
+            f'<span style="font-size:16px;font-weight:700;font-family:\'DM Serif Display\',serif;'
+            f'color:{color}">{val}</span>'
+            f'</div>'
         )
 
-        ten_y_str = f"{ten_y:.2f}%" if ten_y else "—"
-        sp_yield_str = f"{sp_div_pct:.2f}%" if sp_div_pct else "—"
-        qdvd_str = f"{qdvd_yield:.2f}%" if qdvd_yield else "—"
-
-        erp_val = ""
-        erp_color = "rgba(255,255,255,0.95)"
-        if fwd_pe and fwd_pe > 0 and ten_y:
-            ey = (1 / fwd_pe) * 100
-            erp = ey - ten_y
-            erp_bp = round(erp * 100)
-            erp_val = f"{erp_bp:+d}bp"
-            erp_color = "#c45454" if erp < 0.5 else "#C9A84C" if erp < 1.5 else "#569542"
-
-        # Yield comparison
-        st.markdown(f'''
+    # Fear & Greed
+    fg_score, fg_components = _compute_fear_greed()
+    fg_html = ""
+    if fg_score is not None:
+        fg_label, fg_color = _fear_greed_label(fg_score)
+        needle_pct = max(0, min(100, fg_score))
+        comp_str = " · ".join(f"{name} {score}" for name, score in fg_components)
+        fg_html = f'''
         <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
-                    border-radius:8px;padding:14px 16px;margin-bottom:8px">
-            <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
-                        letter-spacing:0.06em;margin-bottom:6px">{ten_y_label} vs S&P Div Yield vs QDVD</div>
-            <div style="font-size:18px;font-weight:700;font-family:'DM Serif Display',serif;
-                        color:rgba(255,255,255,0.95)">
-                {ten_y_str} <span style="color:rgba(255,255,255,0.3)">vs</span> {sp_yield_str}
-                <span style="color:rgba(255,255,255,0.3)">vs</span>
-                <span style="color:#C9A84C">{qdvd_str}</span>
+                    border-radius:8px;padding:16px 20px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <span style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);
+                             text-transform:uppercase;letter-spacing:0.08em">Fear & Greed Index</span>
+                <div style="display:flex;align-items:baseline;gap:10px">
+                    <span style="font-size:13px;font-weight:600;color:{fg_color}">{fg_label}</span>
+                    <span style="font-size:24px;font-weight:700;font-family:'DM Serif Display',serif;
+                                 color:{fg_color}">{fg_score}</span>
+                </div>
             </div>
-            <div style="font-size:11px;color:rgba(255,255,255,0.30);margin-top:4px">
-                QDVD yield premium supports quality dividend positioning</div>
+            <div style="position:relative;height:10px;border-radius:5px;
+                        background:linear-gradient(to right, #c45454 0%, #C9A84C 40%, #C9A84C 60%, #569542 100%);
+                        margin-bottom:8px">
+                <div style="position:absolute;top:-4px;left:{needle_pct}%;
+                            transform:translateX(-50%);width:4px;height:18px;
+                            background:rgba(255,255,255,0.95);border-radius:2px;
+                            box-shadow:0 0 4px rgba(0,0,0,0.4)"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+                <span style="font-size:10px;color:rgba(255,255,255,0.2)">Extreme Fear</span>
+                <span style="font-size:10px;color:rgba(255,255,255,0.2)">Neutral</span>
+                <span style="font-size:10px;color:rgba(255,255,255,0.2)">Extreme Greed</span>
+            </div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.2);margin-top:8px;
+                        text-align:center">{comp_str}</div>
         </div>
-        ''', unsafe_allow_html=True)
+        '''
 
-        # ERP + Yield Curve side by side
-        curve_color = "#569542" if spread_bp and spread_bp > 0 else "#c45454" if spread_bp else "rgba(255,255,255,0.95)"
-        curve_label = f"{spread_bp:+d}bp" if spread_bp is not None else "—"
-        curve_note = "Normal curve" if spread_bp and spread_bp > 0 else "Inverted" if spread_bp and spread_bp <= 0 else ""
+    # Render entire left+middle panel as one HTML block using CSS grid
+    col_left_panel, col_fed = st.columns([3, 1])
 
+    with col_left_panel:
         st.markdown(f'''
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
-                        border-radius:8px;padding:14px 16px">
-                <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
-                            letter-spacing:0.06em;margin-bottom:6px">Equity Risk Premium</div>
-                <div style="font-size:18px;font-weight:700;font-family:'DM Serif Display',serif;
-                            color:{erp_color}">{erp_val if erp_val else "—"}</div>
-                <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:4px">
-                    Earnings yield − {ten_y_label}</div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
+            <!-- Dividend Context (left) -->
+            <div>
+                <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);
+                            text-transform:uppercase;letter-spacing:0.06em;padding:0 0 8px;
+                            border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">
+                    Dividend Strategy Context</div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+                            border-radius:8px;padding:14px 16px;margin-bottom:8px">
+                    <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
+                                letter-spacing:0.06em;margin-bottom:6px">{ten_y_label} vs S&P Div Yield vs QDVD</div>
+                    <div style="font-size:18px;font-weight:700;font-family:'DM Serif Display',serif;
+                                color:rgba(255,255,255,0.95)">
+                        {ten_y_str} <span style="color:rgba(255,255,255,0.3)">vs</span> {sp_yield_str}
+                        <span style="color:rgba(255,255,255,0.3)">vs</span>
+                        <span style="color:#C9A84C">{qdvd_str}</span>
+                    </div>
+                    <div style="font-size:11px;color:rgba(255,255,255,0.30);margin-top:4px">
+                        QDVD yield premium supports quality dividend positioning</div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+                                border-radius:8px;padding:14px 16px">
+                        <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
+                                    letter-spacing:0.06em;margin-bottom:6px">Equity Risk Premium</div>
+                        <div style="font-size:18px;font-weight:700;font-family:'DM Serif Display',serif;
+                                    color:{erp_color}">{erp_val if erp_val else "—"}</div>
+                        <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:4px">
+                            Earnings yield − {ten_y_label}</div>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+                                border-radius:8px;padding:14px 16px">
+                        <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
+                                    letter-spacing:0.06em;margin-bottom:6px">Yield Curve</div>
+                        <div style="font-size:18px;font-weight:700;font-family:'DM Serif Display',serif;
+                                    color:{curve_color}">{curve_label}</div>
+                        <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:4px">
+                            {curve_note}</div>
+                    </div>
+                </div>
             </div>
-            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
-                        border-radius:8px;padding:14px 16px">
-                <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
-                            letter-spacing:0.06em;margin-bottom:6px">Yield Curve</div>
-                <div style="font-size:18px;font-weight:700;font-family:'DM Serif Display',serif;
-                            color:{curve_color}">{curve_label}</div>
-                <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:4px">
-                    {curve_note}</div>
+            <!-- Sentiment (right) -->
+            <div>
+                <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);
+                            text-transform:uppercase;letter-spacing:0.06em;padding:0 0 8px;
+                            border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">
+                    Sentiment</div>
+                <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+                            border-radius:8px;padding:4px 16px;height:calc(100% - 40px);
+                            display:flex;flex-direction:column;justify-content:center">
+                    {sent_rows_html}
+                </div>
             </div>
-        </div>
-        ''', unsafe_allow_html=True)
-
-    with col_sent_top:
-        st.markdown(
-            '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
-            'text-transform:uppercase;letter-spacing:0.06em;padding:12px 0 8px;'
-            'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">'
-            'Sentiment</div>',
-            unsafe_allow_html=True,
-        )
-
-        # VIX
-        vix_data = _yf_quote("^VIX")
-        vix_price = vix_data.get("price")
-        sentiment_items = []
-        if vix_price:
-            vix_color = "#569542" if vix_price < 16 else "#C9A84C" if vix_price < 25 else "#c45454"
-            sentiment_items.append(("VIX", f"{vix_price:.2f}", vix_color))
-
-        # UMich Sentiment
-        um_latest, um_prev, _ = _fred_latest("UMCSENT")
-        if um_latest:
-            um_color = "#569542" if um_latest > 80 else "#C9A84C" if um_latest > 60 else "#c45454"
-            sentiment_items.append(("UMich Sentiment", f"{um_latest:.1f}", um_color))
-
-        # Yield curve signal
-        if spread_bp is not None:
-            curve_label_s = "Normal" if spread_bp > 0 else "Inverted"
-            curve_color_s = "#569542" if spread_bp > 0 else "#c45454"
-            sentiment_items.append(("Yield Curve", f"{curve_label_s} ({spread_bp:+d}bp)", curve_color_s))
-
-        # Render all sentiment items as a single card to match Dividend Context height
-        sent_rows_html = ""
-        for i, (name, val, color) in enumerate(sentiment_items):
-            border = "border-bottom:1px solid rgba(255,255,255,0.04);" if i < len(sentiment_items) - 1 else ""
-            sent_rows_html += (
-                f'<div style="display:flex;justify-content:space-between;align-items:center;'
-                f'padding:16px 0;{border}">'
-                f'<span style="font-size:13px;color:rgba(255,255,255,0.6)">{name}</span>'
-                f'<span style="font-size:16px;font-weight:700;font-family:\'DM Serif Display\',serif;'
-                f'color:{color}">{val}</span>'
-                f'</div>'
-            )
-
-        st.markdown(f'''
-        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
-                    border-radius:8px;padding:4px 16px;min-height:180px;
-                    display:flex;flex-direction:column;justify-content:center">
-            {sent_rows_html}
+            <!-- Fear & Greed (spans both columns) -->
+            <div style="grid-column:1 / -1;margin-top:4px">
+                {fg_html}
+            </div>
         </div>
         ''', unsafe_allow_html=True)
 
@@ -603,49 +637,6 @@ def render_macro_tab(qdvd_yield=None):
             </div>
             ''')
         st.markdown("".join(fed_html), unsafe_allow_html=True)
-
-    # ── Fear & Greed Gauge — spans Dividend Context + Sentiment width ─────
-    fg_score, fg_components = _compute_fear_greed()
-    if fg_score is not None:
-        fg_label, fg_color = _fear_greed_label(fg_score)
-        needle_pct = max(0, min(100, fg_score))
-        comp_str = " · ".join(f"{name} {score}" for name, score in fg_components)
-
-        # Pull up to close the Streamlit column gap
-        st.markdown('<div style="margin-top:-1rem"></div>', unsafe_allow_html=True)
-
-        col_fg, col_fg_spacer = st.columns([3, 1])
-        with col_fg:
-            st.markdown(f'''
-            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
-                        border-radius:8px;padding:16px 20px">
-                <div style="display:flex;justify-content:space-between;align-items:center;
-                            margin-bottom:12px">
-                    <span style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);
-                                 text-transform:uppercase;letter-spacing:0.08em">Fear & Greed Index</span>
-                    <div style="display:flex;align-items:baseline;gap:10px">
-                        <span style="font-size:13px;font-weight:600;color:{fg_color}">{fg_label}</span>
-                        <span style="font-size:24px;font-weight:700;font-family:'DM Serif Display',serif;
-                                     color:{fg_color}">{fg_score}</span>
-                    </div>
-                </div>
-                <div style="position:relative;height:10px;border-radius:5px;
-                            background:linear-gradient(to right, #c45454 0%, #C9A84C 40%, #C9A84C 60%, #569542 100%);
-                            margin-bottom:8px">
-                    <div style="position:absolute;top:-4px;left:{needle_pct}%;
-                                transform:translateX(-50%);width:4px;height:18px;
-                                background:rgba(255,255,255,0.95);border-radius:2px;
-                                box-shadow:0 0 4px rgba(0,0,0,0.4)"></div>
-                </div>
-                <div style="display:flex;justify-content:space-between">
-                    <span style="font-size:10px;color:rgba(255,255,255,0.2)">Extreme Fear</span>
-                    <span style="font-size:10px;color:rgba(255,255,255,0.2)">Neutral</span>
-                    <span style="font-size:10px;color:rgba(255,255,255,0.2)">Extreme Greed</span>
-                </div>
-                <div style="font-size:10px;color:rgba(255,255,255,0.2);margin-top:8px;
-                            text-align:center">{comp_str}</div>
-            </div>
-            ''', unsafe_allow_html=True)
 
     # ── Economic Indicators ────────────────────────────────────────────────
     st.markdown(
