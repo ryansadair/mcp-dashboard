@@ -966,8 +966,8 @@ with tab_holdings:
                 _chart_tickers = _charts_tam["symbol"].tolist()
                 _chart_names = dict(zip(_charts_tam["symbol"], _charts_tam["description"]))
 
-                # Period selector — button row matching Stock Detail style
-                _period_map = {"1M": "1mo", "3M": "3mo", "6M": "6mo", "YTD": "ytd", "1Y": "1y", "2Y": "2y"}
+                # Period selector — matches Stock Detail page
+                _period_map = {"1M": 21, "3M": 63, "6M": 126, "YTD": None, "1Y": 252, "2Y": 504, "3Y": 756, "5Y": 1260, "Max": 0}
                 if "hc_period" not in st.session_state:
                     st.session_state["hc_period"] = "1Y"
 
@@ -979,16 +979,14 @@ with tab_holdings:
                             st.session_state["hc_period"] = _plabel
                             st.rerun()
 
-                _sel_period = _period_map[st.session_state["hc_period"]]
-
-                # Batch download — single yfinance call for all tickers
+                # Batch download max history — slice client-side per period
                 @st.cache_data(ttl=900, show_spinner=False)
-                def _fetch_chart_batch(tickers_tuple, period, _v=1):
+                def _fetch_chart_batch(tickers_tuple, _v=2):
                     import yfinance as yf
                     try:
                         return yf.download(
                             " ".join(tickers_tuple),
-                            period=period,
+                            period="max",
                             interval="1d",
                             group_by="ticker",
                             progress=False,
@@ -998,9 +996,12 @@ with tab_holdings:
                         return None
 
                 with st.spinner(f"Loading {len(_chart_tickers)} charts..."):
-                    _batch_data = _fetch_chart_batch(tuple(_chart_tickers), _sel_period)
+                    _batch_data = _fetch_chart_batch(tuple(_chart_tickers))
 
                 if _batch_data is not None and not _batch_data.empty:
+                    _sel_label = st.session_state["hc_period"]
+                    _sel_days = _period_map[_sel_label]
+
                     # Render 4-column grid of mini charts
                     _ncols = 4
                     _rows_of_tickers = [_chart_tickers[i:i + _ncols] for i in range(0, len(_chart_tickers), _ncols)]
@@ -1011,15 +1012,33 @@ with tab_holdings:
                             with _cols[_ci]:
                                 try:
                                     if len(_chart_tickers) == 1:
-                                        _tk_df = _batch_data
+                                        _tk_full = _batch_data
                                     else:
-                                        _tk_df = _batch_data[_tk] if _tk in _batch_data.columns.get_level_values(0) else None
+                                        _tk_full = _batch_data[_tk] if _tk in _batch_data.columns.get_level_values(0) else None
 
-                                    if _tk_df is None or _tk_df.empty or _tk_df.dropna(subset=["Close"]).empty:
+                                    if _tk_full is None or _tk_full.empty or _tk_full.dropna(subset=["Close"]).empty:
                                         st.caption(f"{_tk} — no data")
                                         continue
 
-                                    _tk_df = _tk_df.dropna(subset=["Close"])
+                                    _tk_full = _tk_full.dropna(subset=["Close"]).copy()
+
+                                    # Compute MAs on full history before slicing
+                                    _tk_full["MA50"] = _tk_full["Close"].rolling(50).mean()
+                                    _tk_full["MA200"] = _tk_full["Close"].rolling(200).mean()
+
+                                    # Slice to selected period
+                                    if _sel_label == "YTD":
+                                        _year_start = datetime(datetime.now().year, 1, 1).strftime("%Y-%m-%d")
+                                        _tk_df = _tk_full[_tk_full.index >= _year_start]
+                                    elif _sel_label == "Max" or _sel_days == 0:
+                                        _tk_df = _tk_full
+                                    else:
+                                        _tk_df = _tk_full.tail(_sel_days)
+
+                                    if _tk_df.empty:
+                                        st.caption(f"{_tk} — no data")
+                                        continue
+
                                     _close = _tk_df["Close"]
                                     _first = float(_close.iloc[0])
                                     _last = float(_close.iloc[-1])
@@ -1038,22 +1057,40 @@ with tab_holdings:
                                         unsafe_allow_html=True,
                                     )
 
-                                    # Mini price chart with fill
+                                    # Mini price chart with MAs
                                     _fig = go.Figure()
                                     _fig.add_trace(go.Scatter(
                                         x=_tk_df.index, y=_close,
-                                        mode="lines",
+                                        mode="lines", name="Price",
                                         line=dict(color=_chg_color, width=1.5),
                                         fill="tozeroy",
                                         fillcolor=("rgba(86,149,66,0.06)" if _chg_pct >= 0 else "rgba(196,84,84,0.06)"),
                                         hovertemplate="%{x|%b %d}<br>$%{y:.2f}<extra></extra>",
                                     ))
 
+                                    # 50-day MA
+                                    if not _tk_df["MA50"].isna().all():
+                                        _fig.add_trace(go.Scatter(
+                                            x=_tk_df.index, y=_tk_df["MA50"],
+                                            mode="lines", name="50 MA",
+                                            line=dict(color="#C9A84C", width=1, dash="dot"),
+                                            hoverinfo="skip",
+                                        ))
+
+                                    # 200-day MA
+                                    if not _tk_df["MA200"].isna().all():
+                                        _fig.add_trace(go.Scatter(
+                                            x=_tk_df.index, y=_tk_df["MA200"],
+                                            mode="lines", name="200 MA",
+                                            line=dict(color="rgba(255,255,255,0.25)", width=1, dash="dash"),
+                                            hoverinfo="skip",
+                                        ))
+
                                     _fig_layout = {**PLOTLY_DARK}
                                     _fig_layout["margin"] = dict(l=0, r=0, t=0, b=0)
                                     _fig.update_layout(
                                         **_fig_layout,
-                                        height=120,
+                                        height=140,
                                         showlegend=False,
                                         hovermode="x unified",
                                         dragmode=False,
