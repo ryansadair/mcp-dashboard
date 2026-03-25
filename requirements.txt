@@ -9,3 +9,4 @@ streamlit-autorefresh>=1.0.0
 finvizfinance
 xlrd
 feedparser
+beautifulsoup4
