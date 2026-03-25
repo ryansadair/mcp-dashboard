@@ -995,10 +995,32 @@ if not financials.empty:
         if rev_row:
             rev_data = fin[rev_row].dropna()
 
-            # Build aligned data — use revenue index as the master timeline
-            chart_index = rev_data.index
-            years = [d.strftime("%Y") for d in chart_index]
-            rev_vals = (rev_data / 1e9).round(2)  # Convert to billions
+            # Detect if data is quarterly (>4 data points or multiple entries per year)
+            # and aggregate to annual by summing within each fiscal year
+            _year_labels = [d.strftime("%Y") for d in rev_data.index]
+            _is_quarterly = len(_year_labels) != len(set(_year_labels))
+
+            if _is_quarterly:
+                # Group by year and sum
+                _rev_annual = rev_data.groupby(rev_data.index.year).sum()
+                years = [str(y) for y in _rev_annual.index]
+                rev_vals = (_rev_annual / 1e9).round(2)
+
+                # Net income — same aggregation
+                _ni_annual = None
+                if ni_row:
+                    _ni_raw = fin[ni_row].dropna()
+                    _ni_annual = _ni_raw.groupby(_ni_raw.index.year).sum()
+
+                # Margins from the most recent complete year
+                _margin_year = _rev_annual.index[-1]
+                _margin_rev = _rev_annual.iloc[-1]
+            else:
+                chart_index = rev_data.index
+                years = [d.strftime("%Y") for d in chart_index]
+                rev_vals = (rev_data / 1e9).round(2)
+                _ni_annual = None
+                _margin_rev = rev_data.iloc[-1]
 
             col_rev, col_margin = st.columns([2, 1])
 
@@ -1013,10 +1035,12 @@ if not financials.empty:
                     textfont=dict(size=10, color="rgba(255,255,255,0.5)"),
                 ))
                 if ni_row:
-                    ni_data = fin[ni_row].dropna()
-                    # Reindex net income to match revenue's dates exactly
-                    ni_aligned = ni_data.reindex(chart_index)
-                    ni_vals = (ni_aligned / 1e9).round(2)
+                    if _is_quarterly and _ni_annual is not None:
+                        ni_vals = (_ni_annual / 1e9).round(2)
+                    else:
+                        ni_data = fin[ni_row].dropna()
+                        ni_aligned = ni_data.reindex(rev_data.index)
+                        ni_vals = (ni_aligned / 1e9).round(2)
                     fig_fin.add_trace(go.Bar(
                         x=years, y=ni_vals,
                         name="Net Income",
