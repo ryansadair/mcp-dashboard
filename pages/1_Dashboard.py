@@ -748,205 +748,333 @@ with tab_overview:
 with tab_holdings:
     _render_strategy_header("holdings")
 
-    # ── Sprint 2: Tamarac + yfinance ─────────────────────────────────────
-    if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
-        tam_df = get_holdings_for_strategy(tamarac_parsed, active)
-        cash_wt = get_cash_weight(tamarac_parsed, active)
+    # ── Sub-tabs: Holdings Detail | Price Charts ──────────────────────────
+    sub_detail, sub_charts = st.tabs(["Holdings Detail", "Price Charts"])
 
-        if not tam_df.empty:
-            tickers = tuple(tam_df["symbol"].tolist())
-            with st.spinner("Fetching live prices..."):
-                price_data = fetch_batch_prices(tickers)
+    # ═══════════════════════════════════════════════════════════════════════
+    # SUB-TAB 1: HOLDINGS DETAIL (existing)
+    # ═══════════════════════════════════════════════════════════════════════
+    with sub_detail:
 
-            # Fetch Notion proprietary metrics (Sprint 5)
-            notion_data = {}
-            if NOTION_METRICS_AVAILABLE:
-                try:
-                    notion_data = fetch_notion_metrics()
-                except Exception:
-                    notion_data = {}
+        # ── Sprint 2: Tamarac + yfinance ─────────────────────────────────
+        if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
+            tam_df = get_holdings_for_strategy(tamarac_parsed, active)
+            cash_wt = get_cash_weight(tamarac_parsed, active)
 
-            # Build merged table
-            rows = []
-            for _, h in tam_df.iterrows():
-                sym = h["symbol"]
-                mkt = price_data.get(sym, {})
-                chg_val = mkt.get("change_1d_pct", 0) or 0
-                yoc = h.get("yield_at_cost", 0) or 0
-                # yoc may be decimal (0.0558) or already percentage (5.58)
-                yoc_pct = float(yoc) * 100 if 0 < float(yoc) < 1 else float(yoc)
+            if not tam_df.empty:
+                tickers = tuple(tam_df["symbol"].tolist())
+                with st.spinner("Fetching live prices..."):
+                    price_data = fetch_batch_prices(tickers)
 
-                # Notion proprietary metrics
-                nm = notion_data.get(sym.upper(), {})
+                # Fetch Notion proprietary metrics (Sprint 5)
+                notion_data = {}
+                if NOTION_METRICS_AVAILABLE:
+                    try:
+                        notion_data = fetch_notion_metrics()
+                    except Exception:
+                        notion_data = {}
 
-                rows.append({
-                    "Company": h["description"],
-                    "Symbol": sym,
-                    "Sector": mkt.get("sector", ""),
-                    "Weight %": round(h["weight_pct"], 2),
-                    "1D Chg %": chg_val,
-                    "Price": mkt.get("price", 0),
-                    "Yield on Cost %": round(yoc_pct, 2),
-                    "Div Yield %": mkt.get("dividend_yield", 0),
-                    "MCP Target": nm.get("mcp_target") if nm.get("mcp_target") is not None else "—",
-                    "Baseline": nm.get("div_baseline") if nm.get("div_baseline") is not None else "—",
-                    "Style": nm.get("style_bucket", "—") or "—",
-                    "P/E": round(mkt.get("pe_ratio", 0), 1) if mkt.get("pe_ratio") else "—",
-                    "Unit Cost": round(float(h.get("unit_cost", 0) or 0), 2),
-                    "% From 52W Hi": round(
-                        ((mkt.get("price", 0) - mkt.get("52w_high", 0)) / mkt.get("52w_high", 1)) * 100, 1
-                    ) if mkt.get("52w_high") else 0,
-                })
-            display_df = pd.DataFrame(rows)
+                # Build merged table
+                rows = []
+                for _, h in tam_df.iterrows():
+                    sym = h["symbol"]
+                    mkt = price_data.get(sym, {})
+                    chg_val = mkt.get("change_1d_pct", 0) or 0
+                    yoc = h.get("yield_at_cost", 0) or 0
+                    # yoc may be decimal (0.0558) or already percentage (5.58)
+                    yoc_pct = float(yoc) * 100 if 0 < float(yoc) < 1 else float(yoc)
 
+                    # Notion proprietary metrics
+                    nm = notion_data.get(sym.upper(), {})
 
-            # Sector filter
-            sectors = ["All"] + sorted(display_df["Sector"].dropna().unique().tolist())
-            sector_filter = st.selectbox("Sector", sectors, key="s2_sector", label_visibility="collapsed")
-
-            filtered = display_df.copy()
-            if sector_filter != "All":
-                filtered = filtered[filtered["Sector"] == sector_filter]
-
-            st.markdown(f"**{len(filtered)}** positions in **{STRATEGY_NAMES.get(active, active)}**")
-
-            # Color-code the 1D change column
-            def _color_1d(val):
-                try:
-                    v = float(val)
-                    color = "#569542" if v >= 0 else "#c45454"
-                    return f"color: {color}; font-weight: 500"
-                except (ValueError, TypeError):
-                    return ""
-
-            styled = filtered.style.map(_color_1d, subset=["1D Chg %"]).map(
-                _color_1d, subset=["% From 52W Hi"]
-            ).format({
-                "Weight %": "{:.2f}",
-                "Price": "${:.2f}",
-                "1D Chg %": "{:+.2f}%",
-                "Yield on Cost %": "{:.2f}%",
-                "Div Yield %": "{:.2f}%",
-                "MCP Target": lambda v: f"${v:,.0f}" if isinstance(v, (int, float)) else v,
-                "Unit Cost": "${:.2f}",
-                "% From 52W Hi": "{:+.1f}%",
-            })
-
-            # Row-selection enabled — click a row to navigate to stock detail
-            # Height: generous calculation to prevent internal scrollbar on mobile
-            _df_height = min(80 + len(filtered) * 40, 2000)
-            event = st.dataframe(
-                styled, use_container_width=True, hide_index=True,
-                height=_df_height,
-                selection_mode="single-row",
-                on_select="rerun",
-                key="holdings_table",
-                column_config={
-                    "Company": st.column_config.TextColumn("Company", width="medium"),
-                    "Symbol": st.column_config.TextColumn("Symbol", width="small"),
-                    "Sector": st.column_config.TextColumn("Sector", width="medium"),
-                    "Weight %": st.column_config.NumberColumn("Wt %", format="%.2f%%"),
-                    "1D Chg %": st.column_config.NumberColumn("1D %", format="%+.2f%%"),
-                    "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
-                    "Yield on Cost %": st.column_config.NumberColumn("Yield on Cost", format="%.2f%%"),
-                    "Div Yield %": st.column_config.NumberColumn("Curr Yield", format="%.2f%%"),
-                    "MCP Target": st.column_config.TextColumn("MCP Target", width="small"),
-                    "Baseline": st.column_config.TextColumn("Baseline", width="small"),
-                    "Style": st.column_config.TextColumn("Style", width="small"),
-                    "P/E": st.column_config.NumberColumn("P/E"),
-                    "Unit Cost": st.column_config.NumberColumn("Unit Cost", format="$%.2f"),
-                    "% From 52W Hi": st.column_config.NumberColumn("% From Hi", format="%+.1f%%"),
-                },
-            )
-
-            # Navigate to stock detail when a row is selected
-            if event and event.selection and event.selection.rows:
-                selected_idx = event.selection.rows[0]
-                selected_ticker = filtered.iloc[selected_idx]["Symbol"]
-                st.session_state["detail_ticker"] = selected_ticker
-                st.query_params["ticker"] = selected_ticker
-                st.switch_page("pages/2_Stock_Detail.py")
-
-            # Sector breakdown — compact table + pie chart
-            if len(filtered) > 0 and "Sector" in filtered.columns:
-                st.divider()
-                st.markdown("**Sector Breakdown**")
-                sect_agg = filtered.groupby("Sector").agg(
-                    Holdings=("Symbol", "count"),
-                    Total_Weight=("Weight %", "sum"),
-                    Avg_Yield=("Div Yield %", "mean"),
-                ).round(2).sort_values("Total_Weight", ascending=False)
-
-                col_tbl, col_pie = st.columns([3, 2])
-                with col_tbl:
-                    st.dataframe(sect_agg, use_container_width=True, height=(80 + len(sect_agg) * 40), column_config={
-                        "Holdings": st.column_config.NumberColumn("#", width="small"),
-                        "Total_Weight": st.column_config.NumberColumn("Wt %", format="%.1f%%", width="small"),
-                        "Avg_Yield": st.column_config.NumberColumn("Avg Yld %", format="%.2f%%", width="small"),
+                    rows.append({
+                        "Company": h["description"],
+                        "Symbol": sym,
+                        "Sector": mkt.get("sector", ""),
+                        "Weight %": round(h["weight_pct"], 2),
+                        "1D Chg %": chg_val,
+                        "Price": mkt.get("price", 0),
+                        "Yield on Cost %": round(yoc_pct, 2),
+                        "Div Yield %": mkt.get("dividend_yield", 0),
+                        "MCP Target": nm.get("mcp_target") if nm.get("mcp_target") is not None else "—",
+                        "Baseline": nm.get("div_baseline") if nm.get("div_baseline") is not None else "—",
+                        "Style": nm.get("style_bucket", "—") or "—",
+                        "P/E": round(mkt.get("pe_ratio", 0), 1) if mkt.get("pe_ratio") else "—",
+                        "Unit Cost": round(float(h.get("unit_cost", 0) or 0), 2),
+                        "% From 52W Hi": round(
+                            ((mkt.get("price", 0) - mkt.get("52w_high", 0)) / mkt.get("52w_high", 1)) * 100, 1
+                        ) if mkt.get("52w_high") else 0,
                     })
-                with col_pie:
-                    pie_colors = [SECTOR_COLORS.get(s, "#888") for s in sect_agg.index]
-                    fig_pie = go.Figure(go.Pie(
-                        labels=sect_agg.index.tolist(),
-                        values=sect_agg["Total_Weight"].tolist(),
-                        marker=dict(colors=pie_colors),
-                        hole=0.45,
-                        textinfo="label+percent",
-                        textposition="outside",
-                        textfont=dict(size=10, color="rgba(255,255,255,0.6)"),
-                        hovertemplate="%{label}: %{value:.1f}%<extra></extra>",
-                        sort=False,
-                    ))
-                    _pie_layout = {**PLOTLY_DARK}
-                    _pie_layout["margin"] = dict(l=10, r=10, t=10, b=10)
-                    fig_pie.update_layout(
-                        **_pie_layout,
-                        height=max(260, len(sect_agg) * 28 + 80),
-                        showlegend=False,
-                    )
-                    st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
+                display_df = pd.DataFrame(rows)
 
-            # ── Finviz Analyst Enrichment (Sprint 7) ─────────────────
-            if FINVIZ_AVAILABLE:
-                st.divider()
-                render_finviz_panel(tam_df, price_data, notion_data=notion_data)
 
-            st.caption(f"Tamarac export + yfinance live prices • {datetime.now().strftime('%I:%M %p')}")
+                # Sector filter
+                sectors = ["All"] + sorted(display_df["Sector"].dropna().unique().tolist())
+                sector_filter = st.selectbox("Sector", sectors, key="s2_sector", label_visibility="collapsed")
 
-        else:
-            st.info("No holdings in Tamarac file for this strategy.")
+                filtered = display_df.copy()
+                if sector_filter != "All":
+                    filtered = filtered[filtered["Sector"] == sector_filter]
 
-    # ── Sprint 1 fallback ─────────────────────────────────────────────────
-    else:
-        search = st.text_input("🔍 Search ticker or company", placeholder="JNJ, Coca-Cola...", key="holdings_search")
-        holdings_df = get_holdings(active)
+                st.markdown(f"**{len(filtered)}** positions in **{STRATEGY_NAMES.get(active, active)}**")
 
-        if holdings_df.empty:
-            st.info("No holdings data. Upload a Tamarac export below.")
-        else:
-            if search:
-                mask = (
-                    holdings_df["ticker"].str.lower().str.contains(search.lower(), na=False) |
-                    holdings_df["name"].str.lower().str.contains(search.lower(), na=False)
+                # Color-code the 1D change column
+                def _color_1d(val):
+                    try:
+                        v = float(val)
+                        color = "#569542" if v >= 0 else "#c45454"
+                        return f"color: {color}; font-weight: 500"
+                    except (ValueError, TypeError):
+                        return ""
+
+                styled = filtered.style.map(_color_1d, subset=["1D Chg %"]).map(
+                    _color_1d, subset=["% From 52W Hi"]
+                ).format({
+                    "Weight %": "{:.2f}",
+                    "Price": "${:.2f}",
+                    "1D Chg %": "{:+.2f}%",
+                    "Yield on Cost %": "{:.2f}%",
+                    "Div Yield %": "{:.2f}%",
+                    "MCP Target": lambda v: f"${v:,.0f}" if isinstance(v, (int, float)) else v,
+                    "Unit Cost": "${:.2f}",
+                    "% From 52W Hi": "{:+.1f}%",
+                })
+
+                # Row-selection enabled — click a row to navigate to stock detail
+                # Height: generous calculation to prevent internal scrollbar on mobile
+                _df_height = min(80 + len(filtered) * 40, 2000)
+                event = st.dataframe(
+                    styled, use_container_width=True, hide_index=True,
+                    height=_df_height,
+                    selection_mode="single-row",
+                    on_select="rerun",
+                    key="holdings_table",
+                    column_config={
+                        "Company": st.column_config.TextColumn("Company", width="medium"),
+                        "Symbol": st.column_config.TextColumn("Symbol", width="small"),
+                        "Sector": st.column_config.TextColumn("Sector", width="medium"),
+                        "Weight %": st.column_config.NumberColumn("Wt %", format="%.2f%%"),
+                        "1D Chg %": st.column_config.NumberColumn("1D %", format="%+.2f%%"),
+                        "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
+                        "Yield on Cost %": st.column_config.NumberColumn("Yield on Cost", format="%.2f%%"),
+                        "Div Yield %": st.column_config.NumberColumn("Curr Yield", format="%.2f%%"),
+                        "MCP Target": st.column_config.TextColumn("MCP Target", width="small"),
+                        "Baseline": st.column_config.TextColumn("Baseline", width="small"),
+                        "Style": st.column_config.TextColumn("Style", width="small"),
+                        "P/E": st.column_config.NumberColumn("P/E"),
+                        "Unit Cost": st.column_config.NumberColumn("Unit Cost", format="$%.2f"),
+                        "% From 52W Hi": st.column_config.NumberColumn("% From Hi", format="%+.1f%%"),
+                    },
                 )
-                holdings_df = holdings_df[mask]
 
-            sort_opts = [c for c in ["weight","ytd","div_yield","quality","chg1d"] if c in holdings_df.columns]
-            c1, c2 = st.columns([2,1])
-            with c1: sort_by = st.selectbox("Sort by", sort_opts)
-            with c2: sort_asc = st.checkbox("Ascending", value=False)
-            holdings_df = holdings_df.sort_values(sort_by, ascending=sort_asc)
+                # Navigate to stock detail when a row is selected
+                if event and event.selection and event.selection.rows:
+                    selected_idx = event.selection.rows[0]
+                    selected_ticker = filtered.iloc[selected_idx]["Symbol"]
+                    st.session_state["detail_ticker"] = selected_ticker
+                    st.query_params["ticker"] = selected_ticker
+                    st.switch_page("pages/2_Stock_Detail.py")
 
-            display_cols = ["ticker","name","weight","price","chg1d","ytd","div_yield","div_growth_5y","sector","div_culture","quality"]
-            available = [c for c in display_cols if c in holdings_df.columns]
-            show_df = holdings_df[available].copy()
-            for col in ["weight","chg1d","ytd","div_yield","div_growth_5y"]:
-                if col in show_df.columns:
-                    show_df[col] = show_df[col].apply(lambda x: f"+{x:.2f}%" if pd.notna(x) and float(x) >= 0 else f"{x:.2f}%" if pd.notna(x) else "—")
-            if "price" in show_df.columns:
-                show_df["price"] = show_df["price"].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "—")
-            show_df.columns = [c.replace("_"," ").title() for c in show_df.columns]
-            st.dataframe(show_df, use_container_width=True, hide_index=True)
+                # Sector breakdown — compact table + pie chart
+                if len(filtered) > 0 and "Sector" in filtered.columns:
+                    st.divider()
+                    st.markdown("**Sector Breakdown**")
+                    sect_agg = filtered.groupby("Sector").agg(
+                        Holdings=("Symbol", "count"),
+                        Total_Weight=("Weight %", "sum"),
+                        Avg_Yield=("Div Yield %", "mean"),
+                    ).round(2).sort_values("Total_Weight", ascending=False)
+
+                    col_tbl, col_pie = st.columns([3, 2])
+                    with col_tbl:
+                        st.dataframe(sect_agg, use_container_width=True, height=(80 + len(sect_agg) * 40), column_config={
+                            "Holdings": st.column_config.NumberColumn("#", width="small"),
+                            "Total_Weight": st.column_config.NumberColumn("Wt %", format="%.1f%%", width="small"),
+                            "Avg_Yield": st.column_config.NumberColumn("Avg Yld %", format="%.2f%%", width="small"),
+                        })
+                    with col_pie:
+                        pie_colors = [SECTOR_COLORS.get(s, "#888") for s in sect_agg.index]
+                        fig_pie = go.Figure(go.Pie(
+                            labels=sect_agg.index.tolist(),
+                            values=sect_agg["Total_Weight"].tolist(),
+                            marker=dict(colors=pie_colors),
+                            hole=0.45,
+                            textinfo="label+percent",
+                            textposition="outside",
+                            textfont=dict(size=10, color="rgba(255,255,255,0.6)"),
+                            hovertemplate="%{label}: %{value:.1f}%<extra></extra>",
+                            sort=False,
+                        ))
+                        _pie_layout = {**PLOTLY_DARK}
+                        _pie_layout["margin"] = dict(l=10, r=10, t=10, b=10)
+                        fig_pie.update_layout(
+                            **_pie_layout,
+                            height=max(260, len(sect_agg) * 28 + 80),
+                            showlegend=False,
+                        )
+                        st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
+
+                # ── Finviz Analyst Enrichment (Sprint 7) ─────────────────
+                if FINVIZ_AVAILABLE:
+                    st.divider()
+                    render_finviz_panel(tam_df, price_data, notion_data=notion_data)
+
+                st.caption(f"Tamarac export + yfinance live prices • {datetime.now().strftime('%I:%M %p')}")
+
+            else:
+                st.info("No holdings in Tamarac file for this strategy.")
+
+        # ── Sprint 1 fallback ─────────────────────────────────────────────
+        else:
+            search = st.text_input("🔍 Search ticker or company", placeholder="JNJ, Coca-Cola...", key="holdings_search")
+            holdings_df = get_holdings(active)
+
+            if holdings_df.empty:
+                st.info("No holdings data. Upload a Tamarac export below.")
+            else:
+                if search:
+                    mask = (
+                        holdings_df["ticker"].str.lower().str.contains(search.lower(), na=False) |
+                        holdings_df["name"].str.lower().str.contains(search.lower(), na=False)
+                    )
+                    holdings_df = holdings_df[mask]
+
+                sort_opts = [c for c in ["weight","ytd","div_yield","quality","chg1d"] if c in holdings_df.columns]
+                c1, c2 = st.columns([2,1])
+                with c1: sort_by = st.selectbox("Sort by", sort_opts)
+                with c2: sort_asc = st.checkbox("Ascending", value=False)
+                holdings_df = holdings_df.sort_values(sort_by, ascending=sort_asc)
+
+                display_cols = ["ticker","name","weight","price","chg1d","ytd","div_yield","div_growth_5y","sector","div_culture","quality"]
+                available = [c for c in display_cols if c in holdings_df.columns]
+                show_df = holdings_df[available].copy()
+                for col in ["weight","chg1d","ytd","div_yield","div_growth_5y"]:
+                    if col in show_df.columns:
+                        show_df[col] = show_df[col].apply(lambda x: f"+{x:.2f}%" if pd.notna(x) and float(x) >= 0 else f"{x:.2f}%" if pd.notna(x) else "—")
+                if "price" in show_df.columns:
+                    show_df["price"] = show_df["price"].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "—")
+                show_df.columns = [c.replace("_"," ").title() for c in show_df.columns]
+                st.dataframe(show_df, use_container_width=True, hide_index=True)
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SUB-TAB 2: PRICE CHARTS GRID
+    # ═══════════════════════════════════════════════════════════════════════
+    with sub_charts:
+        if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
+            _charts_tam = get_holdings_for_strategy(tamarac_parsed, active)
+            if not _charts_tam.empty:
+                _chart_tickers = _charts_tam["symbol"].tolist()
+                _chart_names = dict(zip(_charts_tam["symbol"], _charts_tam["description"]))
+
+                # Period selector — button row matching Stock Detail style
+                _period_map = {"1M": "1mo", "3M": "3mo", "6M": "6mo", "YTD": "ytd", "1Y": "1y", "2Y": "2y"}
+                if "hc_period" not in st.session_state:
+                    st.session_state["hc_period"] = "1Y"
+
+                _pcols = st.columns(len(_period_map))
+                for _pi, (_plabel, _) in enumerate(_period_map.items()):
+                    with _pcols[_pi]:
+                        if st.button(_plabel, key=f"hc_p_{_plabel}", use_container_width=True,
+                                     type="primary" if st.session_state["hc_period"] == _plabel else "secondary"):
+                            st.session_state["hc_period"] = _plabel
+                            st.rerun()
+
+                _sel_period = _period_map[st.session_state["hc_period"]]
+
+                # Batch download — single yfinance call for all tickers
+                @st.cache_data(ttl=900, show_spinner=False)
+                def _fetch_chart_batch(tickers_tuple, period, _v=1):
+                    import yfinance as yf
+                    try:
+                        return yf.download(
+                            " ".join(tickers_tuple),
+                            period=period,
+                            interval="1d",
+                            group_by="ticker",
+                            progress=False,
+                            threads=True,
+                        )
+                    except Exception:
+                        return None
+
+                with st.spinner(f"Loading {len(_chart_tickers)} charts..."):
+                    _batch_data = _fetch_chart_batch(tuple(_chart_tickers), _sel_period)
+
+                if _batch_data is not None and not _batch_data.empty:
+                    # Render 4-column grid of mini charts
+                    _ncols = 4
+                    _rows_of_tickers = [_chart_tickers[i:i + _ncols] for i in range(0, len(_chart_tickers), _ncols)]
+
+                    for _row_tickers in _rows_of_tickers:
+                        _cols = st.columns(_ncols)
+                        for _ci, _tk in enumerate(_row_tickers):
+                            with _cols[_ci]:
+                                try:
+                                    if len(_chart_tickers) == 1:
+                                        _tk_df = _batch_data
+                                    else:
+                                        _tk_df = _batch_data[_tk] if _tk in _batch_data.columns.get_level_values(0) else None
+
+                                    if _tk_df is None or _tk_df.empty or _tk_df.dropna(subset=["Close"]).empty:
+                                        st.caption(f"{_tk} — no data")
+                                        continue
+
+                                    _tk_df = _tk_df.dropna(subset=["Close"])
+                                    _close = _tk_df["Close"]
+                                    _first = float(_close.iloc[0])
+                                    _last = float(_close.iloc[-1])
+                                    _chg_pct = ((_last - _first) / _first * 100) if _first > 0 else 0
+                                    _chg_color = "#569542" if _chg_pct >= 0 else "#c45454"
+
+                                    # Compact header: TICKER  +X.X%  $Price
+                                    st.markdown(
+                                        f"<div style='display:flex;align-items:baseline;gap:8px;padding:2px 0 0;'>"
+                                        f"<span style='font-size:13px;font-weight:700;color:#C9A84C;'>{_tk}</span>"
+                                        f"<span style='font-size:12px;font-weight:600;color:{_chg_color};'>{_chg_pct:+.1f}%</span>"
+                                        f"<span style='font-size:11px;color:rgba(255,255,255,0.4);'>${_last:,.2f}</span>"
+                                        f"</div>"
+                                        f"<div style='font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:2px;'>"
+                                        f"{_chart_names.get(_tk, '')[:30]}</div>",
+                                        unsafe_allow_html=True,
+                                    )
+
+                                    # Mini price chart with fill
+                                    _fig = go.Figure()
+                                    _fig.add_trace(go.Scatter(
+                                        x=_tk_df.index, y=_close,
+                                        mode="lines",
+                                        line=dict(color=_chg_color, width=1.5),
+                                        fill="tozeroy",
+                                        fillcolor=("rgba(86,149,66,0.06)" if _chg_pct >= 0 else "rgba(196,84,84,0.06)"),
+                                        hovertemplate="%{x|%b %d}<br>$%{y:.2f}<extra></extra>",
+                                    ))
+
+                                    _fig_layout = {**PLOTLY_DARK}
+                                    _fig_layout["margin"] = dict(l=0, r=0, t=0, b=0)
+                                    _fig.update_layout(
+                                        **_fig_layout,
+                                        height=120,
+                                        showlegend=False,
+                                        hovermode="x unified",
+                                        dragmode=False,
+                                    )
+                                    _fig.update_xaxes(visible=False, fixedrange=True)
+                                    _fig.update_yaxes(visible=False, fixedrange=True)
+                                    st.plotly_chart(
+                                        _fig, use_container_width=True,
+                                        config=PLOTLY_CONFIG_HOVER,
+                                        key=f"hc_{_tk}_{st.session_state['hc_period']}",
+                                    )
+                                except Exception:
+                                    st.caption(f"{_tk} — chart error")
+
+                    st.caption(f"{len(_chart_tickers)} holdings · {st.session_state['hc_period']} · yfinance · {datetime.now().strftime('%I:%M %p')}")
+                else:
+                    st.warning("Could not load chart data. Try refreshing.")
+            else:
+                st.info("No holdings in Tamarac file for this strategy.")
+        else:
+            st.info("Price charts require Tamarac holdings data.")
 
 
 # ══════════════════════════════════════════════════════════════════════════
