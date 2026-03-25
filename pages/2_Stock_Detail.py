@@ -927,6 +927,18 @@ _si_date = info.get("dateShortInterest", 0)
 _shares_out_raw = info.get("sharesOutstanding")
 _shares_out = int(_shares_out_raw) if _shares_out_raw and isinstance(_shares_out_raw, (int, float)) else 0
 
+# ── DEBUG: remove after confirming ────────────────────────────────────
+st.markdown("---")
+st.caption(
+    f"DEBUG SHORT INTEREST — "
+    f"sharesShort raw={repr(_si_shares_raw)} → {_si_shares} | "
+    f"shortPctFloat raw={repr(_si_pct_raw)} → {_si_pct} | "
+    f"shortRatio raw={repr(_si_ratio_raw)} → {_si_ratio} | "
+    f"_from_supabase={info.get('_from_supabase', 'NO KEY')} | "
+    f"info keys count={len(info)}"
+)
+# ── END DEBUG ─────────────────────────────────────────────────────────
+
 if _si_shares > 0:
     st.markdown("---")
     st.markdown(
