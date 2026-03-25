@@ -83,38 +83,70 @@ def _yf_quote(ticker):
 
 @st.cache_data(ttl=3600)
 def _yf_sp500_metrics():
-    """Get S&P 500 forward P/E and related metrics via yfinance."""
-    try:
-        import yfinance as yf
-        spy = yf.Ticker("SPY")
-        info = spy.info or {}
-        fi = spy.fast_info
+    """
+    Get S&P 500 P/E, earnings yield, and dividend yield.
+    Primary: scrape multpl.com (free, reliable, daily updates, no rate limits).
+    Fallback: Finviz SPY dividend yield + yfinance.
+    """
+    import re
+    from bs4 import BeautifulSoup
 
-        fwd_pe = info.get("forwardPE")
-        trailing_pe = info.get("trailingPE")
-        div_yield = info.get("dividendYield")
-        price = getattr(fi, "last_price", None)
+    result = {"fwd_pe": None, "trailing_pe": None, "div_yield": None, "price": None}
 
-        # Fallback P/E: compute from trailingEps if available
-        if fwd_pe is None and trailing_pe is None:
-            eps = info.get("trailingEps")
-            if eps and eps > 0 and price and price > 0:
-                trailing_pe = round(price / eps, 1)
+    def _scrape_multpl(url):
+        """Scrape a single numeric value from a multpl.com page."""
+        try:
+            resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+            soup = BeautifulSoup(resp.text, "html.parser")
+            current_div = soup.find("div", id="current")
+            if current_div:
+                match = re.search(r'(\d+\.\d+)', current_div.get_text())
+                if match:
+                    return float(match.group(1))
+        except Exception:
+            pass
+        return None
 
-        # Fallback div yield: compute from dividendRate / price
-        if div_yield is None:
-            div_rate = info.get("dividendRate")
-            if div_rate and price and price > 0:
-                div_yield = div_rate / price
+    # ── 1. Trailing P/E from multpl.com ───────────────────────────────────
+    result["trailing_pe"] = _scrape_multpl("https://www.multpl.com/s-p-500-pe-ratio")
 
-        return {
-            "fwd_pe": fwd_pe,
-            "trailing_pe": trailing_pe,
-            "div_yield": div_yield,
-            "price": price,
-        }
-    except Exception:
-        return {}
+    # ── 2. S&P 500 dividend yield from multpl.com ─────────────────────────
+    div_pct = _scrape_multpl("https://www.multpl.com/s-p-500-dividend-yield")
+    if div_pct:
+        result["div_yield"] = div_pct / 100  # Store as decimal (e.g., 0.012)
+
+    # ── 3. Forward P/E estimate from trailing ─────────────────────────────
+    # FactSet reports ~20.3 fwd vs ~28 trailing (ratio ~0.73) as of Mar 2026
+    if result["trailing_pe"] and result["trailing_pe"] > 0:
+        result["fwd_pe"] = round(result["trailing_pe"] * 0.73, 1)
+
+    # ── 4. Finviz fallback for dividend yield ─────────────────────────────
+    if result["div_yield"] is None:
+        try:
+            from finvizfinance.quote import finvizfinance as _fvq
+            spy_raw = _fvq("SPY").ticker_fundament()
+            div_ttm = spy_raw.get("Dividend TTM", "")
+            if div_ttm and "(" in div_ttm:
+                yield_str = div_ttm.split("(")[1].replace(")", "").replace("%", "").strip()
+                result["div_yield"] = float(yield_str) / 100
+        except Exception:
+            pass
+
+    # ── 5. yfinance as last resort ────────────────────────────────────────
+    if result["trailing_pe"] is None:
+        try:
+            import yfinance as yf
+            spy = yf.Ticker("SPY")
+            info = spy.info or {}
+            result["fwd_pe"] = info.get("forwardPE")
+            result["trailing_pe"] = info.get("trailingPE")
+            if result["div_yield"] is None:
+                result["div_yield"] = info.get("dividendYield")
+            result["price"] = getattr(spy.fast_info, "last_price", None)
+        except Exception:
+            pass
+
+    return result
 
 
 # ── FRED Series IDs ────────────────────────────────────────────────────────
@@ -797,13 +829,6 @@ def render_macro_tab(qdvd_yield=None):
         premium = qdvd_yield - sp_div_pct
         status = "positive" if premium > 0.5 else "neutral"
         val_rows.append(("QDVD Yield Premium", f"+{premium:.2f}%", f"QDVD {qdvd_yield:.2f}% vs S&P {sp_div_pct:.2f}%", status))
-
-    # Mortgage rates as context
-    for name, series_id in MORTGAGE_SERIES.items():
-        latest, prev, _ = _fred_latest(series_id)
-        if latest:
-            status = "positive" if latest < 5.5 else "neutral" if latest < 7.0 else "elevated"
-            val_rows.append((name, f"{latest:.2f}%", "Weekly avg from Freddie Mac", status))
 
     # Render as one single table inside a scroll container
     _vtw = "width:100%;border-collapse:collapse;table-layout:fixed;min-width:480px"
