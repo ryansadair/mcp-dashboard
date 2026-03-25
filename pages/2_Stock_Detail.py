@@ -913,13 +913,19 @@ if _FINVIZ_AVAILABLE:
 # ══════════════════════════════════════════════════════════════════════════
 # SHORT INTEREST
 # ══════════════════════════════════════════════════════════════════════════
-_si_shares = g("sharesShort", 0) or 0
-_si_float = g("floatShares", 0) or 0
-_si_pct = g("shortPercentOfFloat", 0) or 0
-_si_ratio = g("shortRatio", 0) or 0
-_si_prior = g("sharesShortPriorMonth", 0) or 0
-_si_date = g("dateShortInterest", 0)
-_shares_out = g("sharesOutstanding", 0) or 0
+_si_shares_raw = info.get("sharesShort")
+_si_shares = int(_si_shares_raw) if _si_shares_raw and isinstance(_si_shares_raw, (int, float)) else 0
+_si_float_raw = info.get("floatShares")
+_si_float = int(_si_float_raw) if _si_float_raw and isinstance(_si_float_raw, (int, float)) else 0
+_si_pct_raw = info.get("shortPercentOfFloat")
+_si_pct = float(_si_pct_raw) if _si_pct_raw and isinstance(_si_pct_raw, (int, float)) else 0
+_si_ratio_raw = info.get("shortRatio")
+_si_ratio = float(_si_ratio_raw) if _si_ratio_raw and isinstance(_si_ratio_raw, (int, float)) else 0
+_si_prior_raw = info.get("sharesShortPriorMonth")
+_si_prior = int(_si_prior_raw) if _si_prior_raw and isinstance(_si_prior_raw, (int, float)) else 0
+_si_date = info.get("dateShortInterest", 0)
+_shares_out_raw = info.get("sharesOutstanding")
+_shares_out = int(_shares_out_raw) if _shares_out_raw and isinstance(_shares_out_raw, (int, float)) else 0
 
 if _si_shares > 0:
     st.markdown("---")
