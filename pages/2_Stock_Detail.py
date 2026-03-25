@@ -491,44 +491,48 @@ yf_warning = data.get("yf_warning")
 
 # If info is empty (yfinance rate-limited, ticker not in Supabase), try Finviz for basics
 if not info.get("longName") and not info.get("shortName"):
-    _fv_fallback_status = "Starting Finviz fallback..."
+    _fv_fallback_status = ""
     if _FINVIZ_AVAILABLE:
         try:
             _fallback_fv = fetch_finviz_batch((ticker_input,))
             _fb = _fallback_fv.get(ticker_input, {})
-            _fv_fallback_status = f"Finviz returned {len(_fb)} keys. ALL KEYS: {sorted(_fb.keys())}"
-            # Try multiple possible field names for company name
-            _fv_name = _fb.get("company_name") or _fb.get("name") or _fb.get("Company") or ""
-            if _fv_name:
+            if _fb and len(_fb) > 0:
+                # fetch_finviz_batch doesn't store company name/sector — get them directly
+                _fv_company = ""
+                _fv_sector = ""
+                _fv_industry = ""
+                try:
+                    from finvizfinance.quote import finvizfinance as _fvq
+                    _fv_raw = _fvq(ticker_input).ticker_fundament()
+                    _fv_company = _fv_raw.get("Company", "")
+                    _fv_sector = _fv_raw.get("Sector", "")
+                    _fv_industry = _fv_raw.get("Industry", "")
+                except Exception:
+                    pass
+
                 info = {
-                    "longName": _fv_name,
+                    "longName": _fv_company or ticker_input,
                     "shortName": ticker_input,
-                    "sector": _fb.get("sector", "") or _fb.get("Sector", ""),
-                    "industry": _fb.get("industry", "") or _fb.get("Industry", ""),
-                    "currentPrice": _fb.get("price", 0) or _fb.get("Price", 0),
-                    "marketCap": _fb.get("market_cap_raw", 0),
+                    "sector": _fv_sector,
+                    "industry": _fv_industry,
+                    "currentPrice": _fb.get("price", 0),
+                    "marketCap": 0,
                     "trailingPE": _fb.get("pe", 0),
                     "forwardPE": _fb.get("forward_pe", 0),
                     "beta": _fb.get("beta", 0),
-                    "dividendYield": (_fb.get("dividend_yield", 0) or 0) / 100 if _fb.get("dividend_yield") else 0,
+                    "priceToBook": _fb.get("pb", 0),
+                    "priceToSalesTrailing12Months": _fb.get("ps", 0),
+                    "pegRatio": _fb.get("peg", 0),
+                    "returnOnEquity": (_fb.get("roe", 0) or 0) / 100 if _fb.get("roe") else 0,
+                    "profitMargins": (_fb.get("profit_margin", 0) or 0) / 100 if _fb.get("profit_margin") else 0,
+                    "dividendYield": (_fb.get("div_yield_finviz", 0) or 0) / 100 if _fb.get("div_yield_finviz") else 0,
                     "_from_finviz_fallback": True,
                 }
                 data["info"] = info
                 if not yf_warning:
                     yf_warning = "yfinance unavailable — showing Finviz data. Some sections may be limited."
-                _fv_fallback_status += f" → SUCCESS: name={_fv_name}"
-            else:
-                _fv_fallback_status += f" → No company name found in keys"
-        except Exception as fv_err:
-            _fv_fallback_status = f"Finviz fallback EXCEPTION: {fv_err}"
-    else:
-        _fv_fallback_status = "Finviz not available (_FINVIZ_AVAILABLE=False)"
-
-    # DEBUG — always show what happened
-    st.caption(
-        f"DEBUG: fetch_error={_fetch_error} | info_keys={len(info)} | "
-        f"has_longName={info.get('longName', 'NONE')} | {_fv_fallback_status}"
-    )
+        except Exception:
+            pass
 
 if not info.get("longName") and not info.get("shortName"):
     st.error(f"No data found for '{ticker_input}'. Check the ticker symbol.")
