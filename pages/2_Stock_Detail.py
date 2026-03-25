@@ -496,7 +496,7 @@ if not info.get("longName") and not info.get("shortName"):
         try:
             _fallback_fv = fetch_finviz_batch((ticker_input,))
             _fb = _fallback_fv.get(ticker_input, {})
-            _fv_fallback_status = f"Finviz returned {len(_fb)} keys. Keys: {sorted(_fb.keys())[:10]}"
+            _fv_fallback_status = f"Finviz returned {len(_fb)} keys. ALL KEYS: {sorted(_fb.keys())}"
             # Try multiple possible field names for company name
             _fv_name = _fb.get("company_name") or _fb.get("name") or _fb.get("Company") or ""
             if _fv_name:
