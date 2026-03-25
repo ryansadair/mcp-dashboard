@@ -216,14 +216,14 @@ def _render_market_table(items, quotes, show_pct=True, section_label=None):
 
         # Format change
         chg_str = f"{chg:+.2f}"
-        pct_str = f"{pct:+.1f}%"
+        pct_str = f"{pct:+.2f}%"
 
         # Format % from high — always negative or zero
         if pct_from_high == 0 and price > 0:
             from_high_str = "AT HIGH"
             from_high_color = "#569542"
         elif pct_from_high != 0:
-            from_high_str = f"{pct_from_high:.1f}%"
+            from_high_str = f"{pct_from_high:.2f}%"
             from_high_color = "#c45454"
         else:
             from_high_str = "—"
