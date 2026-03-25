@@ -472,8 +472,16 @@ with st.spinner(f"Loading {ticker_input}..."):
     try:
         data = fetch_stock_data(ticker_input)
     except Exception as e:
-        st.error(f"Could not fetch data for '{ticker_input}': {e}")
-        st.stop()
+        # yfinance failed and Supabase has nothing — create empty shell
+        data = {
+            "info": {},
+            "history": pd.DataFrame(),
+            "dividends": pd.Series(dtype=float),
+            "financials": pd.DataFrame(),
+            "quarterly_financials": pd.DataFrame(),
+            "recommendations": pd.DataFrame(),
+            "yf_warning": f"yfinance unavailable — showing Finviz data where possible.",
+        }
 
 info = data["info"]
 hist = data["history"]
@@ -500,6 +508,7 @@ if not info.get("longName") and not info.get("shortName"):
                     "dividendYield": (_fb.get("dividend_yield", 0) or 0) / 100 if _fb.get("dividend_yield") else 0,
                     "_from_finviz_fallback": True,
                 }
+                data["info"] = info
                 if not yf_warning:
                     yf_warning = "yfinance unavailable — showing Finviz data. Some sections may be limited."
         except Exception:
