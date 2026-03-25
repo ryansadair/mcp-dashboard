@@ -995,6 +995,17 @@ if _si_has_data:
         'Short Interest</div>',
         unsafe_allow_html=True,
     )
+    # DEBUG: show all values feeding into the cards
+    _fv_short_keys = [k for k in sorted(_fv_short.keys()) if "short" in k.lower() or "float" in k.lower() or "share" in k.lower() or "out" in k.lower()]
+    st.caption(
+        f"DEBUG: pct={_si_pct_display} | ratio={_si_ratio} | shares={_si_shares_str} | "
+        f"float={_si_float_str} | out={_si_out_str if '_si_out_str' in dir() else 'UNDEF'} | "
+        f"Relevant fv keys: {_fv_short_keys} | "
+        f"fv vals: short_float={_fv_short.get('short_float')} short_ratio={_fv_short.get('short_ratio')} "
+        f"short_interest={_fv_short.get('short_interest')} float_shares={_fv_short.get('float_shares')} "
+        f"shares_outstanding={_fv_short.get('shares_outstanding')} shs_float={_fv_short.get('shs_float')} "
+        f"shs_outstand={_fv_short.get('shs_outstand')}"
+    )
 else:
     # DEBUG: show what we have so we can fix field names
     st.markdown("---")
