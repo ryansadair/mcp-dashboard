@@ -451,18 +451,13 @@ def fetch_stock_data(ticker):
     except Exception as e:
         err_str = str(e).lower()
         if "too many requests" in err_str or "rate limit" in err_str or "429" in err_str:
-            if not sb_has_hist:
-                yf_warning = "yfinance rate limited — price chart unavailable until next prefetch."
+            yf_warning = "yfinance rate limited — showing available data from other sources."
         else:
-            if not sb_has_hist:
-                yf_warning = f"yfinance unavailable ({e}) — showing cached data where available."
+            yf_warning = f"yfinance unavailable — showing available data from other sources."
 
-        # If Supabase also has nothing, we truly have no data
-        if not info:
-            raise Exception(f"No data available for '{ticker}'. Check the ticker symbol and try again.")
-
+    # Never crash — return whatever we have, even if info is empty
     return {
-        "info":                  info,
+        "info":                  info if info else {},
         "history":               hist,
         "dividends":             div_hist,
         "financials":            financials,
@@ -484,6 +479,31 @@ info = data["info"]
 hist = data["history"]
 divs = data["dividends"]
 yf_warning = data.get("yf_warning")
+
+# If info is empty (yfinance rate-limited, ticker not in Supabase), try Finviz for basics
+if not info.get("longName") and not info.get("shortName"):
+    if _FINVIZ_AVAILABLE:
+        try:
+            _fallback_fv = fetch_finviz_batch((ticker_input,))
+            _fb = _fallback_fv.get(ticker_input, {})
+            if _fb.get("company_name"):
+                info = {
+                    "longName": _fb.get("company_name", ticker_input),
+                    "shortName": ticker_input,
+                    "sector": _fb.get("sector", ""),
+                    "industry": _fb.get("industry", ""),
+                    "currentPrice": _fb.get("price", 0),
+                    "marketCap": _fb.get("market_cap_raw", 0),
+                    "trailingPE": _fb.get("pe", 0),
+                    "forwardPE": _fb.get("forward_pe", 0),
+                    "beta": _fb.get("beta", 0),
+                    "dividendYield": (_fb.get("dividend_yield", 0) or 0) / 100 if _fb.get("dividend_yield") else 0,
+                    "_from_finviz_fallback": True,
+                }
+                if not yf_warning:
+                    yf_warning = "yfinance unavailable — showing Finviz data. Some sections may be limited."
+        except Exception:
+            pass
 
 if not info.get("longName") and not info.get("shortName"):
     st.error(f"No data found for '{ticker_input}'. Check the ticker symbol.")
