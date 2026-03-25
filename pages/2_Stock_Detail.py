@@ -911,17 +911,17 @@ if _FINVIZ_AVAILABLE:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# SHORT INTEREST (Finviz primary, yfinance info fallback)
+# SHORT INTEREST (Finviz short_float + info dict fallback)
 # ══════════════════════════════════════════════════════════════════════════
 
-# Gather short interest data — prefer Finviz (already loaded), fall back to info dict
 _si_pct_display = 0.0
 _si_ratio = 0.0
 _si_shares_str = "—"
 _si_float_str = "—"
+_si_out_str = "—"
 _si_has_data = False
 
-# Finviz fields (fv is set inside the Finviz section above when _FINVIZ_AVAILABLE and fv exist)
+# 1. Finviz: only has short_float
 _fv_short = {}
 if _FINVIZ_AVAILABLE:
     try:
@@ -929,63 +929,38 @@ if _FINVIZ_AVAILABLE:
     except NameError:
         _fv_short = {}
 
-if _fv_short:
-    _sf = _fv_short.get("short_float")  # already a float like 2.5 (percent)
-    _sr = _fv_short.get("short_ratio")  # float like 3.17
-    _si_raw = _fv_short.get("short_interest")  # string like "124.19M" or float
-    _fl_raw = _fv_short.get("float_shares")    # string like "14.66B" or float
-    _so_raw = _fv_short.get("shares_outstanding")  # string or float
+_sf = _fv_short.get("short_float") if _fv_short else None
+if _sf is not None and isinstance(_sf, (int, float)) and _sf > 0:
+    _si_pct_display = round(_sf, 2)
+    _si_has_data = True
 
-    if _sf is not None and _sf > 0:
-        _si_pct_display = round(_sf, 2)
-        _si_has_data = True
-    if _sr is not None and _sr > 0:
-        _si_ratio = round(_sr, 2)
+# 2. info dict: may have richer data if yfinance merge happened
+_yf_pct = info.get("shortPercentOfFloat")
+if not _si_has_data and _yf_pct and isinstance(_yf_pct, (int, float)) and _yf_pct > 0:
+    _si_pct_display = round(_yf_pct * 100, 2) if _yf_pct < 1 else round(_yf_pct, 2)
+    _si_has_data = True
 
-    # Format share counts — Finviz may store as float (raw count) or pre-formatted
-    def _fmt_si_val(val):
-        if val is None:
-            return "—"
-        if isinstance(val, str):
-            return val  # already formatted like "124.19M"
-        if isinstance(val, (int, float)) and val > 0:
-            if val >= 1e9: return f"{val/1e9:.2f}B"
-            if val >= 1e6: return f"{val/1e6:.1f}M"
-            if val >= 1e3: return f"{val/1e3:.0f}K"
-            return f"{val:,.0f}"
-        return "—"
+_yf_ratio = info.get("shortRatio")
+if _yf_ratio and isinstance(_yf_ratio, (int, float)) and _yf_ratio > 0:
+    _si_ratio = round(_yf_ratio, 2)
 
-    _si_shares_str = _fmt_si_val(_si_raw)
-    _si_float_str = _fmt_si_val(_fl_raw)
-    _si_out_str = _fmt_si_val(_so_raw)
+_yf_shares = info.get("sharesShort")
+if _yf_shares and isinstance(_yf_shares, (int, float)) and _yf_shares > 0:
+    if _yf_shares >= 1e9: _si_shares_str = f"{_yf_shares/1e9:.2f}B"
+    elif _yf_shares >= 1e6: _si_shares_str = f"{_yf_shares/1e6:.1f}M"
+    else: _si_shares_str = f"{_yf_shares:,.0f}"
 
-# Fallback: try info dict (works when yfinance merge happened)
-if not _si_has_data:
-    _yf_pct = info.get("shortPercentOfFloat")
-    _yf_shares = info.get("sharesShort")
-    if _yf_pct and isinstance(_yf_pct, (int, float)) and _yf_pct > 0:
-        _si_pct_display = round(_yf_pct * 100, 2) if _yf_pct < 1 else round(_yf_pct, 2)
-        _si_has_data = True
-    if _yf_shares and isinstance(_yf_shares, (int, float)) and _yf_shares > 0:
-        _si_has_data = True
-        if _yf_shares >= 1e9: _si_shares_str = f"{_yf_shares/1e9:.2f}B"
-        elif _yf_shares >= 1e6: _si_shares_str = f"{_yf_shares/1e6:.1f}M"
-        else: _si_shares_str = f"{_yf_shares:,.0f}"
-    _yf_ratio = info.get("shortRatio")
-    if _yf_ratio and isinstance(_yf_ratio, (int, float)):
-        _si_ratio = round(_yf_ratio, 2)
-    _yf_float = info.get("floatShares")
-    if _yf_float and isinstance(_yf_float, (int, float)) and _yf_float > 0:
-        if _yf_float >= 1e9: _si_float_str = f"{_yf_float/1e9:.2f}B"
-        elif _yf_float >= 1e6: _si_float_str = f"{_yf_float/1e6:.1f}M"
-        else: _si_float_str = f"{_yf_float:,.0f}"
-    _yf_out = info.get("sharesOutstanding")
-    if _yf_out and isinstance(_yf_out, (int, float)) and _yf_out > 0:
-        if _yf_out >= 1e9: _si_out_str = f"{_yf_out/1e9:.2f}B"
-        elif _yf_out >= 1e6: _si_out_str = f"{_yf_out/1e6:.1f}M"
-        else: _si_out_str = f"{_yf_out:,.0f}"
-    else:
-        _si_out_str = "—"
+_yf_float = info.get("floatShares")
+if _yf_float and isinstance(_yf_float, (int, float)) and _yf_float > 0:
+    if _yf_float >= 1e9: _si_float_str = f"{_yf_float/1e9:.2f}B"
+    elif _yf_float >= 1e6: _si_float_str = f"{_yf_float/1e6:.1f}M"
+    else: _si_float_str = f"{_yf_float:,.0f}"
+
+_yf_out = info.get("sharesOutstanding")
+if _yf_out and isinstance(_yf_out, (int, float)) and _yf_out > 0:
+    if _yf_out >= 1e9: _si_out_str = f"{_yf_out/1e9:.2f}B"
+    elif _yf_out >= 1e6: _si_out_str = f"{_yf_out/1e6:.1f}M"
+    else: _si_out_str = f"{_yf_out:,.0f}"
 
 if _si_has_data:
     st.markdown("---")
@@ -994,30 +969,6 @@ if _si_has_data:
         'text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">'
         'Short Interest</div>',
         unsafe_allow_html=True,
-    )
-    # DEBUG: show all values feeding into the cards
-    _fv_short_keys = [k for k in sorted(_fv_short.keys()) if "short" in k.lower() or "float" in k.lower() or "share" in k.lower() or "out" in k.lower()]
-    st.caption(
-        f"DEBUG: pct={_si_pct_display} | ratio={_si_ratio} | shares={_si_shares_str} | "
-        f"float={_si_float_str} | out={_si_out_str if '_si_out_str' in dir() else 'UNDEF'} | "
-        f"Relevant fv keys: {_fv_short_keys} | "
-        f"fv vals: short_float={_fv_short.get('short_float')} short_ratio={_fv_short.get('short_ratio')} "
-        f"short_interest={_fv_short.get('short_interest')} float_shares={_fv_short.get('float_shares')} "
-        f"shares_outstanding={_fv_short.get('shares_outstanding')} shs_float={_fv_short.get('shs_float')} "
-        f"shs_outstand={_fv_short.get('shs_outstand')}"
-    )
-else:
-    # DEBUG: show what we have so we can fix field names
-    st.markdown("---")
-    _fv_keys = sorted(_fv_short.keys()) if _fv_short else []
-    _fv_short_keys = [k for k in _fv_keys if "short" in k.lower() or "float" in k.lower() or "share" in k.lower() or "out" in k.lower()]
-    st.caption(
-        f"DEBUG SI: _si_has_data={_si_has_data} | "
-        f"fv short_float={_fv_short.get('short_float', 'MISSING')} | "
-        f"fv short_ratio={_fv_short.get('short_ratio', 'MISSING')} | "
-        f"fv short_interest={_fv_short.get('short_interest', 'MISSING')} | "
-        f"fv float_shares={_fv_short.get('float_shares', 'MISSING')} | "
-        f"Relevant fv keys: {_fv_short_keys}"
     )
 
     _si_pct_color = "#c45454" if _si_pct_display >= 5 else GOLD if _si_pct_display >= 3 else "rgba(255,255,255,0.9)"
@@ -1031,18 +982,23 @@ else:
             f'</div>'
         )
 
+    # Only show cards that have real data
+    _si_cards = _si_card("Short % of Float", f"{_si_pct_display:.2f}%", _si_pct_color)
+    if _si_ratio > 0:
+        _si_cards += _si_card("Short Ratio (Days)", f"{_si_ratio:.1f}")
+    if _si_shares_str != "—":
+        _si_cards += _si_card("Shares Short", _si_shares_str)
+    if _si_float_str != "—":
+        _si_cards += _si_card("Float", _si_float_str)
+    if _si_out_str != "—":
+        _si_cards += _si_card("Shares Outstanding", _si_out_str)
+
     st.markdown(
-        f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
-        f'{_si_card("Short % of Float", f"{_si_pct_display:.2f}%", _si_pct_color)}'
-        f'{_si_card("Short Ratio (Days)", f"{_si_ratio:.1f}" if _si_ratio else "—")}'
-        f'{_si_card("Shares Short", _si_shares_str)}'
-        f'{_si_card("Float", _si_float_str)}'
-        f'{_si_card("Shares Outstanding", _si_out_str)}'
-        f'</div>',
+        f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">{_si_cards}</div>',
         unsafe_allow_html=True,
     )
 
-    st.caption("Source: Finviz")
+    st.caption("Source: Finviz / yfinance")
 
 
 
