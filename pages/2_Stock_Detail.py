@@ -911,40 +911,83 @@ if _FINVIZ_AVAILABLE:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# SHORT INTEREST
+# SHORT INTEREST (Finviz primary, yfinance info fallback)
 # ══════════════════════════════════════════════════════════════════════════
-_si_shares_raw = info.get("sharesShort")
-_si_float_raw = info.get("floatShares")
-_si_pct_raw = info.get("shortPercentOfFloat")
-_si_ratio_raw = info.get("shortRatio")
-_si_prior_raw = info.get("sharesShortPriorMonth")
-_si_date_raw = info.get("dateShortInterest")
-_shares_out_raw = info.get("sharesOutstanding")
 
-# If Supabase didn't have short interest data, fetch from yfinance directly
-if _si_shares_raw is None:
+# Gather short interest data — prefer Finviz (already loaded), fall back to info dict
+_si_pct_display = 0.0
+_si_ratio = 0.0
+_si_shares_str = "—"
+_si_float_str = "—"
+_si_has_data = False
+
+# Finviz fields (fv is set inside the Finviz section above when _FINVIZ_AVAILABLE and fv exist)
+_fv_short = {}
+if _FINVIZ_AVAILABLE:
     try:
-        _si_tk = yf.Ticker(ticker_input)
-        _si_info = _si_tk.info or {}
-        _si_shares_raw = _si_info.get("sharesShort")
-        _si_float_raw = _si_info.get("floatShares")
-        _si_pct_raw = _si_info.get("shortPercentOfFloat")
-        _si_ratio_raw = _si_info.get("shortRatio")
-        _si_prior_raw = _si_info.get("sharesShortPriorMonth")
-        _si_date_raw = _si_info.get("dateShortInterest")
-        _shares_out_raw = _si_info.get("sharesOutstanding") or _shares_out_raw
-    except Exception:
-        pass
+        _fv_short = fv_data.get(ticker_input, {})
+    except NameError:
+        _fv_short = {}
 
-_si_shares = int(_si_shares_raw) if _si_shares_raw and isinstance(_si_shares_raw, (int, float)) else 0
-_si_float = int(_si_float_raw) if _si_float_raw and isinstance(_si_float_raw, (int, float)) else 0
-_si_pct = float(_si_pct_raw) if _si_pct_raw and isinstance(_si_pct_raw, (int, float)) else 0
-_si_ratio = float(_si_ratio_raw) if _si_ratio_raw and isinstance(_si_ratio_raw, (int, float)) else 0
-_si_prior = int(_si_prior_raw) if _si_prior_raw and isinstance(_si_prior_raw, (int, float)) else 0
-_si_date = _si_date_raw if _si_date_raw else 0
-_shares_out = int(_shares_out_raw) if _shares_out_raw and isinstance(_shares_out_raw, (int, float)) else 0
+if _fv_short:
+    _sf = _fv_short.get("short_float")  # already a float like 2.5 (percent)
+    _sr = _fv_short.get("short_ratio")  # float like 3.17
+    _si_raw = _fv_short.get("short_interest")  # string like "124.19M" or float
+    _fl_raw = _fv_short.get("float_shares")    # string like "14.66B" or float
+    _so_raw = _fv_short.get("shares_outstanding")  # string or float
 
-if _si_shares > 0:
+    if _sf is not None and _sf > 0:
+        _si_pct_display = round(_sf, 2)
+        _si_has_data = True
+    if _sr is not None and _sr > 0:
+        _si_ratio = round(_sr, 2)
+
+    # Format share counts — Finviz may store as float (raw count) or pre-formatted
+    def _fmt_si_val(val):
+        if val is None:
+            return "—"
+        if isinstance(val, str):
+            return val  # already formatted like "124.19M"
+        if isinstance(val, (int, float)) and val > 0:
+            if val >= 1e9: return f"{val/1e9:.2f}B"
+            if val >= 1e6: return f"{val/1e6:.1f}M"
+            if val >= 1e3: return f"{val/1e3:.0f}K"
+            return f"{val:,.0f}"
+        return "—"
+
+    _si_shares_str = _fmt_si_val(_si_raw)
+    _si_float_str = _fmt_si_val(_fl_raw)
+    _si_out_str = _fmt_si_val(_so_raw)
+
+# Fallback: try info dict (works when yfinance merge happened)
+if not _si_has_data:
+    _yf_pct = info.get("shortPercentOfFloat")
+    _yf_shares = info.get("sharesShort")
+    if _yf_pct and isinstance(_yf_pct, (int, float)) and _yf_pct > 0:
+        _si_pct_display = round(_yf_pct * 100, 2) if _yf_pct < 1 else round(_yf_pct, 2)
+        _si_has_data = True
+    if _yf_shares and isinstance(_yf_shares, (int, float)) and _yf_shares > 0:
+        _si_has_data = True
+        if _yf_shares >= 1e9: _si_shares_str = f"{_yf_shares/1e9:.2f}B"
+        elif _yf_shares >= 1e6: _si_shares_str = f"{_yf_shares/1e6:.1f}M"
+        else: _si_shares_str = f"{_yf_shares:,.0f}"
+    _yf_ratio = info.get("shortRatio")
+    if _yf_ratio and isinstance(_yf_ratio, (int, float)):
+        _si_ratio = round(_yf_ratio, 2)
+    _yf_float = info.get("floatShares")
+    if _yf_float and isinstance(_yf_float, (int, float)) and _yf_float > 0:
+        if _yf_float >= 1e9: _si_float_str = f"{_yf_float/1e9:.2f}B"
+        elif _yf_float >= 1e6: _si_float_str = f"{_yf_float/1e6:.1f}M"
+        else: _si_float_str = f"{_yf_float:,.0f}"
+    _yf_out = info.get("sharesOutstanding")
+    if _yf_out and isinstance(_yf_out, (int, float)) and _yf_out > 0:
+        if _yf_out >= 1e9: _si_out_str = f"{_yf_out/1e9:.2f}B"
+        elif _yf_out >= 1e6: _si_out_str = f"{_yf_out/1e6:.1f}M"
+        else: _si_out_str = f"{_yf_out:,.0f}"
+    else:
+        _si_out_str = "—"
+
+if _si_has_data:
     st.markdown("---")
     st.markdown(
         '<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);'
@@ -952,32 +995,22 @@ if _si_shares > 0:
         'Short Interest</div>',
         unsafe_allow_html=True,
     )
+else:
+    # DEBUG: show what we have so we can fix field names
+    st.markdown("---")
+    _fv_keys = sorted(_fv_short.keys()) if _fv_short else []
+    _fv_short_keys = [k for k in _fv_keys if "short" in k.lower() or "float" in k.lower() or "share" in k.lower() or "out" in k.lower()]
+    st.caption(
+        f"DEBUG SI: _si_has_data={_si_has_data} | "
+        f"fv short_float={_fv_short.get('short_float', 'MISSING')} | "
+        f"fv short_ratio={_fv_short.get('short_ratio', 'MISSING')} | "
+        f"fv short_interest={_fv_short.get('short_interest', 'MISSING')} | "
+        f"fv float_shares={_fv_short.get('float_shares', 'MISSING')} | "
+        f"Relevant fv keys: {_fv_short_keys}"
+    )
 
-    # Format helpers
-    def _fmt_shares(val):
-        if val >= 1e9: return f"{val/1e9:.2f}B"
-        if val >= 1e6: return f"{val/1e6:.1f}M"
-        if val >= 1e3: return f"{val/1e3:.0f}K"
-        return f"{val:,.0f}"
-
-    _si_pct_display = round(_si_pct * 100, 2) if _si_pct < 1 else round(_si_pct, 2)
     _si_pct_color = "#c45454" if _si_pct_display >= 5 else GOLD if _si_pct_display >= 3 else "rgba(255,255,255,0.9)"
 
-    # Change vs prior month
-    _si_chg = _si_shares - _si_prior if _si_prior > 0 else 0
-    _si_chg_pct = ((_si_chg / _si_prior) * 100) if _si_prior > 0 else 0
-    _si_chg_color = "#c45454" if _si_chg > 0 else "#569542" if _si_chg < 0 else "rgba(255,255,255,0.5)"
-    _si_chg_str = f"{_si_chg_pct:+.1f}%" if _si_prior > 0 else "—"
-
-    # Report date
-    _si_date_str = ""
-    if _si_date and isinstance(_si_date, (int, float)) and _si_date > 0:
-        try:
-            _si_date_str = datetime.fromtimestamp(_si_date).strftime("%b %d, %Y")
-        except Exception:
-            _si_date_str = ""
-
-    # KPI cards row
     def _si_card(label, value, color="rgba(255,255,255,0.9)"):
         return (
             f'<div style="flex:1 1 130px;min-width:100px;padding:8px 0;">'
@@ -991,51 +1024,14 @@ if _si_shares > 0:
         f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
         f'{_si_card("Short % of Float", f"{_si_pct_display:.2f}%", _si_pct_color)}'
         f'{_si_card("Short Ratio (Days)", f"{_si_ratio:.1f}" if _si_ratio else "—")}'
-        f'{_si_card("Shares Short", _fmt_shares(_si_shares))}'
-        f'{_si_card("Float", _fmt_shares(_si_float) if _si_float > 0 else "—")}'
-        f'{_si_card("Shares Outstanding", _fmt_shares(_shares_out) if _shares_out > 0 else "—")}'
-        f'{_si_card("MoM Change", _si_chg_str, _si_chg_color)}'
+        f'{_si_card("Shares Short", _si_shares_str)}'
+        f'{_si_card("Float", _si_float_str)}'
+        f'{_si_card("Shares Outstanding", _si_out_str)}'
         f'</div>',
         unsafe_allow_html=True,
     )
 
-    # Bar chart: current vs prior month
-    if _si_prior > 0:
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-        _si_fig = go.Figure()
-
-        _prior_date_raw = g("sharesShortPreviousMonthDate", 0)
-        _prior_label = "Prior Month"
-        if _prior_date_raw and isinstance(_prior_date_raw, (int, float)) and _prior_date_raw > 0:
-            try:
-                _prior_label = datetime.fromtimestamp(_prior_date_raw).strftime("%b %d")
-            except Exception:
-                pass
-        _current_label = _si_date_str.split(",")[0] if _si_date_str else "Current"
-
-        _si_fig.add_trace(go.Bar(
-            x=[_prior_label, _current_label],
-            y=[_si_prior, _si_shares],
-            marker_color=[BLUE, _si_pct_color],
-            text=[_fmt_shares(_si_prior), _fmt_shares(_si_shares)],
-            textposition="outside",
-            textfont=dict(size=11, color="rgba(255,255,255,0.6)"),
-        ))
-
-        _si_fig_layout = {**PLOTLY_DARK}
-        _si_fig_layout["margin"] = dict(l=10, r=10, t=10, b=10)
-        _si_fig.update_layout(
-            **_si_fig_layout,
-            height=200,
-            showlegend=False,
-            dragmode=False,
-        )
-        _si_fig.update_xaxes(fixedrange=True)
-        _si_fig.update_yaxes(visible=False, fixedrange=True)
-        st.plotly_chart(_si_fig, use_container_width=True, config=PLOTLY_CONFIG)
-
-    if _si_date_str:
-        st.caption(f"Short interest as of {_si_date_str} · Source: yfinance")
+    st.caption("Source: Finviz")
 
 
 
