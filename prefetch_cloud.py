@@ -391,17 +391,60 @@ INDICES = {
 
 
 def fetch_index_data():
-    """Fetch major market indices for the ticker bar."""
+    """
+    Fetch major market indices for the ticker bar.
+    Uses batch yf.download with 5-day history to compute change_pct
+    from the last two actual closes. fast_info.previous_close is
+    unreliable for futures tickers (GC=F, CL=F, etc.).
+    """
     import yfinance as yf
 
     results = {}
+    tickers_str = " ".join(INDICES.keys())
+
+    try:
+        data = yf.download(
+            tickers_str,
+            period="5d",
+            interval="1d",
+            group_by="ticker",
+            progress=False,
+            threads=True,
+        )
+    except Exception as e:
+        print(f"  [ERROR] Batch index download failed: {e}")
+        for symbol, name in INDICES.items():
+            results[symbol] = {
+                "symbol": symbol, "name": name, "price": 0,
+                "change_pct": 0, "fetched_at": datetime.utcnow().isoformat(),
+            }
+        return results
+
     for symbol, name in INDICES.items():
         try:
-            tk   = yf.Ticker(symbol)
-            fi   = tk.fast_info
-            price = round(float(getattr(fi, "last_price",     0) or 0), 2)
-            prev  = round(float(getattr(fi, "previous_close", 0) or 0), 2)
-            chg   = round((price - prev) / prev * 100, 2) if prev else 0
+            if len(INDICES) == 1:
+                df = data
+            else:
+                df = data[symbol] if symbol in data.columns.get_level_values(0) else None
+
+            if df is None or df.empty:
+                results[symbol] = {
+                    "symbol": symbol, "name": name, "price": 0,
+                    "change_pct": 0, "fetched_at": datetime.utcnow().isoformat(),
+                }
+                continue
+
+            df = df.dropna(subset=["Close"])
+            if len(df) < 1:
+                results[symbol] = {
+                    "symbol": symbol, "name": name, "price": 0,
+                    "change_pct": 0, "fetched_at": datetime.utcnow().isoformat(),
+                }
+                continue
+
+            price = round(float(df["Close"].iloc[-1]), 2)
+            prev  = round(float(df["Close"].iloc[-2]), 2) if len(df) >= 2 else price
+            chg   = round((price - prev) / prev * 100, 2) if prev > 0 else 0
 
             results[symbol] = {
                 "symbol":     symbol,
@@ -410,7 +453,6 @@ def fetch_index_data():
                 "change_pct": chg,
                 "fetched_at": datetime.utcnow().isoformat(),
             }
-            time.sleep(0.2)
         except Exception as e:
             print(f"  [ERROR] Index {symbol}: {e}")
             results[symbol] = {
