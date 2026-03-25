@@ -682,6 +682,67 @@ else:
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# 4. VALUATION METRICS
+# ══════════════════════════════════════════════════════════════════════════
+st.markdown("---")
+st.markdown('<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">Valuation</div>', unsafe_allow_html=True)
+
+v_pe = f"{g('trailingPE', 0):.1f}" if g("trailingPE", 0) else "—"
+v_fpe = f"{g('forwardPE', 0):.1f}" if g("forwardPE", 0) else "—"
+v_peg = f"{g('pegRatio', 0):.2f}" if g("pegRatio", 0) else "—"
+v_pb = f"{g('priceToBook', 0):.2f}" if g("priceToBook", 0) else "—"
+v_ps = f"{g('priceToSalesTrailing12Months', 0):.2f}" if g("priceToSalesTrailing12Months", 0) else "—"
+v_ev = f"{g('enterpriseToEbitda', 0):.1f}" if g("enterpriseToEbitda", 0) else "—"
+
+def _val_card(label, value):
+    return (
+        f'<div style="flex:1 1 130px;min-width:100px;padding:8px 0;">'
+        f'<div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;'
+        f'letter-spacing:0.06em;margin-bottom:4px;">{label}</div>'
+        f'<div style="font-size:18px;font-weight:700;color:rgba(255,255,255,0.9);">{value}</div>'
+        f'</div>'
+    )
+
+st.markdown(
+    f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
+    f'{_val_card("P/E (TTM)", v_pe)}{_val_card("Fwd P/E", v_fpe)}{_val_card("PEG Ratio", v_peg)}'
+    f'{_val_card("P/B", v_pb)}{_val_card("P/S (TTM)", v_ps)}{_val_card("EV/EBITDA", v_ev)}'
+    f'</div>',
+    unsafe_allow_html=True,
+)
+
+# Second row
+st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+v_beta = f"{g('beta', 0):.2f}" if g("beta", 0) else "—"
+
+payout_raw = g("payoutRatio", 0)
+payout_pct = round(payout_raw * 100, 1) if isinstance(payout_raw, (int, float)) and 0 < payout_raw < 5 else 0
+v_payout = f"{payout_pct:.1f}%" if payout_pct > 0 else "—"
+
+ev_raw = g("enterpriseValue", 0)
+if ev_raw >= 1e12:
+    ev_str = f"${ev_raw/1e12:.2f}T"
+elif ev_raw >= 1e9:
+    ev_str = f"${ev_raw/1e9:.1f}B"
+else:
+    ev_str = "—"
+
+v_roe = f"{g('returnOnEquity', 0)*100:.1f}%" if isinstance(g("returnOnEquity", 0), (int, float)) and g("returnOnEquity", 0) else "—"
+v_de = f"{g('debtToEquity', 0):.0f}%" if g("debtToEquity", 0) else "—"
+v_cr = f"{g('currentRatio', 0):.2f}" if g("currentRatio", 0) else "—"
+
+st.markdown(
+    f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
+    f'{_val_card("Beta", v_beta)}{_val_card("Payout Ratio", v_payout)}{_val_card("Enterprise Value", ev_str)}'
+    f'{_val_card("ROE", v_roe)}{_val_card("Debt/Equity", v_de)}{_val_card("Current Ratio", v_cr)}'
+    f'</div>',
+    unsafe_allow_html=True,
+)
+
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # FINVIZ: ANALYST, TECHNICALS & OWNERSHIP
 # ══════════════════════════════════════════════════════════════════════════
 if _FINVIZ_AVAILABLE:
@@ -849,65 +910,110 @@ if _FINVIZ_AVAILABLE:
         st.caption(f"Source: Finviz · Cached 1 hour · Analyst ratings are consensus of Wall Street coverage")
 
 
-
 # ══════════════════════════════════════════════════════════════════════════
-# 4. VALUATION METRICS
+# SHORT INTEREST
 # ══════════════════════════════════════════════════════════════════════════
-st.markdown("---")
-st.markdown('<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">Valuation</div>', unsafe_allow_html=True)
+_si_shares = g("sharesShort", 0) or 0
+_si_float = g("floatShares", 0) or 0
+_si_pct = g("shortPercentOfFloat", 0) or 0
+_si_ratio = g("shortRatio", 0) or 0
+_si_prior = g("sharesShortPriorMonth", 0) or 0
+_si_date = g("dateShortInterest", 0)
+_shares_out = g("sharesOutstanding", 0) or 0
 
-v_pe = f"{g('trailingPE', 0):.1f}" if g("trailingPE", 0) else "—"
-v_fpe = f"{g('forwardPE', 0):.1f}" if g("forwardPE", 0) else "—"
-v_peg = f"{g('pegRatio', 0):.2f}" if g("pegRatio", 0) else "—"
-v_pb = f"{g('priceToBook', 0):.2f}" if g("priceToBook", 0) else "—"
-v_ps = f"{g('priceToSalesTrailing12Months', 0):.2f}" if g("priceToSalesTrailing12Months", 0) else "—"
-v_ev = f"{g('enterpriseToEbitda', 0):.1f}" if g("enterpriseToEbitda", 0) else "—"
-
-def _val_card(label, value):
-    return (
-        f'<div style="flex:1 1 130px;min-width:100px;padding:8px 0;">'
-        f'<div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;'
-        f'letter-spacing:0.06em;margin-bottom:4px;">{label}</div>'
-        f'<div style="font-size:18px;font-weight:700;color:rgba(255,255,255,0.9);">{value}</div>'
-        f'</div>'
+if _si_shares > 0:
+    st.markdown("---")
+    st.markdown(
+        '<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);'
+        'text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">'
+        'Short Interest</div>',
+        unsafe_allow_html=True,
     )
 
-st.markdown(
-    f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
-    f'{_val_card("P/E (TTM)", v_pe)}{_val_card("Fwd P/E", v_fpe)}{_val_card("PEG Ratio", v_peg)}'
-    f'{_val_card("P/B", v_pb)}{_val_card("P/S (TTM)", v_ps)}{_val_card("EV/EBITDA", v_ev)}'
-    f'</div>',
-    unsafe_allow_html=True,
-)
+    # Format helpers
+    def _fmt_shares(val):
+        if val >= 1e9: return f"{val/1e9:.2f}B"
+        if val >= 1e6: return f"{val/1e6:.1f}M"
+        if val >= 1e3: return f"{val/1e3:.0f}K"
+        return f"{val:,.0f}"
 
-# Second row
-st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+    _si_pct_display = round(_si_pct * 100, 2) if _si_pct < 1 else round(_si_pct, 2)
+    _si_pct_color = "#c45454" if _si_pct_display >= 5 else GOLD if _si_pct_display >= 3 else "rgba(255,255,255,0.9)"
 
-v_beta = f"{g('beta', 0):.2f}" if g("beta", 0) else "—"
+    # Change vs prior month
+    _si_chg = _si_shares - _si_prior if _si_prior > 0 else 0
+    _si_chg_pct = ((_si_chg / _si_prior) * 100) if _si_prior > 0 else 0
+    _si_chg_color = "#c45454" if _si_chg > 0 else "#569542" if _si_chg < 0 else "rgba(255,255,255,0.5)"
+    _si_chg_str = f"{_si_chg_pct:+.1f}%" if _si_prior > 0 else "—"
 
-payout_raw = g("payoutRatio", 0)
-payout_pct = round(payout_raw * 100, 1) if isinstance(payout_raw, (int, float)) and 0 < payout_raw < 5 else 0
-v_payout = f"{payout_pct:.1f}%" if payout_pct > 0 else "—"
+    # Report date
+    _si_date_str = ""
+    if _si_date and isinstance(_si_date, (int, float)) and _si_date > 0:
+        try:
+            _si_date_str = datetime.fromtimestamp(_si_date).strftime("%b %d, %Y")
+        except Exception:
+            _si_date_str = ""
 
-ev_raw = g("enterpriseValue", 0)
-if ev_raw >= 1e12:
-    ev_str = f"${ev_raw/1e12:.2f}T"
-elif ev_raw >= 1e9:
-    ev_str = f"${ev_raw/1e9:.1f}B"
-else:
-    ev_str = "—"
+    # KPI cards row
+    def _si_card(label, value, color="rgba(255,255,255,0.9)"):
+        return (
+            f'<div style="flex:1 1 130px;min-width:100px;padding:8px 0;">'
+            f'<div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;'
+            f'letter-spacing:0.06em;margin-bottom:4px;">{label}</div>'
+            f'<div style="font-size:18px;font-weight:700;color:{color};">{value}</div>'
+            f'</div>'
+        )
 
-v_roe = f"{g('returnOnEquity', 0)*100:.1f}%" if isinstance(g("returnOnEquity", 0), (int, float)) and g("returnOnEquity", 0) else "—"
-v_de = f"{g('debtToEquity', 0):.0f}%" if g("debtToEquity", 0) else "—"
-v_cr = f"{g('currentRatio', 0):.2f}" if g("currentRatio", 0) else "—"
+    st.markdown(
+        f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
+        f'{_si_card("Short % of Float", f"{_si_pct_display:.2f}%", _si_pct_color)}'
+        f'{_si_card("Short Ratio (Days)", f"{_si_ratio:.1f}" if _si_ratio else "—")}'
+        f'{_si_card("Shares Short", _fmt_shares(_si_shares))}'
+        f'{_si_card("Float", _fmt_shares(_si_float) if _si_float > 0 else "—")}'
+        f'{_si_card("Shares Outstanding", _fmt_shares(_shares_out) if _shares_out > 0 else "—")}'
+        f'{_si_card("MoM Change", _si_chg_str, _si_chg_color)}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
-st.markdown(
-    f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
-    f'{_val_card("Beta", v_beta)}{_val_card("Payout Ratio", v_payout)}{_val_card("Enterprise Value", ev_str)}'
-    f'{_val_card("ROE", v_roe)}{_val_card("Debt/Equity", v_de)}{_val_card("Current Ratio", v_cr)}'
-    f'</div>',
-    unsafe_allow_html=True,
-)
+    # Bar chart: current vs prior month
+    if _si_prior > 0:
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        _si_fig = go.Figure()
+
+        _prior_date_raw = g("sharesShortPreviousMonthDate", 0)
+        _prior_label = "Prior Month"
+        if _prior_date_raw and isinstance(_prior_date_raw, (int, float)) and _prior_date_raw > 0:
+            try:
+                _prior_label = datetime.fromtimestamp(_prior_date_raw).strftime("%b %d")
+            except Exception:
+                pass
+        _current_label = _si_date_str.split(",")[0] if _si_date_str else "Current"
+
+        _si_fig.add_trace(go.Bar(
+            x=[_prior_label, _current_label],
+            y=[_si_prior, _si_shares],
+            marker_color=[BLUE, _si_pct_color],
+            text=[_fmt_shares(_si_prior), _fmt_shares(_si_shares)],
+            textposition="outside",
+            textfont=dict(size=11, color="rgba(255,255,255,0.6)"),
+        ))
+
+        _si_fig_layout = {**PLOTLY_DARK}
+        _si_fig_layout["margin"] = dict(l=10, r=10, t=10, b=10)
+        _si_fig.update_layout(
+            **_si_fig_layout,
+            height=200,
+            showlegend=False,
+            dragmode=False,
+        )
+        _si_fig.update_xaxes(fixedrange=True)
+        _si_fig.update_yaxes(visible=False, fixedrange=True)
+        st.plotly_chart(_si_fig, use_container_width=True, config=PLOTLY_CONFIG)
+
+    if _si_date_str:
+        st.caption(f"Short interest as of {_si_date_str} · Source: yfinance")
+
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -944,7 +1050,10 @@ if not financials.empty:
 
         if rev_row:
             rev_data = fin[rev_row].dropna()
-            years = [d.strftime("%Y") for d in rev_data.index]
+
+            # Build aligned data — use revenue index as the master timeline
+            chart_index = rev_data.index
+            years = [d.strftime("%Y") for d in chart_index]
             rev_vals = (rev_data / 1e9).round(2)  # Convert to billions
 
             col_rev, col_margin = st.columns([2, 1])
@@ -961,12 +1070,14 @@ if not financials.empty:
                 ))
                 if ni_row:
                     ni_data = fin[ni_row].dropna()
-                    ni_vals = (ni_data / 1e9).round(2)
+                    # Reindex net income to match revenue's dates exactly
+                    ni_aligned = ni_data.reindex(chart_index)
+                    ni_vals = (ni_aligned / 1e9).round(2)
                     fig_fin.add_trace(go.Bar(
                         x=years, y=ni_vals,
                         name="Net Income",
                         marker_color=GREEN,
-                        text=[f"${v:.1f}B" for v in ni_vals],
+                        text=[f"${v:.1f}B" if pd.notna(v) else "" for v in ni_vals],
                         textposition="outside",
                         textfont=dict(size=10, color="rgba(255,255,255,0.5)"),
                     ))
