@@ -224,10 +224,10 @@ def fetch_price_history(ticker, period="ytd"):
 def get_index_data():
     """
     Return market index data for the ticker bar.
-    Priority: Supabase -> local JSON cache -> live yfinance
-
-    Uses 5-day history to compute change_pct (last close vs prior close).
-    fast_info.previous_close is unreliable for futures (GC=F, CL=F, etc.).
+    Always uses batch yf.download with 5-day history to compute change_pct.
+    Supabase indices table is skipped — it was populated by fast_info which
+    is unreliable for futures (GC=F, CL=F). This is only 9 tickers and
+    cached for 15 min, so the direct yfinance call is fast and accurate.
     """
     INDEX_SYMBOLS = {
         "^GSPC":    "S&P 500",
@@ -241,18 +241,6 @@ def get_index_data():
         "BTC-USD":  "Bitcoin",
     }
 
-    # ── 1. Try Supabase ───────────────────────────────────────────────────
-    if SUPABASE_KEY != "YOUR_SERVICE_ROLE_KEY":
-        rows = _sb_get("indices")
-        if rows:
-            return {row["symbol"]: row for row in rows}
-
-    # ── 2. Local JSON cache ───────────────────────────────────────────────
-    cache, _ = _load_index_cache()
-    if cache:
-        return cache
-
-    # ── 3. Live yfinance fallback — batch download, history-based ─────────
     try:
         import yfinance as yf
 
@@ -293,7 +281,15 @@ def get_index_data():
 
         return results
 
-    except ImportError:
+    except Exception:
+        # Last resort: try Supabase or local cache if yfinance completely fails
+        if SUPABASE_KEY != "YOUR_SERVICE_ROLE_KEY":
+            rows = _sb_get("indices")
+            if rows:
+                return {row["symbol"]: row for row in rows}
+        cache, _ = _load_index_cache()
+        if cache:
+            return cache
         return {}
 
 
