@@ -225,7 +225,22 @@ def get_index_data():
     """
     Return market index data for the ticker bar.
     Priority: Supabase -> local JSON cache -> live yfinance
+
+    Uses 5-day history to compute change_pct (last close vs prior close).
+    fast_info.previous_close is unreliable for futures (GC=F, CL=F, etc.).
     """
+    INDEX_SYMBOLS = {
+        "^GSPC":    "S&P 500",
+        "^DJI":     "DJIA",
+        "^IXIC":    "Nasdaq",
+        "^TNX":     "10Y Treasury",
+        "^VIX":     "VIX",
+        "DX-Y.NYB": "US Dollar",
+        "CL=F":     "Crude Oil",
+        "GC=F":     "Gold",
+        "BTC-USD":  "Bitcoin",
+    }
+
     # ── 1. Try Supabase ───────────────────────────────────────────────────
     if SUPABASE_KEY != "YOUR_SERVICE_ROLE_KEY":
         rows = _sb_get("indices")
@@ -237,35 +252,45 @@ def get_index_data():
     if cache:
         return cache
 
-    # ── 3. Live yfinance fallback ─────────────────────────────────────────
+    # ── 3. Live yfinance fallback — batch download, history-based ─────────
     try:
         import yfinance as yf
-        import time as _time
 
-        indices = {
-            "^GSPC":    "S&P 500",
-            "^DJI":     "DJIA",
-            "^IXIC":    "Nasdaq",
-            "^TNX":     "10Y Treasury",
-            "^VIX":     "VIX",
-            "DX-Y.NYB": "US Dollar",
-            "CL=F":     "Crude Oil",
-            "GC=F":     "Gold",
-            "BTC-USD":  "Bitcoin",
-        }
+        tickers_str = " ".join(INDEX_SYMBOLS.keys())
+        data = yf.download(
+            tickers_str,
+            period="5d",
+            interval="1d",
+            group_by="ticker",
+            progress=False,
+            threads=True,
+        )
 
         results = {}
-        for symbol, name in indices.items():
+        for symbol, name in INDEX_SYMBOLS.items():
             try:
-                t     = yf.Ticker(symbol)
-                fi    = t.fast_info
-                price = round(float(getattr(fi, "last_price",     0) or 0), 2)
-                prev  = round(float(getattr(fi, "previous_close", 0) or 0), 2)
-                chg   = round((price - prev) / prev * 100, 2) if prev else 0
+                if len(INDEX_SYMBOLS) == 1:
+                    df = data
+                else:
+                    df = data[symbol] if symbol in data.columns.get_level_values(0) else None
+
+                if df is None or df.empty:
+                    results[symbol] = {"name": name, "price": 0, "change_pct": 0}
+                    continue
+
+                df = df.dropna(subset=["Close"])
+                if len(df) < 1:
+                    results[symbol] = {"name": name, "price": 0, "change_pct": 0}
+                    continue
+
+                price = round(float(df["Close"].iloc[-1]), 2)
+                prev  = round(float(df["Close"].iloc[-2]), 2) if len(df) >= 2 else price
+                chg   = round((price - prev) / prev * 100, 2) if prev > 0 else 0
+
                 results[symbol] = {"name": name, "price": price, "change_pct": chg}
-                _time.sleep(0.2)
             except Exception:
                 results[symbol] = {"name": name, "price": 0, "change_pct": 0}
+
         return results
 
     except ImportError:
