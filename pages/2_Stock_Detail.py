@@ -914,30 +914,35 @@ if _FINVIZ_AVAILABLE:
 # SHORT INTEREST
 # ══════════════════════════════════════════════════════════════════════════
 _si_shares_raw = info.get("sharesShort")
-_si_shares = int(_si_shares_raw) if _si_shares_raw and isinstance(_si_shares_raw, (int, float)) else 0
 _si_float_raw = info.get("floatShares")
-_si_float = int(_si_float_raw) if _si_float_raw and isinstance(_si_float_raw, (int, float)) else 0
 _si_pct_raw = info.get("shortPercentOfFloat")
-_si_pct = float(_si_pct_raw) if _si_pct_raw and isinstance(_si_pct_raw, (int, float)) else 0
 _si_ratio_raw = info.get("shortRatio")
-_si_ratio = float(_si_ratio_raw) if _si_ratio_raw and isinstance(_si_ratio_raw, (int, float)) else 0
 _si_prior_raw = info.get("sharesShortPriorMonth")
-_si_prior = int(_si_prior_raw) if _si_prior_raw and isinstance(_si_prior_raw, (int, float)) else 0
-_si_date = info.get("dateShortInterest", 0)
+_si_date_raw = info.get("dateShortInterest")
 _shares_out_raw = info.get("sharesOutstanding")
-_shares_out = int(_shares_out_raw) if _shares_out_raw and isinstance(_shares_out_raw, (int, float)) else 0
 
-# ── DEBUG: remove after confirming ────────────────────────────────────
-st.markdown("---")
-st.caption(
-    f"DEBUG SHORT INTEREST — "
-    f"sharesShort raw={repr(_si_shares_raw)} → {_si_shares} | "
-    f"shortPctFloat raw={repr(_si_pct_raw)} → {_si_pct} | "
-    f"shortRatio raw={repr(_si_ratio_raw)} → {_si_ratio} | "
-    f"_from_supabase={info.get('_from_supabase', 'NO KEY')} | "
-    f"info keys count={len(info)}"
-)
-# ── END DEBUG ─────────────────────────────────────────────────────────
+# If Supabase didn't have short interest data, fetch from yfinance directly
+if _si_shares_raw is None:
+    try:
+        _si_tk = yf.Ticker(ticker_input)
+        _si_info = _si_tk.info or {}
+        _si_shares_raw = _si_info.get("sharesShort")
+        _si_float_raw = _si_info.get("floatShares")
+        _si_pct_raw = _si_info.get("shortPercentOfFloat")
+        _si_ratio_raw = _si_info.get("shortRatio")
+        _si_prior_raw = _si_info.get("sharesShortPriorMonth")
+        _si_date_raw = _si_info.get("dateShortInterest")
+        _shares_out_raw = _si_info.get("sharesOutstanding") or _shares_out_raw
+    except Exception:
+        pass
+
+_si_shares = int(_si_shares_raw) if _si_shares_raw and isinstance(_si_shares_raw, (int, float)) else 0
+_si_float = int(_si_float_raw) if _si_float_raw and isinstance(_si_float_raw, (int, float)) else 0
+_si_pct = float(_si_pct_raw) if _si_pct_raw and isinstance(_si_pct_raw, (int, float)) else 0
+_si_ratio = float(_si_ratio_raw) if _si_ratio_raw and isinstance(_si_ratio_raw, (int, float)) else 0
+_si_prior = int(_si_prior_raw) if _si_prior_raw and isinstance(_si_prior_raw, (int, float)) else 0
+_si_date = _si_date_raw if _si_date_raw else 0
+_shares_out = int(_shares_out_raw) if _shares_out_raw and isinstance(_shares_out_raw, (int, float)) else 0
 
 if _si_shares > 0:
     st.markdown("---")
