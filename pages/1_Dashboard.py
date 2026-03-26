@@ -894,23 +894,40 @@ with tab_holdings:
                         })
                     with col_pie:
                         pie_colors = [SECTOR_COLORS.get(s, "#888") for s in sect_agg.index]
+                        _n_sectors = len(sect_agg)
+                        _pie_labels = sect_agg.index.tolist()
+                        _pie_vals = sect_agg["Total_Weight"].tolist()
+
+                        # Pull out smaller slices slightly for visual separation
+                        _total = sum(_pie_vals) if sum(_pie_vals) > 0 else 1
+                        _pull = [0.03 if v / _total < 0.05 else 0 for v in _pie_vals]
+
                         fig_pie = go.Figure(go.Pie(
-                            labels=sect_agg.index.tolist(),
-                            values=sect_agg["Total_Weight"].tolist(),
-                            marker=dict(colors=pie_colors),
-                            hole=0.45,
+                            labels=_pie_labels,
+                            values=_pie_vals,
+                            marker=dict(
+                                colors=pie_colors,
+                                line=dict(color="rgba(12,17,23,0.8)", width=1.5),
+                            ),
+                            hole=0.5,
+                            pull=_pull,
                             textinfo="label+percent",
                             textposition="outside",
-                            textfont=dict(size=10, color="rgba(255,255,255,0.6)"),
-                            hovertemplate="%{label}: %{value:.1f}%<extra></extra>",
+                            textfont=dict(size=11, color="rgba(255,255,255,0.7)"),
+                            outsidetextfont=dict(size=10, color="rgba(255,255,255,0.6)"),
+                            hovertemplate="<b>%{label}</b><br>%{value:.1f}% of portfolio<extra></extra>",
                             sort=False,
+                            direction="clockwise",
+                            rotation=90,
                         ))
                         _pie_layout = {**PLOTLY_DARK}
-                        _pie_layout["margin"] = dict(l=10, r=10, t=10, b=10)
+                        _pie_layout["margin"] = dict(l=60, r=60, t=30, b=30)
                         fig_pie.update_layout(
                             **_pie_layout,
-                            height=max(260, len(sect_agg) * 28 + 80),
+                            height=max(320, _n_sectors * 28 + 120),
                             showlegend=False,
+                            uniformtext_minsize=9,
+                            uniformtext_mode="hide",
                         )
                         st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
 
