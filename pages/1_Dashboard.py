@@ -404,28 +404,40 @@ if MONTHLY_RETURNS_AVAILABLE and active in STRATEGY_YTD:
     kpis["ytd"] = STRATEGY_YTD[active]
     kpis["ytd_as_of"] = AS_OF_DATE
 
-# ── Finviz sector fallback (for tickers missing sector from yfinance/Supabase) ─
+# ── Finviz sector fallback (single batch call, not per-ticker) ─────────────
 @st.cache_data(ttl=86400, show_spinner=False)
 def _finviz_sector_lookup(tickers: tuple) -> dict:
     """Batch lookup sectors from Finviz for tickers missing yfinance sector data.
-    Returns dict: {ticker: sector_string}. Cached 24h since sectors rarely change."""
+    Tries screener batch first, falls back to individual lookups (max 5 retries).
+    Cached 24h since sectors rarely change."""
+    if not tickers:
+        return {}
     result = {}
     try:
-        from finvizfinance.quote import finvizfinance
-        for sym in tickers:
-            try:
-                fv = finvizfinance(sym)
-                info = fv.ticker_fundament()
-                result[sym] = info.get("Sector", "Other") or "Other"
-            except Exception:
-                result[sym] = "Other"
-    except ImportError:
-        pass
+        from finvizfinance.screener.overview import Overview
+        foverview = Overview()
+        foverview.set_filter(ticker=",".join(tickers))
+        df = foverview.screener_view()
+        if df is not None and not df.empty and "Sector" in df.columns and "Ticker" in df.columns:
+            result = dict(zip(df["Ticker"], df["Sector"]))
+    except Exception:
+        # Screener failed — try individual lookups for remaining (cap at 10 to avoid slowdown)
+        try:
+            from finvizfinance.quote import finvizfinance as _fvq
+            for sym in list(tickers)[:10]:
+                if sym not in result:
+                    try:
+                        info = _fvq(sym).ticker_fundament()
+                        result[sym] = info.get("Sector", "Other") or "Other"
+                    except Exception:
+                        pass
+        except ImportError:
+            pass
     return result
 
 
 def _resolve_sector(sym, price_data, _finviz_cache):
-    """Return sector for a ticker, using Finviz as fallback when yfinance has no data."""
+    """Return sector for a ticker, using Finviz cache as fallback."""
     sect = price_data.get(sym, {}).get("sector", "") or ""
     if sect and sect != "Other":
         return sect
@@ -681,7 +693,7 @@ with tab_overview:
                 ov_tickers = tuple(tam_ov["symbol"].tolist())
                 ov_prices = fetch_batch_prices(ov_tickers)
 
-                # Identify tickers missing sector from yfinance, fetch from Finviz
+                # Finviz fallback for tickers missing sector from yfinance
                 _missing_sector = tuple(
                     sym for sym in ov_tickers
                     if not ov_prices.get(sym, {}).get("sector") or ov_prices.get(sym, {}).get("sector") == "Other"
@@ -856,8 +868,6 @@ with tab_holdings:
                         ) if mkt.get("52w_high") else 0,
                     })
                 display_df = pd.DataFrame(rows)
-                if not display_df.empty and "Company" in display_df.columns:
-                    display_df = display_df.sort_values("Company", ascending=True).reset_index(drop=True)
 
 
                 # Sector filter
@@ -1032,7 +1042,6 @@ with tab_holdings:
         if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
             _charts_tam = get_holdings_for_strategy(tamarac_parsed, active)
             if not _charts_tam.empty:
-                _charts_tam = _charts_tam.sort_values("description", ascending=True)
                 _chart_tickers = _charts_tam["symbol"].tolist()
                 _chart_names = dict(zip(_charts_tam["symbol"], _charts_tam["description"]))
 
