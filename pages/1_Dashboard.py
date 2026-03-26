@@ -1059,14 +1059,46 @@ with tab_holdings:
 
                                     # Mini price chart with MAs
                                     _fig = go.Figure()
-                                    _fig.add_trace(go.Scatter(
-                                        x=_tk_df.index, y=_close,
-                                        mode="lines", name="Price",
-                                        line=dict(color=_chg_color, width=1.5),
-                                        fill="tozeroy",
-                                        fillcolor=("rgba(86,149,66,0.06)" if _chg_pct >= 0 else "rgba(196,84,84,0.06)"),
-                                        hovertemplate="%{x|%b %d}<br>$%{y:.2f}<extra></extra>",
-                                    ))
+
+                                    # For Max period, fill from zero; otherwise fill from period low
+                                    # giving a Finviz-style zoomed-in view
+                                    _use_zero_base = (_sel_label == "Max")
+                                    _all_vals = _close.dropna()
+                                    _y_min = 0 if _use_zero_base else float(_all_vals.min())
+                                    _y_max = float(_all_vals.max())
+
+                                    if _use_zero_base:
+                                        # Simple fill to zero
+                                        _fig.add_trace(go.Scatter(
+                                            x=_tk_df.index, y=_close,
+                                            mode="lines", name="Price",
+                                            line=dict(color=_chg_color, width=1.5),
+                                            fill="tozeroy",
+                                            fillcolor=("rgba(86,149,66,0.06)" if _chg_pct >= 0 else "rgba(196,84,84,0.06)"),
+                                            hovertemplate="%{x|%b %d}<br>$%{y:.2f}<extra></extra>",
+                                        ))
+                                    else:
+                                        # Pad below the low by 5% of range so the fill has visual weight
+                                        _price_range = _y_max - _y_min if _y_max > _y_min else 1
+                                        _y_floor = max(0, _y_min - _price_range * 0.05)
+
+                                        # Invisible baseline at the floor
+                                        _fig.add_trace(go.Scatter(
+                                            x=_tk_df.index,
+                                            y=[_y_floor] * len(_tk_df),
+                                            mode="lines", name="_base",
+                                            line=dict(width=0), showlegend=False,
+                                            hoverinfo="skip",
+                                        ))
+                                        # Price line that fills down to baseline
+                                        _fig.add_trace(go.Scatter(
+                                            x=_tk_df.index, y=_close,
+                                            mode="lines", name="Price",
+                                            line=dict(color=_chg_color, width=1.5),
+                                            fill="tonexty",
+                                            fillcolor=("rgba(86,149,66,0.06)" if _chg_pct >= 0 else "rgba(196,84,84,0.06)"),
+                                            hovertemplate="%{x|%b %d}<br>$%{y:.2f}<extra></extra>",
+                                        ))
 
                                     # 50-day MA
                                     if not _tk_df["MA50"].isna().all():
