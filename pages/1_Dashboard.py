@@ -404,6 +404,34 @@ if MONTHLY_RETURNS_AVAILABLE and active in STRATEGY_YTD:
     kpis["ytd"] = STRATEGY_YTD[active]
     kpis["ytd_as_of"] = AS_OF_DATE
 
+# ── Finviz sector fallback (for tickers missing sector from yfinance/Supabase) ─
+@st.cache_data(ttl=86400, show_spinner=False)
+def _finviz_sector_lookup(tickers: tuple) -> dict:
+    """Batch lookup sectors from Finviz for tickers missing yfinance sector data.
+    Returns dict: {ticker: sector_string}. Cached 24h since sectors rarely change."""
+    result = {}
+    try:
+        from finvizfinance.quote import finvizfinance
+        for sym in tickers:
+            try:
+                fv = finvizfinance(sym)
+                info = fv.ticker_fundament()
+                result[sym] = info.get("Sector", "Other") or "Other"
+            except Exception:
+                result[sym] = "Other"
+    except ImportError:
+        pass
+    return result
+
+
+def _resolve_sector(sym, price_data, _finviz_cache):
+    """Return sector for a ticker, using Finviz as fallback when yfinance has no data."""
+    sect = price_data.get(sym, {}).get("sector", "") or ""
+    if sect and sect != "Other":
+        return sect
+    return _finviz_cache.get(sym, "Other")
+
+
 # ── Plotly dark theme (reused across tabs) ─────────────────────────────────
 PLOTLY_DARK = dict(
     paper_bgcolor="rgba(255,255,255,0.02)",
@@ -452,12 +480,19 @@ with tab_overview:
                 ov_hm_tickers = tuple(tam_ov_hm["symbol"].tolist())
                 ov_hm_prices = fetch_batch_prices(ov_hm_tickers)
 
+                # Finviz fallback for missing sectors
+                _hm_missing = tuple(
+                    sym for sym in ov_hm_tickers
+                    if not ov_hm_prices.get(sym, {}).get("sector") or ov_hm_prices.get(sym, {}).get("sector") == "Other"
+                )
+                _hm_fv_sectors = _finviz_sector_lookup(_hm_missing) if _hm_missing else {}
+
                 hm_rows = []
                 for _, row in tam_ov_hm.iterrows():
                     sym = row["symbol"]
                     mkt = ov_hm_prices.get(sym, {})
                     chg = mkt.get("change_1d_pct", 0) or 0
-                    sector = mkt.get("sector", "") or "Other"
+                    sector = _resolve_sector(sym, ov_hm_prices, _hm_fv_sectors)
                     hm_rows.append({
                         "symbol": sym,
                         "description": row["description"],
@@ -645,11 +680,19 @@ with tab_overview:
             if not tam_ov.empty:
                 ov_tickers = tuple(tam_ov["symbol"].tolist())
                 ov_prices = fetch_batch_prices(ov_tickers)
+
+                # Identify tickers missing sector from yfinance, fetch from Finviz
+                _missing_sector = tuple(
+                    sym for sym in ov_tickers
+                    if not ov_prices.get(sym, {}).get("sector") or ov_prices.get(sym, {}).get("sector") == "Other"
+                )
+                _fv_sectors = _finviz_sector_lookup(_missing_sector) if _missing_sector else {}
+
                 sector_rows = []
                 for _, h in tam_ov.iterrows():
                     sym = h["symbol"]
-                    sect = ov_prices.get(sym, {}).get("sector", "Other")
-                    sector_rows.append({"sector": sect or "Other", "weight": h["weight_pct"]})
+                    sect = _resolve_sector(sym, ov_prices, _fv_sectors)
+                    sector_rows.append({"sector": sect, "weight": h["weight_pct"]})
                 if cash_ov > 0:
                     sector_rows.append({"sector": "Cash", "weight": cash_ov})
                 sector_df = pd.DataFrame(sector_rows).groupby("sector")["weight"].sum().reset_index().sort_values("weight", ascending=False)
@@ -766,6 +809,13 @@ with tab_holdings:
                 with st.spinner("Fetching live prices..."):
                     price_data = fetch_batch_prices(tickers)
 
+                # Finviz fallback for missing sectors
+                _hd_missing = tuple(
+                    sym for sym in tickers
+                    if not price_data.get(sym, {}).get("sector")
+                )
+                _hd_fv_sectors = _finviz_sector_lookup(_hd_missing) if _hd_missing else {}
+
                 # Fetch Notion proprietary metrics (Sprint 5)
                 notion_data = {}
                 if NOTION_METRICS_AVAILABLE:
@@ -790,7 +840,7 @@ with tab_holdings:
                     rows.append({
                         "Company": h["description"],
                         "Symbol": sym,
-                        "Sector": mkt.get("sector", ""),
+                        "Sector": _resolve_sector(sym, price_data, _hd_fv_sectors),
                         "Weight %": round(h["weight_pct"], 2),
                         "1D Chg %": chg_val,
                         "Price": mkt.get("price", 0),
