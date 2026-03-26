@@ -1087,16 +1087,34 @@ with tab_holdings:
                                         ))
 
                                     _fig_layout = {**PLOTLY_DARK}
-                                    _fig_layout["margin"] = dict(l=0, r=0, t=0, b=0)
+                                    _fig_layout["margin"] = dict(l=0, r=42, t=0, b=20)
                                     _fig.update_layout(
                                         **_fig_layout,
-                                        height=140,
+                                        height=160,
                                         showlegend=False,
                                         hovermode="x unified",
                                         dragmode=False,
                                     )
-                                    _fig.update_xaxes(visible=False, fixedrange=True)
-                                    _fig.update_yaxes(visible=False, fixedrange=True)
+                                    _fig.update_xaxes(
+                                        visible=True,
+                                        fixedrange=True,
+                                        showgrid=False,
+                                        showline=False,
+                                        tickfont=dict(size=9, color="rgba(255,255,255,0.25)"),
+                                        nticks=4,
+                                        tickformat="%b" if _sel_label in ("YTD", "Max") or (_sel_days and _sel_days > 90) else "%b %d",
+                                    )
+                                    _fig.update_yaxes(
+                                        visible=True,
+                                        fixedrange=True,
+                                        side="right",
+                                        showgrid=True,
+                                        gridcolor="rgba(255,255,255,0.04)",
+                                        showline=False,
+                                        tickfont=dict(size=9, color="rgba(255,255,255,0.25)"),
+                                        tickprefix="$",
+                                        nticks=4,
+                                    )
                                     st.plotly_chart(
                                         _fig, use_container_width=True,
                                         config=PLOTLY_CONFIG_HOVER,
