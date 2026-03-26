@@ -477,7 +477,7 @@ def _render_income_dashboard(edf, tam_df, div_data, active_strategy, strat_color
     with k1: st.metric("Annual Income", f"${total_income:,.0f}")
     with k2: st.metric("Wtd Avg Yield", f"{wtd_cy:.2f}%")
     with k3: st.metric("Wtd Yield on Cost", f"{wtd_yoc:.2f}%")
-    with k4: st.metric("Wtd 5Y Div CAGR", f"{wtd_growth_5y:+.1f}%")
+    with k4: st.metric("Wtd 5Y Div CAGR", f"{wtd_growth_5y:+.2f}%")
     with k5: st.metric("Div Growers", f"{growers} / {len(edf)}")
     with k6: st.metric("Div Cutters", f"{cutters}")
 
@@ -632,9 +632,9 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
 
     d1, d2, d3, d4, d5 = st.columns(5)
     with d1: st.metric("Wtd Avg Yield", f"{wtd_yield}%")
-    with d2: st.metric("Avg 1Y Div Growth", f"{avg_1y:+.1f}%")
-    with d3: st.metric("Avg 3Y Div Growth", f"{avg_3y:+.1f}%")
-    with d4: st.metric("Avg 5Y Div Growth", f"{avg_5y:+.1f}%")
+    with d2: st.metric("Avg 1Y Div Growth", f"{avg_1y:+.2f}%")
+    with d3: st.metric("Avg 3Y Div Growth", f"{avg_3y:+.2f}%")
+    with d4: st.metric("Avg 5Y Div Growth", f"{avg_5y:+.2f}%")
     with d5: st.metric("Avg Consec. Years", f"{int(avg_consec)}")
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
@@ -719,10 +719,10 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Curr Yield":     "{:.2f}%",
             "Yield on Cost":  "{:.2f}%",
             "Div Amount":     "${:.2f}",
-            "1Y Growth":      "{:+.1f}%",
-            "3Y Growth":      "{:+.1f}%",
-            "5Y Growth":      "{:+.1f}%",
-            "10Y Growth":     lambda v: f"{v:+.1f}%" if isinstance(v, (int, float)) and v != 0 else "N/A",
+            "1Y Growth":      "{:+.2f}%",
+            "3Y Growth":      "{:+.2f}%",
+            "5Y Growth":      "{:+.2f}%",
+            "10Y Growth":     lambda v: f"{v:+.2f}%" if isinstance(v, (int, float)) and v != 0 else "N/A",
             "Streak":         lambda v: f"{v:.0f}y" if isinstance(v, (int, float)) else str(v),
             "Recessions":     lambda v: str(v) if isinstance(v, (int, float)) else str(v),
             "Payout %":       "{:.0f}%",
@@ -743,9 +743,9 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Curr Yield":    st.column_config.NumberColumn("Yield", format="%.2f%%"),
             "Yield on Cost": st.column_config.NumberColumn("YoC", format="%.2f%%"),
             "Div Amount":    st.column_config.NumberColumn("Div Amt", format="$%.2f"),
-            "1Y Growth":     st.column_config.NumberColumn("1Y Gr", format="%+.1f%%"),
-            "3Y Growth":     st.column_config.NumberColumn("3Y Gr", format="%+.1f%%"),
-            "5Y Growth":     st.column_config.NumberColumn("5Y Gr", format="%+.1f%%"),
+            "1Y Growth":     st.column_config.NumberColumn("1Y Gr", format="%+.2f%%"),
+            "3Y Growth":     st.column_config.NumberColumn("3Y Gr", format="%+.2f%%"),
+            "5Y Growth":     st.column_config.NumberColumn("5Y Gr", format="%+.2f%%"),
             "10Y Growth":    st.column_config.TextColumn("10Y Gr", width="small"),
             "Streak":        st.column_config.TextColumn("Streak", width="small"),
             "Began":         st.column_config.TextColumn("Began", width="small"),
@@ -1103,15 +1103,15 @@ A+ = 14–15 &nbsp;·&nbsp; A = 12–13 &nbsp;·&nbsp; A- = 10–11 &nbsp;·&nbs
         if is_fish:
             # Fish data is reliable — flag any negative growth
             if r["growth_5y"] < 0:
-                concerns.append(f"Negative 5Y dividend growth ({r['growth_5y']:+.1f}%)")
+                concerns.append(f"Negative 5Y dividend growth ({r['growth_5y']:+.2f}%)")
             if r["growth_1y"] < -10:
-                concerns.append(f"Significant 1Y decline ({r['growth_1y']:+.1f}%)")
+                concerns.append(f"Significant 1Y decline ({r['growth_1y']:+.2f}%)")
         else:
             # yfinance fallback — use stricter thresholds to filter ADR/special noise
             if r["growth_5y"] < -10:
-                concerns.append(f"Possible 5Y decline ({r['growth_5y']:+.1f}%) — verify (non-CCC)")
+                concerns.append(f"Possible 5Y decline ({r['growth_5y']:+.2f}%) — verify (non-CCC)")
             if r["growth_1y"] < -20:
-                concerns.append(f"Possible 1Y decline ({r['growth_1y']:+.1f}%) — verify (non-CCC)")
+                concerns.append(f"Possible 1Y decline ({r['growth_1y']:+.2f}%) — verify (non-CCC)")
 
         if 0 < r["consec_years"] < 5:
             concerns.append(f"Short streak ({r['consec_years']}y) — possible reset")
@@ -1139,7 +1139,7 @@ A+ = 14–15 &nbsp;·&nbsp; A = 12–13 &nbsp;·&nbsp; A- = 10–11 &nbsp;·&nbs
             .map(_risk_color, subset=["Concern"])
             .format({
                 "Payout": "{:.0f}%",
-                "5Y Growth": "{:+.1f}%",
+                "5Y Growth": "{:+.2f}%",
                 "Streak": lambda v: f"{v:.0f}y" if isinstance(v, (int, float)) else str(v),
             })
         )
@@ -1151,7 +1151,7 @@ A+ = 14–15 &nbsp;·&nbsp; A = 12–13 &nbsp;·&nbsp; A- = 10–11 &nbsp;·&nbs
                 "Company":   st.column_config.TextColumn("Company", width="medium"),
                 "Safety":    st.column_config.TextColumn("Safety", width="small"),
                 "Payout":    st.column_config.NumberColumn("Payout", format="%.0f%%"),
-                "5Y Growth": st.column_config.NumberColumn("5Y Gr", format="%+.1f%%"),
+                "5Y Growth": st.column_config.NumberColumn("5Y Gr", format="%+.2f%%"),
                 "Streak":    st.column_config.TextColumn("Streak", width="small"),
                 "Concern":   st.column_config.TextColumn("Concern", width="large"),
             },
