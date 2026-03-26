@@ -713,6 +713,36 @@ def push_to_supabase(prices=None, dividends=None, indices=None,
     """Upsert all fetched data to Supabase."""
 
     if prices:
+        # Preserve existing dividend_yield and sector when yfinance returns 0/empty
+        # (prevents rate-limited fetches from wiping good data)
+        _preserve_fields = ["dividend_yield", "sector", "industry", "pe_ratio", "forward_pe", "beta", "name", "price_to_book"]
+        try:
+            tickers_filter = f"in.({','.join(prices.keys())})"
+            existing_url = f"{SUPABASE_URL}/rest/v1/prices"
+            existing_params = {
+                "select": "ticker," + ",".join(_preserve_fields),
+                "ticker": tickers_filter,
+                "limit": 1000,
+            }
+            resp = requests.get(existing_url, headers=SB_HEADERS, params=existing_params, timeout=10)
+            if resp.status_code == 200:
+                existing = {row["ticker"]: row for row in resp.json()}
+                for ticker, data in prices.items():
+                    old = existing.get(ticker, {})
+                    for field in _preserve_fields:
+                        new_val = data.get(field)
+                        old_val = old.get(field)
+                        # Keep old value if new is empty/zero but old was populated
+                        if field in ("sector", "industry", "name"):
+                            if not new_val and old_val:
+                                data[field] = old_val
+                        else:
+                            if (new_val == 0 or new_val is None) and old_val and old_val != 0:
+                                data[field] = old_val
+                print(f"    ✓ preserved existing data for rate-limited fields")
+        except Exception as e:
+            print(f"    [WARN] Could not read existing prices for preservation: {e}")
+
         print(f"  Pushing: prices ({len(prices)} rows)...")
         if sb_upsert("prices", list(prices.values())):
             print(f"    ✓ prices OK")
