@@ -156,7 +156,7 @@ def _render_period_returns(data, strategy, color):
             alpha = (val - bench_val) * 100
             a_color = BRAND["green"] if alpha >= 0 else BRAND["red"]
             a_sign = "+" if alpha >= 0 else ""
-            alpha_html = f'<div style="font-size:10px; color:{a_color}; margin-top:2px;">{a_sign}{alpha:.1f}% α</div>'
+            alpha_html = f'<div style="font-size:10px; color:{a_color}; margin-top:2px;">{a_sign}{alpha:.2f}% α</div>'
 
         with cols[i]:
             st.markdown(f"""<div style="
@@ -166,7 +166,7 @@ def _render_period_returns(data, strategy, color):
                 padding: 12px 14px;
             ">
                 <div style="font-size:10px; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">{label}</div>
-                <div style="font-size:20px; font-weight:700; color:{val_color};">{val_pct:+.1f}%</div>
+                <div style="font-size:20px; font-weight:700; color:{val_color};">{val_pct:+.2f}%</div>
                 {alpha_html}
             </div>""", unsafe_allow_html=True)
 
@@ -209,15 +209,19 @@ def _render_cumulative_chart(comp_df, strategy, color, name):
     fig.add_hline(y=100, line=dict(color="rgba(255,255,255,0.1)", width=1, dash="dash"))
 
     _layout = {**PLOTLY_DARK}
-    _layout["margin"] = dict(l=50, r=20, t=40, b=40)
+    _layout["margin"] = dict(l=50, r=20, t=16, b=40)
     fig.update_layout(
         **_layout,
-        title=f"Growth of $100 — {name} vs Benchmarks (Gross)",
         xaxis=_XAXIS,
         yaxis={**_YAXIS, "tickprefix": "$"},
         height=380,
         hovermode="x unified",
         showlegend=True,
+    )
+    st.markdown(
+        f'<div style="font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:4px;">'
+        f'Growth of $100 — {name} vs Benchmarks (Gross)</div>',
+        unsafe_allow_html=True,
     )
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
@@ -287,7 +291,7 @@ def _render_monthly_heatmap(comp_df, strategy, color):
 
     text = []
     for row in z_data:
-        text.append([f"{v*100:+.1f}%" if not pd.isna(v) else "" for v in row])
+        text.append([f"{v*100:+.2f}%" if not pd.isna(v) else "" for v in row])
 
     # Minimum width ensures cells stay readable; container scrolls on mobile
     min_width = max(760, len(available_months) * 62)
@@ -307,7 +311,7 @@ def _render_monthly_heatmap(comp_df, strategy, color):
         texttemplate="%{text}",
         textfont=dict(size=11),
         showscale=False,
-        hovertemplate="Year: %{y}<br>%{x}: %{z:.1f}%<extra></extra>",
+        hovertemplate="Year: %{y}<br>%{x}: %{z:.2f}%<extra></extra>",
     ))
 
     _hm_layout = {**PLOTLY_DARK}
@@ -374,13 +378,13 @@ def _render_annual_returns(data, strategy, color):
 
     # Build a clean display DataFrame
     display_data = {"Year": ar["Year"].astype(int)}
-    display_data[strategy] = ar[strat_col].apply(lambda x: f"{x*100:+.1f}%" if pd.notna(x) else "—")
+    display_data[strategy] = ar[strat_col].apply(lambda x: f"{x*100:+.2f}%" if pd.notna(x) else "—")
 
     primary_bench_col = None
     for i, (bname, bcol) in enumerate(bench_cols):
         if i == 0:
             primary_bench_col = bcol
-        display_data[bname] = ar[bcol].apply(lambda x: f"{x*100:+.1f}%" if pd.notna(x) else "—")
+        display_data[bname] = ar[bcol].apply(lambda x: f"{x*100:+.2f}%" if pd.notna(x) else "—")
 
     # Alpha column
     if primary_bench_col and strat_col:
@@ -389,7 +393,7 @@ def _render_annual_returns(data, strategy, color):
             b = row[primary_bench_col]
             if pd.notna(s) and pd.notna(b):
                 a = (s - b) * 100
-                return f"{a:+.1f}%"
+                return f"{a:+.2f}%"
             return "—"
         display_data["Alpha"] = ar.apply(calc_alpha, axis=1)
 

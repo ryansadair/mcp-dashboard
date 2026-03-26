@@ -46,7 +46,7 @@ def render_kpi_cards(strategy: str, kpis: dict, bench_ytd: float):
     daily_str = f"{daily_return:+.2f}%" if daily_return != 0 else "0.00%"
     daily_color = GREEN if daily_return > 0 else RED if daily_return < 0 else "rgba(255,255,255,0.95)"
 
-    cash_str = f"{cash_pct:.1f}%" if cash_pct > 0 else "—"
+    cash_str = f"{cash_pct:.2f}%" if cash_pct > 0 else "—"
 
     yield_str = f"{div_yield:.2f}%"
     yield_color = GOLD if div_yield > 0 else "rgba(255,255,255,0.95)"
