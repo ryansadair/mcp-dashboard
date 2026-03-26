@@ -806,6 +806,8 @@ with tab_holdings:
                         ) if mkt.get("52w_high") else 0,
                     })
                 display_df = pd.DataFrame(rows)
+                if not display_df.empty and "Company" in display_df.columns:
+                    display_df = display_df.sort_values("Company", ascending=True).reset_index(drop=True)
 
 
                 # Sector filter
@@ -912,22 +914,21 @@ with tab_holdings:
                             hole=0.5,
                             pull=_pull,
                             textinfo="label+percent",
-                            textposition="auto",
-                            insidetextfont=dict(size=10, color="rgba(255,255,255,0.85)"),
+                            textposition="outside",
+                            textfont=dict(size=11, color="rgba(255,255,255,0.7)"),
                             outsidetextfont=dict(size=10, color="rgba(255,255,255,0.6)"),
                             hovertemplate="<b>%{label}</b><br>%{value:.2f}% of portfolio<extra></extra>",
                             sort=False,
                             direction="clockwise",
                             rotation=90,
-                            automargin=True,
                         ))
                         _pie_layout = {**PLOTLY_DARK}
-                        _pie_layout["margin"] = dict(l=20, r=20, t=20, b=20)
+                        _pie_layout["margin"] = dict(l=60, r=60, t=30, b=30)
                         fig_pie.update_layout(
                             **_pie_layout,
-                            height=max(360, _n_sectors * 28 + 140),
+                            height=max(320, _n_sectors * 28 + 120),
                             showlegend=False,
-                            uniformtext_minsize=8,
+                            uniformtext_minsize=9,
                             uniformtext_mode="hide",
                         )
                         st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)

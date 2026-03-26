@@ -675,6 +675,8 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Sector":         r["sector"],
         })
     detail_df = pd.DataFrame(detail_rows)
+    if not detail_df.empty and "Company" in detail_df.columns:
+        detail_df = detail_df.sort_values("Company", ascending=True).reset_index(drop=True)
 
     # Color formatting
     def _color_growth(val):
