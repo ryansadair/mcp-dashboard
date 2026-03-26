@@ -405,10 +405,9 @@ if MONTHLY_RETURNS_AVAILABLE and active in STRATEGY_YTD:
     kpis["ytd_as_of"] = AS_OF_DATE
 
 # ── Finviz sector fallback ──────────────────────────────────────────────────
-# Only called for tickers with missing sector; cached 24h; fully isolated.
-@st.cache_data(ttl=86400, show_spinner=False, _v=2)
-def _finviz_sector_lookup(tickers: tuple) -> dict:
-    """Batch sector lookup from Finviz screener. Single HTTP call, cached 24h."""
+@st.cache_data(ttl=86400, show_spinner=False)
+def _finviz_sector_lookup_v2(tickers: tuple) -> dict:
+    """Batch sector lookup via Finviz screener. Single HTTP call, cached 24h."""
     if not tickers:
         return {}
     try:
@@ -431,14 +430,14 @@ def _get_sector(sym, price_data, fv_cache):
     return fv_cache.get(sym, "Other")
 
 
-def _build_finviz_sector_cache(tickers, price_data):
-    """Identify tickers missing sector and do a single Finviz batch lookup."""
+def _build_fv_sector_cache(tickers, price_data):
+    """Identify tickers missing sector, do a single Finviz batch lookup."""
     try:
         missing = tuple(
             sym for sym in tickers
             if not (price_data.get(sym, {}).get("sector", "") or "").strip()
         )
-        return _finviz_sector_lookup(missing) if missing else {}
+        return _finviz_sector_lookup_v2(missing) if missing else {}
     except Exception:
         return {}
 
@@ -490,7 +489,7 @@ with tab_overview:
             if not tam_ov_hm.empty:
                 ov_hm_tickers = tuple(tam_ov_hm["symbol"].tolist())
                 ov_hm_prices = fetch_batch_prices(ov_hm_tickers)
-                _hm_fv = _build_finviz_sector_cache(ov_hm_tickers, ov_hm_prices)
+                _hm_fv = _build_fv_sector_cache(ov_hm_tickers, ov_hm_prices)
 
                 hm_rows = []
                 for _, row in tam_ov_hm.iterrows():
@@ -685,7 +684,7 @@ with tab_overview:
             if not tam_ov.empty:
                 ov_tickers = tuple(tam_ov["symbol"].tolist())
                 ov_prices = fetch_batch_prices(ov_tickers)
-                _ov_fv = _build_finviz_sector_cache(ov_tickers, ov_prices)
+                _ov_fv = _build_fv_sector_cache(ov_tickers, ov_prices)
 
                 sector_rows = []
                 for _, h in tam_ov.iterrows():
@@ -807,7 +806,7 @@ with tab_holdings:
                 tickers = tuple(tam_df["symbol"].tolist())
                 with st.spinner("Fetching live prices..."):
                     price_data = fetch_batch_prices(tickers)
-                _hd_fv = _build_finviz_sector_cache(tickers, price_data)
+                _hd_fv = _build_fv_sector_cache(tickers, price_data)
 
                 # Fetch Notion proprietary metrics (Sprint 5)
                 notion_data = {}
