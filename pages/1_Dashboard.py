@@ -383,6 +383,10 @@ if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
             wt = row["weight"]
             mkt = kpi_prices.get(sym, {})
             yld = mkt.get("dividend_yield", 0) or 0
+            # Fallback to Tamarac current_yield when Supabase has 0
+            if yld == 0:
+                _cy_raw = row.get("current_yield", 0) or 0
+                yld = float(_cy_raw) * 100 if 0 < float(_cy_raw) < 1 else float(_cy_raw)
             chg = mkt.get("change_1d_pct", 0) or 0
             weighted_yield += wt * yld
             weighted_daily += wt * chg
@@ -753,6 +757,9 @@ with tab_overview:
                     price = mkt.get("price", 0)
                     chg = mkt.get("change_1d_pct", 0) or 0
                     yld = mkt.get("dividend_yield", 0) or 0
+                    if yld == 0:
+                        _cy_raw = h.get("current_yield", 0) or 0
+                        yld = float(_cy_raw) * 100 if 0 < float(_cy_raw) < 1 else float(_cy_raw)
                     chg_color = "#569542" if chg >= 0 else "#c45454"
                     yld_str = f"{yld:.2f}%" if yld > 0 else "—"
                     st.markdown(
@@ -829,6 +836,12 @@ with tab_holdings:
                     # Notion proprietary metrics
                     nm = notion_data.get(sym.upper(), {})
 
+                    # Dividend yield: Supabase/yfinance primary, Tamarac current_yield fallback
+                    _dy = mkt.get("dividend_yield", 0) or 0
+                    if _dy == 0:
+                        _cy_raw = h.get("current_yield", 0) or 0
+                        _dy = float(_cy_raw) * 100 if 0 < float(_cy_raw) < 1 else float(_cy_raw)
+
                     rows.append({
                         "Company": h["description"],
                         "Symbol": sym,
@@ -837,7 +850,7 @@ with tab_holdings:
                         "1D Chg %": chg_val,
                         "Price": mkt.get("price", 0),
                         "Yield on Cost %": round(yoc_pct, 2),
-                        "Div Yield %": mkt.get("dividend_yield", 0),
+                        "Div Yield %": round(_dy, 2),
                         "MCP Target": nm.get("mcp_target") if nm.get("mcp_target") is not None else "—",
                         "Baseline": nm.get("div_baseline") if nm.get("div_baseline") is not None else "—",
                         "Style": nm.get("style_bucket", "—") or "—",
