@@ -982,6 +982,7 @@ with tab_holdings:
         if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
             _charts_tam = get_holdings_for_strategy(tamarac_parsed, active)
             if not _charts_tam.empty:
+                _charts_tam = _charts_tam.sort_values("description", ascending=True)
                 _chart_tickers = _charts_tam["symbol"].tolist()
                 _chart_names = dict(zip(_charts_tam["symbol"], _charts_tam["description"]))
 
