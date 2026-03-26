@@ -679,7 +679,7 @@ with tab_overview:
                 f"<div style='flex:1;font-size:13px;color:rgba(255,255,255,0.7);'>{row['sector']}</div>"
                 f"<div style='width:120px;background:rgba(255,255,255,0.06);border-radius:3px;height:6px;overflow:hidden;'>"
                 f"<div style='width:{min(float(row['weight'])*2.5,100):.1f}%;height:6px;border-radius:3px;background:{color};'></div></div>"
-                f"<div style='font-size:13px;color:rgba(255,255,255,0.5);width:38px;text-align:right;'>{float(row['weight']):.2f}%</div>"
+                f"<div style='font-size:13px;color:rgba(255,255,255,0.5);width:54px;text-align:right;white-space:nowrap;'>{float(row['weight']):.2f}%</div>"
                 f"</div>",
                 unsafe_allow_html=True
             )
@@ -1078,14 +1078,12 @@ with tab_holdings:
                                     _fig = go.Figure()
 
                                     # For Max period, fill from zero; otherwise fill from period low
-                                    # giving a Finviz-style zoomed-in view
                                     _use_zero_base = (_sel_label == "Max")
                                     _all_vals = _close.dropna()
                                     _y_min = 0 if _use_zero_base else float(_all_vals.min())
                                     _y_max = float(_all_vals.max())
 
                                     if _use_zero_base:
-                                        # Simple fill to zero
                                         _fig.add_trace(go.Scatter(
                                             x=_tk_df.index, y=_close,
                                             mode="lines", name="Price",
@@ -1095,11 +1093,9 @@ with tab_holdings:
                                             hovertemplate="%{x|%b %d}<br>$%{y:.2f}<extra></extra>",
                                         ))
                                     else:
-                                        # Pad below the low by 5% of range so the fill has visual weight
                                         _price_range = _y_max - _y_min if _y_max > _y_min else 1
                                         _y_floor = max(0, _y_min - _price_range * 0.05)
 
-                                        # Invisible baseline at the floor
                                         _fig.add_trace(go.Scatter(
                                             x=_tk_df.index,
                                             y=[_y_floor] * len(_tk_df),
@@ -1107,7 +1103,6 @@ with tab_holdings:
                                             line=dict(width=0), showlegend=False,
                                             hoverinfo="skip",
                                         ))
-                                        # Price line that fills down to baseline
                                         _fig.add_trace(go.Scatter(
                                             x=_tk_df.index, y=_close,
                                             mode="lines", name="Price",
