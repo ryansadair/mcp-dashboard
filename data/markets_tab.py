@@ -91,6 +91,15 @@ COMMODITIES = [
     ("Copper",      "HG=F"),
 ]
 
+# US Equity Factors — Morningstar-style 3x3 grid (iShares Russell ETFs)
+# Rows: Large, Mid, Small  |  Columns: Value, Core, Growth
+STYLE_BOX = [
+    ("Large", [("Value", "IWD"), ("Core", "IWB"), ("Growth", "IWF")]),
+    ("Mid",   [("Value", "IWS"), ("Core", "IWR"), ("Growth", "IWP")]),
+    ("Small", [("Value", "IWN"), ("Core", "IWM"), ("Growth", "IWO")]),
+]
+_STYLE_BOX_TICKERS = [t for _, cols in STYLE_BOX for _, t in cols]
+
 # Collect all tickers for batch fetch
 _ALL_GROUPS = [INDICES, DIVIDEND_BENCHMARKS, SECTORS, FIXED_INCOME, GLOBAL_DEVELOPED, GLOBAL_EMERGING, COMMODITIES]
 _ALL_TICKERS = []
@@ -98,6 +107,9 @@ for group in _ALL_GROUPS:
     for _, ticker in group:
         if ticker not in _ALL_TICKERS:
             _ALL_TICKERS.append(ticker)
+for t in _STYLE_BOX_TICKERS:
+    if t not in _ALL_TICKERS:
+        _ALL_TICKERS.append(t)
 
 
 # ── Data Fetching ──────────────────────────────────────────────────────────
@@ -263,6 +275,86 @@ def _section_header(title):
     )
 
 
+def _render_style_box(quotes):
+    """
+    Render a Koyfin-inspired 3x3 US Equity Factors heatmap.
+    Color intensity scales with magnitude of daily change.
+    """
+    col_labels = ["Value", "Core", "Growth"]
+
+    # Find max absolute change for color scaling
+    all_pcts = []
+    for _, cols in STYLE_BOX:
+        for _, ticker in cols:
+            pct = quotes.get(ticker, {}).get("change_pct", 0)
+            all_pcts.append(abs(pct))
+    max_abs = max(all_pcts) if all_pcts and max(all_pcts) > 0 else 1
+
+    def _cell_bg(pct):
+        """Return background color with intensity based on magnitude."""
+        intensity = min(abs(pct) / max(max_abs, 0.5), 1.0)
+        if pct > 0:
+            # Green scale
+            r, g, b = 86, 149, 66
+            alpha = 0.15 + intensity * 0.55
+        elif pct < 0:
+            # Red scale
+            r, g, b = 196, 84, 84
+            alpha = 0.15 + intensity * 0.55
+        else:
+            return "rgba(255,255,255,0.04)"
+        return f"rgba({r},{g},{b},{alpha:.2f})"
+
+    # Build HTML grid
+    html = '<div style="margin-top:8px;">'
+
+    # Column headers
+    html += '<div style="display:flex;gap:4px;margin-bottom:4px;margin-left:52px;">'
+    for cl in col_labels:
+        html += (
+            f'<div style="flex:1;text-align:center;font-size:10px;font-weight:600;'
+            f'color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.06em;">'
+            f'{cl}</div>'
+        )
+    html += '</div>'
+
+    # Rows
+    for row_label, cols in STYLE_BOX:
+        html += '<div style="display:flex;gap:4px;margin-bottom:4px;align-items:stretch;">'
+
+        # Row label
+        html += (
+            f'<div style="width:48px;display:flex;align-items:center;font-size:10px;font-weight:600;'
+            f'color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.04em;">'
+            f'{row_label}</div>'
+        )
+
+        # Cells
+        for _, ticker in cols:
+            pct = quotes.get(ticker, {}).get("change_pct", 0)
+            bg = _cell_bg(pct)
+            text_color = "rgba(255,255,255,0.9)" if abs(pct) > 0.3 else "rgba(255,255,255,0.6)"
+
+            html += (
+                f'<div style="flex:1;background:{bg};border-radius:6px;padding:14px 8px;'
+                f'text-align:center;min-height:48px;display:flex;align-items:center;justify-content:center;">'
+                f'<span style="font-size:14px;font-weight:700;color:{text_color};'
+                f'font-family:\'DM Serif Display\',serif;">{pct:+.2f}%</span>'
+                f'</div>'
+            )
+
+        html += '</div>'
+
+    # Subtitle
+    html += (
+        '<div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:6px;text-align:center;">'
+        '1-Day Performance · iShares Russell ETFs</div>'
+    )
+    html += '</div>'
+
+    return html
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # MAIN RENDER
 # ══════════════════════════════════════════════════════════════════════════
@@ -293,9 +385,14 @@ def render_markets_tab():
         st.markdown(_section_header("Dividend Benchmarks"), unsafe_allow_html=True)
         st.markdown(_render_market_table(_sort_by_change(DIVIDEND_BENCHMARKS), quotes, section_label="Benchmark"), unsafe_allow_html=True)
 
-    # ── Sector ETFs ───────────────────────────────────────────────────────
-    st.markdown(_section_header("S&P Sector ETFs"), unsafe_allow_html=True)
-    st.markdown(_render_market_table(_sort_by_change(SECTORS), quotes, section_label="Sector"), unsafe_allow_html=True)
+    # ── Sector ETFs & US Equity Factors (side by side) ──────────────────────
+    col_sectors, col_factors = st.columns([3, 2])
+    with col_sectors:
+        st.markdown(_section_header("S&P Sector ETFs"), unsafe_allow_html=True)
+        st.markdown(_render_market_table(_sort_by_change(SECTORS), quotes, section_label="Sector"), unsafe_allow_html=True)
+    with col_factors:
+        st.markdown(_section_header("US Equity Factors"), unsafe_allow_html=True)
+        st.markdown(_render_style_box(quotes), unsafe_allow_html=True)
 
     # ── Fixed Income ──────────────────────────────────────────────────────
     st.markdown(_section_header("Fixed Income ETFs"), unsafe_allow_html=True)
