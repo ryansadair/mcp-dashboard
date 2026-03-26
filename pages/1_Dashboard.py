@@ -861,6 +861,8 @@ with tab_holdings:
                         ) if mkt.get("52w_high") else 0,
                     })
                 display_df = pd.DataFrame(rows)
+                if not display_df.empty and "Company" in display_df.columns:
+                    display_df = display_df.sort_values("Company", ascending=True).reset_index(drop=True)
 
 
                 # Sector filter
@@ -1035,6 +1037,7 @@ with tab_holdings:
         if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
             _charts_tam = get_holdings_for_strategy(tamarac_parsed, active)
             if not _charts_tam.empty:
+                _charts_tam = _charts_tam.sort_values("description", ascending=True)
                 _chart_tickers = _charts_tam["symbol"].tolist()
                 _chart_names = dict(zip(_charts_tam["symbol"], _charts_tam["description"]))
 
