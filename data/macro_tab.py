@@ -290,9 +290,15 @@ def _fmt_chg(latest, prev, suffix="", is_bp=False):
         return "—", "neutral"
     diff = latest - prev
     if is_bp:
-        diff_display = f"{diff:+.0f}bp" if abs(diff) >= 0.5 else "unch"
+        # Convert percentage-point diff to basis points (e.g., 0.01 → 1bp)
+        diff_bp = diff * 100
+        diff_display = f"{diff_bp:+.0f}bp" if abs(diff_bp) >= 0.5 else "unch"
+        if abs(diff_bp) < 0.5:
+            return "unch", "neutral"
+        direction = "up" if diff_bp > 0 else "down"
+        return diff_display, direction
     elif suffix == "%":
-        diff_display = f"{diff:+.1f}%"
+        diff_display = f"{diff:+.2f}%"
     else:
         diff_display = f"{diff:+.2f}{suffix}"
 
@@ -310,7 +316,7 @@ def _fmt_econ_val(name, val):
     if "Claims" in name:
         return f"{val / 1000:.0f}K" if val > 100 else f"{val:.0f}K"
     if "Unemployment" in name or "CPI" in name or "PCE" in name or "GDP" in name:
-        return f"{val:.1f}%"
+        return f"{val:.2f}%"
     if "ISM" in name or "Confidence" in name:
         return f"{val:.1f}"
     return f"{val:.2f}"
@@ -730,8 +736,8 @@ def render_macro_tab(qdvd_yield=None):
                 else:
                     prev_yoy = None
 
-                display_val = f"{yoy:.1f}%" if yoy is not None else "—"
-                display_prev = f"{prev_yoy:.1f}%" if prev_yoy is not None else "—"
+                display_val = f"{yoy:.2f}%" if yoy is not None else "—"
+                display_prev = f"{prev_yoy:.2f}%" if prev_yoy is not None else "—"
                 trend = "down" if yoy and prev_yoy and yoy < prev_yoy else "up" if yoy and prev_yoy and yoy > prev_yoy else "neutral"
                 signal = _signal_for_econ(name, yoy, prev_yoy)
                 date_label = obs[0].get("date", "")[:7]
