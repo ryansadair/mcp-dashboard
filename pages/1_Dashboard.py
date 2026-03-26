@@ -396,7 +396,7 @@ if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
         if total_portfolio_weight > 0:
             kpis["daily_return"] = round(weighted_daily / total_portfolio_weight, 2)
 
-        kpis["cash_pct"] = round(cash_kpi, 1)
+        kpis["cash_pct"] = round(cash_kpi, 2)
 
 # Override YTD with official Tamarac monthly numbers when available
 if MONTHLY_RETURNS_AVAILABLE and active in STRATEGY_YTD:
@@ -571,7 +571,7 @@ with tab_overview:
                         textfont=dict(size=13, family="DM Sans"),
                         hovertemplate=(
                             "<b>%{label}</b><br>"
-                            "Weight: %{value:.1f}%<br>"
+                            "Weight: %{value:.2f}%<br>"
                             "Return: %{text}<extra></extra>"
                         ),
                         marker=dict(
@@ -679,7 +679,7 @@ with tab_overview:
                 f"<div style='flex:1;font-size:13px;color:rgba(255,255,255,0.7);'>{row['sector']}</div>"
                 f"<div style='width:120px;background:rgba(255,255,255,0.06);border-radius:3px;height:6px;overflow:hidden;'>"
                 f"<div style='width:{min(float(row['weight'])*2.5,100):.1f}%;height:6px;border-radius:3px;background:{color};'></div></div>"
-                f"<div style='font-size:13px;color:rgba(255,255,255,0.5);width:38px;text-align:right;'>{float(row['weight']):.1f}%</div>"
+                f"<div style='font-size:13px;color:rgba(255,255,255,0.5);width:38px;text-align:right;'>{float(row['weight']):.2f}%</div>"
                 f"</div>",
                 unsafe_allow_html=True
             )
@@ -718,7 +718,7 @@ with tab_overview:
                         f"<div style='display:flex;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);'>"
                         f"<div style='flex:0 0 50px;font-size:12px;font-weight:600;color:#C9A84C;'>{sym}</div>"
                         f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.45);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{h['description']}</div>"
-                        f"<div style='flex:0 0 46px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h['weight_pct']:.1f}%</div>"
+                        f"<div style='flex:0 0 46px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h['weight_pct']:.2f}%</div>"
                         f"<div style='flex:0 0 65px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>${price:.2f}</div>"
                         f"<div style='flex:0 0 52px;font-size:12px;color:{chg_color};text-align:right;font-weight:500;'>{chg:+.2f}%</div>"
                         f"<div style='flex:0 0 52px;font-size:12px;color:#C9A84C;text-align:right;'>{yld_str}</div>"
@@ -733,7 +733,7 @@ with tab_overview:
                         f"<div style='display:flex;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);'>"
                         f"<div style='flex:0 0 50px;font-size:12px;font-weight:600;color:#C9A84C;'>{h.get('ticker','')}</div>"
                         f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.45);'>{h.get('name','')}</div>"
-                        f"<div style='flex:0 0 46px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h.get('weight',0):.1f}%</div>"
+                        f"<div style='flex:0 0 46px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h.get('weight',0):.2f}%</div>"
                         f"<div style='flex:0 0 65px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>${h.get('price',0):.2f}</div>"
                         f"<div style='flex:0 0 52px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h.get('chg1d',0):+.2f}%</div>"
                         f"<div style='flex:0 0 52px;font-size:12px;color:#C9A84C;text-align:right;'>—</div>"
@@ -837,7 +837,7 @@ with tab_holdings:
                     "Div Yield %": "{:.2f}%",
                     "MCP Target": lambda v: f"${v:,.0f}" if isinstance(v, (int, float)) else v,
                     "Unit Cost": "${:.2f}",
-                    "% From 52W Hi": "{:+.1f}%",
+                    "% From 52W Hi": "{:+.2f}%",
                 })
 
                 # Row-selection enabled — click a row to navigate to stock detail
@@ -863,7 +863,7 @@ with tab_holdings:
                         "Style": st.column_config.TextColumn("Style", width="small"),
                         "P/E": st.column_config.NumberColumn("P/E"),
                         "Unit Cost": st.column_config.NumberColumn("Unit Cost", format="$%.2f"),
-                        "% From 52W Hi": st.column_config.NumberColumn("% From Hi", format="%+.1f%%"),
+                        "% From 52W Hi": st.column_config.NumberColumn("% From Hi", format="%+.2f%%"),
                     },
                 )
 
@@ -889,7 +889,7 @@ with tab_holdings:
                     with col_tbl:
                         st.dataframe(sect_agg, use_container_width=True, height=(80 + len(sect_agg) * 40), column_config={
                             "Holdings": st.column_config.NumberColumn("#", width="small"),
-                            "Total_Weight": st.column_config.NumberColumn("Wt %", format="%.1f%%", width="small"),
+                            "Total_Weight": st.column_config.NumberColumn("Wt %", format="%.2f%%", width="small"),
                             "Avg_Yield": st.column_config.NumberColumn("Avg Yld %", format="%.2f%%", width="small"),
                         })
                     with col_pie:
@@ -915,7 +915,7 @@ with tab_holdings:
                             textposition="outside",
                             textfont=dict(size=11, color="rgba(255,255,255,0.7)"),
                             outsidetextfont=dict(size=10, color="rgba(255,255,255,0.6)"),
-                            hovertemplate="<b>%{label}</b><br>%{value:.1f}% of portfolio<extra></extra>",
+                            hovertemplate="<b>%{label}</b><br>%{value:.2f}% of portfolio<extra></extra>",
                             sort=False,
                             direction="clockwise",
                             rotation=90,
@@ -1066,7 +1066,7 @@ with tab_holdings:
                                     st.markdown(
                                         f"<div style='display:flex;align-items:baseline;gap:8px;padding:2px 0 0;'>"
                                         f"<span style='font-size:13px;font-weight:700;color:#C9A84C;'>{_tk}</span>"
-                                        f"<span style='font-size:12px;font-weight:600;color:{_chg_color};'>{_chg_pct:+.1f}%</span>"
+                                        f"<span style='font-size:12px;font-weight:600;color:{_chg_color};'>{_chg_pct:+.2f}%</span>"
                                         f"<span style='font-size:11px;color:rgba(255,255,255,0.4);'>${_last:,.2f}</span>"
                                         f"</div>"
                                         f"<div style='font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:2px;'>"
