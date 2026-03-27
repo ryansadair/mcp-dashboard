@@ -296,7 +296,10 @@ def get_index_data():
 def get_cache_timestamp():
     """Return the timestamp of the last Supabase fetch, or local cache time."""
     if SUPABASE_KEY != "YOUR_SERVICE_ROLE_KEY":
-        rows = _sb_get("prices", select="fetched_at", filters={"limit": "1"})
+        rows = _sb_get("prices", select="fetched_at", filters={
+            "limit": "1",
+            "order": "fetched_at.desc",
+        })
         if rows and len(rows) > 0:
             return rows[0].get("fetched_at", "")
     _, meta = _load_price_cache()
