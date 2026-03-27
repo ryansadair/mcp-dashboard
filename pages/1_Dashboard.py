@@ -339,17 +339,17 @@ strat_labels = [f"{STRATEGIES[k]['full_name']}  ({k})" for k in strat_keys]
 
 def _on_strategy_change(tab_key):
     """Callback for strategy selectbox — syncs widget value to session state
-    and clears stale widget keys from other tabs so they re-init correctly."""
+    and updates other tabs' selectbox values to match."""
     widget_key = f"strategy_select_{tab_key}"
     selected_label = st.session_state[widget_key]
     selected_key = strat_keys[strat_labels.index(selected_label)]
     st.session_state["active_strategy"] = selected_key
-    # Clear other tabs' selectbox keys so they pick up the new value on next render
+    # Sync other tabs' selectbox keys so they show the correct strategy
     all_tab_keys = ["overview", "holdings", "perf", "divs", "watchlist", "macro", "markets", "alerts"]
     for tk in all_tab_keys:
         other_key = f"strategy_select_{tk}"
         if other_key != widget_key and other_key in st.session_state:
-            del st.session_state[other_key]
+            st.session_state[other_key] = selected_label
 
 def _render_strategy_header(tab_key):
     """Render strategy selector + KPI cards inside a tab."""
@@ -390,10 +390,6 @@ if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
             wt = row["weight"]
             mkt = kpi_prices.get(sym, {})
             yld = mkt.get("dividend_yield", 0) or 0
-            # Fallback to Tamarac current_yield when Supabase has 0
-            if yld == 0:
-                _cy_raw = row.get("current_yield", 0) or 0
-                yld = float(_cy_raw) * 100 if 0 < float(_cy_raw) < 1 else float(_cy_raw)
             chg = mkt.get("change_1d_pct", 0) or 0
             weighted_yield += wt * yld
             weighted_daily += wt * chg
@@ -414,44 +410,6 @@ if MONTHLY_RETURNS_AVAILABLE and active in STRATEGY_YTD:
     kpis = dict(kpis) if not isinstance(kpis, dict) else kpis
     kpis["ytd"] = STRATEGY_YTD[active]
     kpis["ytd_as_of"] = AS_OF_DATE
-
-# ── Finviz sector fallback ──────────────────────────────────────────────────
-@st.cache_data(ttl=86400, show_spinner=False)
-def _finviz_sector_lookup_v2(tickers: tuple) -> dict:
-    """Batch sector lookup via Finviz screener. Single HTTP call, cached 24h."""
-    if not tickers:
-        return {}
-    try:
-        from finvizfinance.screener.overview import Overview
-        foverview = Overview()
-        foverview.set_filter(ticker=",".join(tickers))
-        df = foverview.screener_view()
-        if df is not None and not df.empty and "Sector" in df.columns and "Ticker" in df.columns:
-            return dict(zip(df["Ticker"], df["Sector"]))
-    except Exception:
-        pass
-    return {}
-
-
-def _get_sector(sym, price_data, fv_cache):
-    """Sector from yfinance/Supabase first, then Finviz cache, else 'Other'."""
-    sect = (price_data.get(sym, {}).get("sector", "") or "").strip()
-    if sect:
-        return sect
-    return fv_cache.get(sym, "Other")
-
-
-def _build_fv_sector_cache(tickers, price_data):
-    """Identify tickers missing sector, do a single Finviz batch lookup."""
-    try:
-        missing = tuple(
-            sym for sym in tickers
-            if not (price_data.get(sym, {}).get("sector", "") or "").strip()
-        )
-        return _finviz_sector_lookup_v2(missing) if missing else {}
-    except Exception:
-        return {}
-
 
 # ── Plotly dark theme (reused across tabs) ─────────────────────────────────
 PLOTLY_DARK = dict(
@@ -500,14 +458,13 @@ with tab_overview:
             if not tam_ov_hm.empty:
                 ov_hm_tickers = tuple(tam_ov_hm["symbol"].tolist())
                 ov_hm_prices = fetch_batch_prices(ov_hm_tickers)
-                _hm_fv = _build_fv_sector_cache(ov_hm_tickers, ov_hm_prices)
 
                 hm_rows = []
                 for _, row in tam_ov_hm.iterrows():
                     sym = row["symbol"]
                     mkt = ov_hm_prices.get(sym, {})
                     chg = mkt.get("change_1d_pct", 0) or 0
-                    sector = _get_sector(sym, ov_hm_prices, _hm_fv)
+                    sector = mkt.get("sector", "") or "Other"
                     hm_rows.append({
                         "symbol": sym,
                         "description": row["description"],
@@ -695,13 +652,11 @@ with tab_overview:
             if not tam_ov.empty:
                 ov_tickers = tuple(tam_ov["symbol"].tolist())
                 ov_prices = fetch_batch_prices(ov_tickers)
-                _ov_fv = _build_fv_sector_cache(ov_tickers, ov_prices)
-
                 sector_rows = []
                 for _, h in tam_ov.iterrows():
                     sym = h["symbol"]
-                    sect = _get_sector(sym, ov_prices, _ov_fv)
-                    sector_rows.append({"sector": sect, "weight": h["weight_pct"]})
+                    sect = ov_prices.get(sym, {}).get("sector", "Other")
+                    sector_rows.append({"sector": sect or "Other", "weight": h["weight_pct"]})
                 if cash_ov > 0:
                     sector_rows.append({"sector": "Cash", "weight": cash_ov})
                 sector_df = pd.DataFrame(sector_rows).groupby("sector")["weight"].sum().reset_index().sort_values("weight", ascending=False)
@@ -764,9 +719,6 @@ with tab_overview:
                     price = mkt.get("price", 0)
                     chg = mkt.get("change_1d_pct", 0) or 0
                     yld = mkt.get("dividend_yield", 0) or 0
-                    if yld == 0:
-                        _cy_raw = h.get("current_yield", 0) or 0
-                        yld = float(_cy_raw) * 100 if 0 < float(_cy_raw) < 1 else float(_cy_raw)
                     chg_color = "#569542" if chg >= 0 else "#c45454"
                     yld_str = f"{yld:.2f}%" if yld > 0 else "—"
                     st.markdown(
@@ -820,7 +772,6 @@ with tab_holdings:
                 tickers = tuple(tam_df["symbol"].tolist())
                 with st.spinner("Fetching live prices..."):
                     price_data = fetch_batch_prices(tickers)
-                _hd_fv = _build_fv_sector_cache(tickers, price_data)
 
                 # Fetch Notion proprietary metrics (Sprint 5)
                 notion_data = {}
@@ -843,21 +794,15 @@ with tab_holdings:
                     # Notion proprietary metrics
                     nm = notion_data.get(sym.upper(), {})
 
-                    # Dividend yield: Supabase/yfinance primary, Tamarac current_yield fallback
-                    _dy = mkt.get("dividend_yield", 0) or 0
-                    if _dy == 0:
-                        _cy_raw = h.get("current_yield", 0) or 0
-                        _dy = float(_cy_raw) * 100 if 0 < float(_cy_raw) < 1 else float(_cy_raw)
-
                     rows.append({
                         "Company": h["description"],
                         "Symbol": sym,
-                        "Sector": _get_sector(sym, price_data, _hd_fv),
+                        "Sector": mkt.get("sector", ""),
                         "Weight %": round(h["weight_pct"], 2),
                         "1D Chg %": chg_val,
                         "Price": mkt.get("price", 0),
                         "Yield on Cost %": round(yoc_pct, 2),
-                        "Div Yield %": round(_dy, 2),
+                        "Div Yield %": mkt.get("dividend_yield", 0),
                         "MCP Target": nm.get("mcp_target") if nm.get("mcp_target") is not None else "—",
                         "Baseline": nm.get("div_baseline") if nm.get("div_baseline") is not None else "—",
                         "Style": nm.get("style_bucket", "—") or "—",
@@ -868,8 +813,6 @@ with tab_holdings:
                         ) if mkt.get("52w_high") else 0,
                     })
                 display_df = pd.DataFrame(rows)
-                if not display_df.empty and "Company" in display_df.columns:
-                    display_df = display_df.sort_values("Company", ascending=True).reset_index(drop=True)
 
 
                 # Sector filter
@@ -1044,7 +987,6 @@ with tab_holdings:
         if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
             _charts_tam = get_holdings_for_strategy(tamarac_parsed, active)
             if not _charts_tam.empty:
-                _charts_tam = _charts_tam.sort_values("description", ascending=True)
                 _chart_tickers = _charts_tam["symbol"].tolist()
                 _chart_names = dict(zip(_charts_tam["symbol"], _charts_tam["description"]))
 
