@@ -62,8 +62,8 @@ COMPOSITE_BLOCKS = {
     "QDVD": {
         "label_row": 2,
         "benchmarks": {
-            "primary": {"name": "S&P 500", "qtr_col": 11, "mo_col": 12, "cum_col": 13, "val_col": 14},
-            "secondary": {"name": "S&P 500 High Dividend", "qtr_col": 15, "mo_col": 16, "cum_col": 17, "val_col": 18},
+            "primary": {"name": "S&P 500 High Dividend", "qtr_col": 15, "mo_col": 16, "cum_col": 17, "val_col": 18},
+            "secondary": {"name": "S&P 500", "qtr_col": 11, "mo_col": 12, "cum_col": 13, "val_col": 14},
         },
     },
     "SMID": {
