@@ -141,11 +141,17 @@ try:
     from data.market_data import get_cache_timestamp
     _raw_ts = get_cache_timestamp()
     if _raw_ts:
-        from datetime import timedelta
+        from datetime import timedelta, timezone
         try:
             _parsed = datetime.fromisoformat(_raw_ts.replace("Z", "+00:00"))
-            _pacific = _parsed - timedelta(hours=7)  # PDT offset; change to 8 for PST
-            _age_min = int((datetime.utcnow() - _parsed.replace(tzinfo=None)).total_seconds() / 60)
+            # Make _parsed timezone-aware UTC if it came in naive
+            if _parsed.tzinfo is None:
+                _parsed = _parsed.replace(tzinfo=timezone.utc)
+            # Auto-detect PDT vs PST for display time
+            _utc_now = datetime.now(timezone.utc)
+            from zoneinfo import ZoneInfo
+            _pacific = _parsed.astimezone(ZoneInfo("America/Los_Angeles"))
+            _age_min = int((_utc_now - _parsed).total_seconds() / 60)
             _time_str = _pacific.strftime("%I:%M %p").lstrip("0")
 
             if _age_min <= 20:
