@@ -338,11 +338,18 @@ strat_keys   = list(STRATEGIES.keys())
 strat_labels = [f"{STRATEGIES[k]['full_name']}  ({k})" for k in strat_keys]
 
 def _on_strategy_change(tab_key):
-    """Callback for strategy selectbox — syncs widget value to session state."""
+    """Callback for strategy selectbox — syncs widget value to session state
+    and clears stale widget keys from other tabs so they re-init correctly."""
     widget_key = f"strategy_select_{tab_key}"
     selected_label = st.session_state[widget_key]
     selected_key = strat_keys[strat_labels.index(selected_label)]
     st.session_state["active_strategy"] = selected_key
+    # Clear other tabs' selectbox keys so they pick up the new value on next render
+    all_tab_keys = ["overview", "holdings", "perf", "divs", "watchlist", "macro", "markets", "alerts"]
+    for tk in all_tab_keys:
+        other_key = f"strategy_select_{tk}"
+        if other_key != widget_key and other_key in st.session_state:
+            del st.session_state[other_key]
 
 def _render_strategy_header(tab_key):
     """Render strategy selector + KPI cards inside a tab."""
