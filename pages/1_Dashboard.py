@@ -152,6 +152,8 @@ try:
             from zoneinfo import ZoneInfo
             _pacific = _parsed.astimezone(ZoneInfo("America/Los_Angeles"))
             _age_min = int((_utc_now - _parsed).total_seconds() / 60)
+            # DEBUG — remove after diagnosing
+            st.caption(f"DEBUG | raw: {_raw_ts} | parsed_tz: {_parsed.tzinfo} | utc_now: {_utc_now.isoformat()} | age_min: {_age_min}")
             _time_str = _pacific.strftime("%I:%M %p").lstrip("0")
 
             if _age_min <= 20:
