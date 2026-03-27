@@ -29,7 +29,12 @@ import time
 import math
 import argparse
 import requests
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
+
+
+def _utc_now():
+    """Timezone-aware UTC now — always includes +00:00 in .isoformat()."""
+    return datetime.now(timezone.utc)
 
 # ── Configuration ─────────────────────────────────────────────────────────
 
@@ -227,7 +232,7 @@ def fetch_all_prices(tickers):
                 "beta":           round(float(g("beta")         or 0), 2),
                 "name":           g("longName", "") or g("shortName", ticker),
                 "price_to_book":  round(float(g("priceToBook")  or 0), 2),
-                "fetched_at":     datetime.utcnow().isoformat(),
+                "fetched_at":     _utc_now().isoformat(),
             }
 
             if i % 10 == 0 or i == total:
@@ -238,7 +243,7 @@ def fetch_all_prices(tickers):
             results[ticker] = {
                 "ticker": ticker, "price": 0, "change_1d_pct": 0,
                 "dividend_yield": 0, "sector": "",
-                "fetched_at": datetime.utcnow().isoformat(),
+                "fetched_at": _utc_now().isoformat(),
             }
 
         time.sleep(0.3)
@@ -309,7 +314,7 @@ def fetch_all_dividends(tickers):
                 "div_growth_5y":       0,
                 "div_growth_years":    0,
                 "consecutive_years":   0,
-                "fetched_at":          datetime.utcnow().isoformat(),
+                "fetched_at":          _utc_now().isoformat(),
             }
 
             # Ex-dividend date
@@ -365,7 +370,7 @@ def fetch_all_dividends(tickers):
                 "payout_ratio": 0, "ex_dividend_date": "", "five_year_avg_yield": 0,
                 "div_growth_1y": 0, "div_growth_3y": 0, "div_growth_5y": 0,
                 "div_growth_years": 0, "consecutive_years": 0,
-                "fetched_at": datetime.utcnow().isoformat(),
+                "fetched_at": _utc_now().isoformat(),
             }
 
         time.sleep(0.3)
@@ -416,7 +421,7 @@ def fetch_index_data():
         for symbol, name in INDICES.items():
             results[symbol] = {
                 "symbol": symbol, "name": name, "price": 0,
-                "change_pct": 0, "fetched_at": datetime.utcnow().isoformat(),
+                "change_pct": 0, "fetched_at": _utc_now().isoformat(),
             }
         return results
 
@@ -430,7 +435,7 @@ def fetch_index_data():
             if df is None or df.empty:
                 results[symbol] = {
                     "symbol": symbol, "name": name, "price": 0,
-                    "change_pct": 0, "fetched_at": datetime.utcnow().isoformat(),
+                    "change_pct": 0, "fetched_at": _utc_now().isoformat(),
                 }
                 continue
 
@@ -438,7 +443,7 @@ def fetch_index_data():
             if len(df) < 1:
                 results[symbol] = {
                     "symbol": symbol, "name": name, "price": 0,
-                    "change_pct": 0, "fetched_at": datetime.utcnow().isoformat(),
+                    "change_pct": 0, "fetched_at": _utc_now().isoformat(),
                 }
                 continue
 
@@ -451,13 +456,13 @@ def fetch_index_data():
                 "name":       name,
                 "price":      price,
                 "change_pct": chg,
-                "fetched_at": datetime.utcnow().isoformat(),
+                "fetched_at": _utc_now().isoformat(),
             }
         except Exception as e:
             print(f"  [ERROR] Index {symbol}: {e}")
             results[symbol] = {
                 "symbol": symbol, "name": name, "price": 0,
-                "change_pct": 0, "fetched_at": datetime.utcnow().isoformat(),
+                "change_pct": 0, "fetched_at": _utc_now().isoformat(),
             }
 
     return results
@@ -511,14 +516,14 @@ def fetch_benchmark_data():
                     "symbol":     symbol,
                     "date":       date_str,
                     "close":      round(float(close), 4),
-                    "fetched_at": datetime.utcnow().isoformat(),
+                    "fetched_at": _utc_now().isoformat(),
                 })
 
             results[symbol] = {
                 "symbol":     symbol,
                 "ytd_return": ytd,
                 "history":    history_rows,
-                "fetched_at": datetime.utcnow().isoformat(),
+                "fetched_at": _utc_now().isoformat(),
             }
             print(f"  Benchmark {symbol}: YTD {ytd:+.2f}%")
             time.sleep(0.3)
@@ -527,7 +532,7 @@ def fetch_benchmark_data():
             print(f"  [ERROR] Benchmark {symbol}: {e}")
             results[symbol] = {
                 "symbol": symbol, "ytd_return": 0, "history": [],
-                "fetched_at": datetime.utcnow().isoformat(),
+                "fetched_at": _utc_now().isoformat(),
             }
 
     return results
@@ -541,7 +546,7 @@ def fetch_price_history(tickers):
     """Fetch full OHLCV history. Skips tickers already stored today."""
     import yfinance as yf
 
-    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    today_str = _utc_now().strftime("%Y-%m-%d")
     try:
         resp = requests.get(
             f"{SUPABASE_URL}/rest/v1/price_history",
@@ -581,7 +586,7 @@ def fetch_price_history(tickers):
                     "low":    round(_sf(row.get("Low",    0)), 4),
                     "close":  round(_sf(row.get("Close",  0)), 4),
                     "volume": int(_sf(row.get("Volume", 0))),
-                    "fetched_at": datetime.utcnow().isoformat(),
+                    "fetched_at": _utc_now().isoformat(),
                 })
             if i % 10 == 0 or i == total:
                 print(f"  Price history: {i}/{total} ({ticker}, {len(hist)} rows)")
@@ -620,7 +625,7 @@ def fetch_dividend_history(tickers):
                 all_rows.append({
                     "id": f"{ticker}_{year}", "ticker": ticker,
                     "year": int(year), "amount": round(float(amt), 4),
-                    "fetched_at": datetime.utcnow().isoformat(),
+                    "fetched_at": _utc_now().isoformat(),
                 })
             if i % 10 == 0 or i == total:
                 print(f"  Div history: {i}/{total} ({ticker})")
@@ -639,7 +644,7 @@ def fetch_financials(tickers):
     """Fetch quarterly financials. Skips tickers updated within 7 days."""
     import yfinance as yf
 
-    week_ago = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
+    week_ago = (_utc_now() - timedelta(days=7)).strftime("%Y-%m-%d")
     try:
         resp = requests.get(
             f"{SUPABASE_URL}/rest/v1/financials",
@@ -689,7 +694,7 @@ def fetch_financials(tickers):
                     "gross_margin":  round(gp / rev * 100, 2) if rev else 0.0,
                     "net_margin":    round(ni / rev * 100, 2) if rev else 0.0,
                     "op_margin":     round(oi / rev * 100, 2) if rev else 0.0,
-                    "fetched_at": datetime.utcnow().isoformat(),
+                    "fetched_at": _utc_now().isoformat(),
                 })
             if i % 10 == 0 or i == total:
                 print(f"  Financials: {i}/{total} ({ticker})")
@@ -875,7 +880,7 @@ def main():
 
     if not is_open and not args.force and args.mode == "auto":
         print(f"\n  Martin Capital — Cloud Pre-Fetch")
-        print(f"  {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')} "
+        print(f"  {_utc_now().strftime('%Y-%m-%d %H:%M:%S UTC')} "
               f"({day_names[weekday]} {et_hour}:{et_min:02d} ET)")
         print(f"  Outside market hours — skipping. Use --force to override.")
         sys.exit(0)
@@ -889,7 +894,7 @@ def main():
     print(f"\n{'=' * 60}")
     print(f"  Martin Capital — Cloud Pre-Fetch")
     print(f"  Mode: {mode.upper()}{'  (DRY RUN)' if args.dry else ''}")
-    print(f"  {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')} "
+    print(f"  {_utc_now().strftime('%Y-%m-%d %H:%M:%S UTC')} "
           f"({day_names[weekday]} {et_hour}:{et_min:02d} ET)")
     print(f"{'=' * 60}\n")
 
@@ -953,7 +958,7 @@ def main():
             print(f"  Sample: {sample[0]} = ${sample[1].get('price', 0)}")
 
     total_elapsed = round(time.time() - start, 1)
-    print(f"\n  Done in {total_elapsed}s at {datetime.utcnow().strftime('%H:%M:%S UTC')}")
+    print(f"\n  Done in {total_elapsed}s at {_utc_now().strftime('%H:%M:%S UTC')}")
 
 
 if __name__ == "__main__":
