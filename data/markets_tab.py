@@ -362,6 +362,16 @@ def _render_style_box(quotes):
 def render_markets_tab():
     """Render the full Markets tab."""
 
+    # Row hover highlight (matches holdings/dividends tab behavior)
+    st.markdown(
+        '<style>'
+        '[data-testid="stMarkdownContainer"] table tbody tr:hover {'
+        '  background: rgba(255,255,255,0.04) !important;'
+        '}'
+        '</style>',
+        unsafe_allow_html=True,
+    )
+
     st.markdown(
         '<div style="font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:12px">'
         'Broad market snapshot · ETF proxies · 15-min cache'
