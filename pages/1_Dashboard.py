@@ -300,7 +300,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
-    "Overview", "Holdings", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "Alerts"
+    "Overview", "Holdings", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "News & Alerts"
 ])
 
 # ── Strategy selector ─────────────────────────────────────────────────────
