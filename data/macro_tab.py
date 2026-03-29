@@ -509,6 +509,28 @@ def render_macro_tab(qdvd_yield=None):
     curve_label = f"{spread_bp:+d}bp" if spread_bp is not None else "—"
     curve_note = "Normal curve" if spread_bp and spread_bp > 0 else "Inverted" if spread_bp and spread_bp <= 0 else ""
 
+    # Real yield (10Y nominal − 10Y breakeven inflation)
+    real_yield_val = "—"
+    real_yield_color = "rgba(255,255,255,0.95)"
+    real_yield_note = ""
+    breakeven, _, _ = _fred_latest("T10YIE")
+    if ten_y is not None and breakeven is not None:
+        real_y = ten_y - breakeven
+        real_yield_val = f"{real_y:.2f}%"
+        real_yield_color = "#569542" if real_y > 1.5 else "#C9A84C" if real_y > 0 else "#c45454"
+        real_yield_note = f"{ten_y_label} {ten_y:.2f}% − {breakeven:.2f}% breakeven"
+
+    # IG credit spread (ICE BofA US Corporate Index OAS)
+    ig_spread_val = "—"
+    ig_spread_color = "rgba(255,255,255,0.95)"
+    ig_spread_note = ""
+    ig_oas, ig_oas_prev, _ = _fred_latest("BAMLC0A0CM")
+    if ig_oas is not None:
+        ig_spread_bp = round(ig_oas * 100)
+        ig_spread_val = f"{ig_spread_bp}bp"
+        ig_spread_color = "#569542" if ig_oas < 1.0 else "#C9A84C" if ig_oas < 1.8 else "#c45454"
+        ig_spread_note = "Investment grade OAS · Hist avg ~120bp"
+
     # VIX
     vix_data = _yf_quote("^VIX")
     vix_price = vix_data.get("price")
@@ -608,20 +630,20 @@ def render_macro_tab(qdvd_yield=None):
                     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
                                 border-radius:8px;padding:14px 16px">
                         <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
-                                    letter-spacing:0.06em;margin-bottom:6px">Equity Risk Premium</div>
+                                    letter-spacing:0.06em;margin-bottom:6px">Real Yield ({ten_y_label})</div>
                         <div style="font-size:18px;font-weight:700;font-family:'DM Serif Display',serif;
-                                    color:{erp_color}">{erp_val if erp_val else "—"}</div>
+                                    color:{real_yield_color}">{real_yield_val}</div>
                         <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:4px">
-                            Earnings yield − {ten_y_label}</div>
+                            {real_yield_note}</div>
                     </div>
                     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
                                 border-radius:8px;padding:14px 16px">
                         <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
-                                    letter-spacing:0.06em;margin-bottom:6px">Yield Curve</div>
+                                    letter-spacing:0.06em;margin-bottom:6px">IG Credit Spread</div>
                         <div style="font-size:18px;font-weight:700;font-family:'DM Serif Display',serif;
-                                    color:{curve_color}">{curve_label}</div>
+                                    color:{ig_spread_color}">{ig_spread_val}</div>
                         <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:4px">
-                            {curve_note}</div>
+                            {ig_spread_note}</div>
                     </div>
                 </div>
             </div>
