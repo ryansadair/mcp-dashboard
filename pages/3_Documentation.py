@@ -212,28 +212,47 @@ st.markdown('<div class="doc-section">Performance Tab</div>', unsafe_allow_html=
 
 st.markdown("""
 <div class="doc-body">
-Shows strategy performance vs benchmark over time. Currently uses a weighted projection based on current holdings. A rebuild using authoritative composite return data from Tamarac's Composite_Returns.xls is planned for a future sprint.
+Shows strategy performance vs benchmarks over time using authoritative composite return data from Composite Returns.xls (updated quarterly, covers QDVD since Jun 2010, SMID since Dec 2014, DAC since Dec 2015, OR since Sep 2017). All returns displayed gross of fees.
+</div>
+
+<div class="doc-subsection">Strategy Benchmarks</div>
+<table class="doc-table">
+<tr><th>Strategy</th><th>Primary Benchmark (used for Alpha)</th><th>Secondary Benchmark</th></tr>
+<tr><td>QDVD</td><td>S&P 500 High Dividend</td><td>S&P 500</td></tr>
+<tr><td>SMID</td><td>S&P Mid Cap 400</td><td>S&P 400 Aristocrats</td></tr>
+<tr><td>DAC</td><td>Russell 3000</td><td>Dow Jones Select Dividend</td></tr>
+<tr><td>OR</td><td>S&P 500</td><td>—</td></tr>
+</table>
+
+<div class="doc-subsection">Period Returns</div>
+<div class="doc-body">
+KPI cards showing QTD, YTD, 1Y, 3Y, 5Y, 10Y, and Since Inception (annualized) returns. Each card includes alpha vs the primary benchmark.
+</div>
+
+<div class="doc-subsection">Growth of $100 Chart</div>
+<div class="doc-body">
+Cumulative performance chart with strategy (solid line) and benchmarks (dashed lines) overlaid. The primary benchmark is the brighter dashed line; secondary is lighter.
 </div>
 
 <div class="doc-subsection">Monthly Returns Heatmap</div>
 <div class="doc-body">
-Displays monthly returns in a grid, color-coded green (positive) to red (negative). Risk metrics are displayed above the heatmap in a responsive flex grid.
+Displays monthly returns in a grid, color-coded green (positive) to red (negative). Scrollable on mobile to prevent column squishing.
 </div>
 
 <div class="doc-subsection">Risk Metrics</div>
 <table class="doc-table">
 <tr><th>Metric</th><th>Calculation</th></tr>
-<tr><td>Sharpe Ratio</td><td>(Annualized return − risk-free rate) / annualized standard deviation. Risk-free rate from FRED (3-month T-bill).</td></tr>
+<tr><td>Sharpe Ratio</td><td>(Annualized return − risk-free rate) / annualized standard deviation. Risk-free rate: 4%.</td></tr>
 <tr><td>Sortino Ratio</td><td>Same as Sharpe but only uses downside deviation (negative returns only).</td></tr>
-<tr><td>Beta</td><td>Covariance of strategy returns with benchmark returns / variance of benchmark returns.</td></tr>
+<tr><td>Beta</td><td>Covariance of strategy returns with primary benchmark returns / variance of benchmark returns.</td></tr>
 <tr><td>Max Drawdown</td><td>Largest peak-to-trough decline in cumulative returns over the period.</td></tr>
-<tr><td>Tracking Error</td><td>Annualized standard deviation of the difference between strategy and benchmark returns.</td></tr>
+<tr><td>Tracking Error</td><td>Annualized standard deviation of the difference between strategy and primary benchmark returns.</td></tr>
 <tr><td>Information Ratio</td><td>Annualized alpha / tracking error.</td></tr>
 </table>
 
-<div class="doc-subsection">Important Note</div>
+<div class="doc-subsection">Calendar Year Returns</div>
 <div class="doc-body">
-The current performance data projects current holdings backward, which creates a look-ahead bias — it assumes today's portfolio was held throughout the period. The planned rebuild using Composite_Returns.xls will use actual historical composite returns aggregated from client accounts, which is the authoritative source. This file is updated quarterly and covers six composites: QDVD (since Jun 2010), SMID (Dec 2014), DAC (Dec 2015), OR (Sep 2017), Balanced, and Income.
+Annual returns table showing strategy vs benchmarks with an Alpha column calculated against the primary benchmark.
 </div>
 """, unsafe_allow_html=True)
 
@@ -321,7 +340,7 @@ Live rate cards showing Fed Funds Rate, 2Y/10Y/30Y Treasury yields, 2s10s spread
 <tr><th>Metric</th><th>Calculation</th></tr>
 <tr><td>Yield Comparison</td><td>10Y Treasury yield vs S&P 500 dividend yield vs QDVD weighted yield — shows whether dividend stocks are competitive with bonds for income.</td></tr>
 <tr><td>Equity Risk Premium</td><td>S&P 500 earnings yield (1 / forward P/E × 100) minus the 10Y Treasury yield. Expressed in basis points. Below 50bp is flagged as tight.</td></tr>
-<tr><td>Yield Curve</td><td>2s10s spread in basis points. Positive = normal curve, negative = inverted.</td></tr>
+<tr><td>IG Credit Spread</td><td>ICE BofA US Corporate Investment Grade OAS from FRED (BAMLC0A0CM), converted to basis points. Historical average ~120bp. Green &lt;100bp, Gold 100-180bp, Red &gt;180bp. Tight spreads = healthy credit conditions for dividend-paying companies.</td></tr>
 </table>
 
 <div class="doc-subsection">Sentiment</div>
@@ -384,6 +403,11 @@ Broad market snapshot using ETF proxies, sorted by daily performance (best to wo
 <tr><td>Commodities</td><td>GC=F, SI=F, CL=F, BZ=F, NG=F, HG=F</td><td>Actual futures contracts, not ETF proxies</td></tr>
 </table>
 
+<div class="doc-subsection">US Equity Factors Style Box</div>
+<div class="doc-body">
+A Koyfin-inspired 3×3 grid showing 1-day performance by size (Large/Mid/Small) and style (Value/Core/Growth) using 9 iShares Russell ETFs (IWD, IWB, IWF, IWS, IWR, IWP, IWN, IWM, IWO). Color intensity scales with daily change magnitude.
+</div>
+
 <div class="doc-subsection">% From High Column</div>
 <div class="doc-body">
 Shows each ticker's distance from its 52-week high, calculated from 1 year of daily data. Displayed in red for any value below the high; green "AT HIGH" if at the 52-week peak.
@@ -440,7 +464,12 @@ Market data is refreshed automatically during trading hours. The pipeline runs a
 
 <div class="doc-subsection">Cron Job Maintenance</div>
 <div class="doc-body">
-The cron-job.org trigger uses a GitHub Personal Access Token (classic, repo scope) to dispatch the workflow. If the token expires, update the Authorization header in cron-job.org. Prefetch hours are set for EDT (UTC-4); the EST (UTC-5) shift in November may require adjustment.
+The cron-job.org trigger uses a GitHub Personal Access Token (classic, repo scope) to dispatch the workflow. If the token expires, update the Authorization header in cron-job.org. Prefetch market hours detection automatically handles EDT/DST transitions — no manual seasonal adjustment is needed.
+</div>
+
+<div class="doc-subsection">Data Freshness Display</div>
+<div class="doc-body">
+The "Data refreshed X ago" indicator reads the most recent fetched_at timestamp from Supabase (sorted by fetched_at DESC). All timestamps are stored and compared in timezone-aware UTC. Pacific time display automatically adjusts for PDT/PST using Python's zoneinfo module.
 </div>
 
 <div class="doc-subsection">Tamarac File Detection</div>
