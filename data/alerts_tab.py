@@ -101,7 +101,7 @@ def _price_mover_alerts(tickers, price_data, threshold=2.0):
 
 def _dividend_alerts(tickers, price_data, div_data):
     """
-    Flag upcoming ex-dividend dates and notable dividend changes.
+    Flag upcoming ex-dividend dates (within 14 days).
     Returns list of alert dicts.
     """
     alerts = []
@@ -133,63 +133,6 @@ def _dividend_alerts(tickers, price_data, div_data):
                     })
             except (ValueError, TypeError):
                 pass
-
-        # Dividend growth alerts — Fish CCC data tracks regular dividends only,
-        # but ADRs (KOF, TTE) can appear in Fish with FX-distorted growth rates.
-        # Only trust Fish growth as "real" if growth is positive OR the ticker has
-        # a meaningful streak (5+ years). Otherwise treat as unreliable.
-        growth_1y = 0
-        _source = "yfinance"
-        _fish_reliable = False
-
-        if _FISH_AVAILABLE:
-            fish = get_fish_metrics(ticker)
-            ccc_years, _ = get_streak(ticker)
-            fish_growth = fish.get("dgr_1y", 0) or 0
-
-            if fish_growth != 0 or ccc_years > 0:
-                growth_1y = fish_growth
-                _source = "CCC"
-                # Only mark as reliable if positive growth or long streak
-                if fish_growth >= 0 or ccc_years >= 5:
-                    _fish_reliable = True
-                # else: negative growth + short streak → likely ADR/special noise
-
-        if _source == "yfinance":
-            growth_1y = dd.get("div_growth_1y", 0) or 0
-
-        if growth_1y >= 10:
-            alerts.append({
-                "type": "dividend",
-                "severity": "positive",
-                "ticker": ticker,
-                "title": f"{ticker} dividend grew <span style='color:#569542'>{growth_1y:+.1f}%</span> (1Y)",
-                "detail": f"{name} — strong dividend growth ({_source})",
-                "value": growth_1y,
-                "sort_key": 100 - growth_1y,
-            })
-        elif _fish_reliable and growth_1y < -5:
-            # Reliable Fish data with negative growth — real cut concern
-            alerts.append({
-                "type": "dividend",
-                "severity": "critical",
-                "ticker": ticker,
-                "title": f"{ticker} dividend declined <span style='color:#c45454'>{growth_1y:+.1f}%</span> (1Y)",
-                "detail": f"{name} — potential dividend cut ({_source})",
-                "value": growth_1y,
-                "sort_key": 0,
-            })
-        elif not _fish_reliable and growth_1y < -15:
-            # Unreliable source (ADR in Fish or yfinance) — strict threshold + caveat
-            alerts.append({
-                "type": "dividend",
-                "severity": "warning",
-                "ticker": ticker,
-                "title": f"{ticker} dividend may have declined <span style='color:#c45454'>{growth_1y:+.1f}%</span> (1Y)",
-                "detail": f"{name} — verify manually (may be ADR FX effect or special div drop)",
-                "value": growth_1y,
-                "sort_key": 1,
-            })
 
     alerts.sort(key=lambda a: a["sort_key"])
     return alerts
@@ -376,7 +319,7 @@ def _render_alert_section(title, alerts):
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# NEWS HEADLINES (RSS)
+# NEWS HEADLINES (RSS + Holdings)
 # ══════════════════════════════════════════════════════════════════════════
 
 # RSS feed sources — free, no API keys, reliable
@@ -452,8 +395,80 @@ def _fetch_news_headlines(max_per_feed=5, max_total=12):
     return headlines[:max_total]
 
 
-def _render_news_section():
-    """Render the news headlines section."""
+@st.cache_data(ttl=900, show_spinner=False)
+def _fetch_holdings_news(tickers_tuple, max_total=15):
+    """
+    Fetch news for portfolio holdings via yfinance .news property.
+    Batches requests with short delays to avoid rate limits.
+    Cached 15 min. Returns list of dicts similar to RSS headlines.
+    """
+    import time as _time
+    headlines = []
+    seen_titles = set()
+
+    try:
+        import yfinance as yf
+    except ImportError:
+        return []
+
+    for ticker in tickers_tuple:
+        try:
+            tk = yf.Ticker(ticker)
+            news = tk.news
+            if not news:
+                continue
+            for item in news[:3]:
+                content = item.get("content", {})
+                title = content.get("title", "").strip()
+                if not title or title in seen_titles:
+                    continue
+                seen_titles.add(title)
+
+                # Parse publish time
+                pub_str = ""
+                pub_ts = content.get("pubDate")
+                sort_ts = None
+                if pub_ts:
+                    try:
+                        pub_dt = datetime.fromisoformat(pub_ts.replace("Z", "+00:00"))
+                        pub_dt_naive = pub_dt.replace(tzinfo=None)
+                        delta = datetime.utcnow() - pub_dt_naive
+                        if delta.total_seconds() < 3600:
+                            pub_str = f"{max(1, int(delta.total_seconds() / 60))}m ago"
+                        elif delta.total_seconds() < 86400:
+                            pub_str = f"{int(delta.total_seconds() / 3600)}h ago"
+                        else:
+                            pub_str = pub_dt_naive.strftime("%b %d")
+                        sort_ts = pub_dt_naive
+                    except Exception:
+                        pass
+
+                provider = content.get("provider", {}).get("displayName", "")
+                link = content.get("canonicalUrl", {}).get("url", "")
+
+                headlines.append({
+                    "title": title,
+                    "link": link,
+                    "source": provider or "yfinance",
+                    "source_color": GOLD,
+                    "published": pub_str,
+                    "sort_ts": sort_ts,
+                    "ticker": ticker,
+                })
+            _time.sleep(0.1)
+        except Exception:
+            continue
+
+        if len(headlines) >= max_total * 2:
+            break
+
+    # Sort newest first, cap total
+    headlines.sort(key=lambda h: h.get("sort_ts") or datetime.min, reverse=True)
+    return headlines[:max_total]
+
+
+def _render_news_section(tickers=None):
+    """Render the news headlines section: market news + holdings news."""
     headlines = _fetch_news_headlines()
 
     st.markdown(
@@ -472,39 +487,93 @@ def _render_news_section():
             '</div>',
             unsafe_allow_html=True,
         )
-        return
+    else:
+        # Render as a clean table — same structure as alerts
+        rows = ""
+        for h in headlines:
+            rows += (
+                f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">'
+                f'<td style="padding:9px 10px;vertical-align:top;">'
+                f'<a href="{h["link"]}" target="_blank" rel="noopener" style="'
+                f'font-size:13px;color:rgba(255,255,255,0.8);text-decoration:none;'
+                f'line-height:1.4;">{h["title"]}</a>'
+                f'</td>'
+                f'<td style="padding:9px 10px;text-align:right;vertical-align:top;'
+                f'white-space:nowrap;width:110px;">'
+                f'<div style="font-size:10px;color:rgba(255,255,255,0.25);'
+                f'text-transform:uppercase;letter-spacing:0.04em;">{h["source"]}</div>'
+                f'<div style="font-size:10px;color:rgba(255,255,255,0.15);margin-top:1px;">'
+                f'{h["published"]}</div>'
+                f'</td>'
+                f'</tr>'
+            )
 
-    # Render as a clean table — same structure as alerts
-    rows = ""
-    for h in headlines:
-        rows += (
-            f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">'
-            f'<td style="padding:9px 10px;vertical-align:top;">'
-            f'<a href="{h["link"]}" target="_blank" rel="noopener" style="'
-            f'font-size:13px;color:rgba(255,255,255,0.8);text-decoration:none;'
-            f'line-height:1.4;">{h["title"]}</a>'
-            f'</td>'
-            f'<td style="padding:9px 10px;text-align:right;vertical-align:top;'
-            f'white-space:nowrap;width:110px;">'
-            f'<div style="font-size:10px;color:rgba(255,255,255,0.25);'
-            f'text-transform:uppercase;letter-spacing:0.04em;">{h["source"]}</div>'
-            f'<div style="font-size:10px;color:rgba(255,255,255,0.15);margin-top:1px;">'
-            f'{h["published"]}</div>'
-            f'</td>'
-            f'</tr>'
+        html = (
+            f'<table style="width:100%;border-collapse:collapse;">'
+            f'<tbody>{rows}</tbody>'
+            f'</table>'
+        )
+        st.markdown(html, unsafe_allow_html=True)
+
+    st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
+
+    # ── Holdings News ─────────────────────────────────────────────────────
+    if tickers:
+        with st.spinner("Fetching holdings news..."):
+            holdings_news = _fetch_holdings_news(tuple(tickers))
+
+        st.markdown(
+            f'<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);'
+            f'text-transform:uppercase;letter-spacing:0.08em;padding:0 0 8px;'
+            f'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:0">'
+            f'Holdings News'
+            f'<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.2);'
+            f'margin-left:8px;">{len(holdings_news)} stories</span>'
+            f'</div>',
+            unsafe_allow_html=True,
         )
 
-    html = (
-        f'<table style="width:100%;border-collapse:collapse;">'
-        f'<tbody>{rows}</tbody>'
-        f'</table>'
-    )
-    st.markdown(html, unsafe_allow_html=True)
+        if holdings_news:
+            rows = ""
+            for h in holdings_news:
+                ticker_badge = (
+                    f'<span style="display:inline-block;padding:1px 5px;border-radius:3px;'
+                    f'background:rgba(201,168,76,0.12);color:#C9A84C;font-size:10px;'
+                    f'font-weight:600;letter-spacing:0.03em;margin-right:6px;">'
+                    f'{h.get("ticker", "")}</span>'
+                ) if h.get("ticker") else ""
+                rows += (
+                    f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">'
+                    f'<td style="padding:9px 10px;vertical-align:top;">'
+                    f'{ticker_badge}'
+                    f'<a href="{h["link"]}" target="_blank" rel="noopener" style="'
+                    f'font-size:13px;color:rgba(255,255,255,0.8);text-decoration:none;'
+                    f'line-height:1.4;">{h["title"]}</a>'
+                    f'</td>'
+                    f'<td style="padding:9px 10px;text-align:right;vertical-align:top;'
+                    f'white-space:nowrap;width:110px;">'
+                    f'<div style="font-size:10px;color:rgba(255,255,255,0.25);'
+                    f'text-transform:uppercase;letter-spacing:0.04em;">{h["source"]}</div>'
+                    f'<div style="font-size:10px;color:rgba(255,255,255,0.15);margin-top:1px;">'
+                    f'{h["published"]}</div>'
+                    f'</td>'
+                    f'</tr>'
+                )
+            html = (
+                f'<table style="width:100%;border-collapse:collapse;">'
+                f'<tbody>{rows}</tbody>'
+                f'</table>'
+            )
+            st.markdown(html, unsafe_allow_html=True)
+        else:
+            st.markdown(
+                '<div style="font-size:12px;color:rgba(255,255,255,0.3);padding:12px 0;">'
+                'No recent holdings news available.'
+                '</div>',
+                unsafe_allow_html=True,
+            )
 
-    st.markdown(
-        '<div style="height:8px;"></div>',
-        unsafe_allow_html=True,
-    )
+        st.markdown('<div style="height:8px;"></div>', unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -521,12 +590,12 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
     """
 
     # ── News Headlines (top section) ─────────────────────────────────────
-    _render_news_section()
+    # Gather tickers first so we can use them for both news and alerts
+    tickers = sorted(get_all_unique_tickers(tamarac_parsed))
+
+    _render_news_section(tickers=tickers)
 
     # ── Portfolio Alerts (bottom section) ─────────────────────────────────
-
-    # ── Gather tickers (all strategies) ───────────────────────────────────
-    tickers = sorted(get_all_unique_tickers(tamarac_parsed))
 
     # ── Fetch data ────────────────────────────────────────────────────────
     with st.spinner(f"Scanning {len(tickers)} holdings..."):
