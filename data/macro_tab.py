@@ -630,11 +630,11 @@ def render_macro_tab(qdvd_yield=None):
                     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
                                 border-radius:8px;padding:14px 16px">
                         <div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;
-                                    letter-spacing:0.06em;margin-bottom:6px">Real Yield ({ten_y_label})</div>
+                                    letter-spacing:0.06em;margin-bottom:6px">Equity Risk Premium</div>
                         <div style="font-size:18px;font-weight:700;font-family:'DM Serif Display',serif;
-                                    color:{real_yield_color}">{real_yield_val}</div>
+                                    color:{erp_color}">{erp_val if erp_val else "—"}</div>
                         <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:4px">
-                            {real_yield_note}</div>
+                            Earnings yield − {ten_y_label}</div>
                     </div>
                     <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
                                 border-radius:8px;padding:14px 16px">
