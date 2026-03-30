@@ -518,24 +518,18 @@ def render_markets_tab():
         """Sort items by change_pct descending (best performers on top)."""
         return sorted(items, key=lambda x: quotes.get(x[1], {}).get("change_pct", 0), reverse=True)
 
-    # ── Normalized Performance Chart + US Equity Factors (top row) ─────────
-    col_chart, col_style = st.columns([5, 2])
-    with col_chart:
-        st.markdown(_section_header("Normalized Performance"), unsafe_allow_html=True)
-        # Period selector
-        period_cols = st.columns(len(PERF_PERIODS))
-        selected_period = st.session_state.get("mkt_perf_period", "1D")
-        for i, pkey in enumerate(PERF_PERIODS):
-            with period_cols[i]:
-                if st.button(pkey, key=f"mkt_perf_{pkey}", use_container_width=True,
-                             type="primary" if pkey == selected_period else "secondary"):
-                    st.session_state["mkt_perf_period"] = pkey
-                    selected_period = pkey
-        _render_perf_chart(selected_period)
-
-    with col_style:
-        st.markdown(_section_header("US Equity Factors"), unsafe_allow_html=True)
-        st.markdown(_render_style_box(quotes), unsafe_allow_html=True)
+    # ── Normalized Performance Chart (full width) ──────────────────────────
+    st.markdown(_section_header("Normalized Performance"), unsafe_allow_html=True)
+    # Period selector
+    period_cols = st.columns(len(PERF_PERIODS))
+    selected_period = st.session_state.get("mkt_perf_period", "1D")
+    for i, pkey in enumerate(PERF_PERIODS):
+        with period_cols[i]:
+            if st.button(pkey, key=f"mkt_perf_{pkey}", use_container_width=True,
+                         type="primary" if pkey == selected_period else "secondary"):
+                st.session_state["mkt_perf_period"] = pkey
+                selected_period = pkey
+    _render_perf_chart(selected_period)
 
     # ── Indices & Dividend Benchmarks (side by side) ────────────────────────
     col_idx, col_div = st.columns(2)
@@ -546,9 +540,14 @@ def render_markets_tab():
         st.markdown(_section_header("Dividend Benchmarks"), unsafe_allow_html=True)
         st.markdown(_render_market_table(_sort_by_change(DIVIDEND_BENCHMARKS), quotes, section_label="Benchmark"), unsafe_allow_html=True)
 
-    # ── S&P Sector ETFs (full width since style box moved to top) ─────────
-    st.markdown(_section_header("S&P Sector ETFs"), unsafe_allow_html=True)
-    st.markdown(_render_market_table(_sort_by_change(SECTORS), quotes, section_label="Sector"), unsafe_allow_html=True)
+    # ── Sector ETFs & US Equity Factors (side by side) ──────────────────────
+    col_sectors, col_factors = st.columns([3, 2])
+    with col_sectors:
+        st.markdown(_section_header("S&P Sector ETFs"), unsafe_allow_html=True)
+        st.markdown(_render_market_table(_sort_by_change(SECTORS), quotes, section_label="Sector"), unsafe_allow_html=True)
+    with col_factors:
+        st.markdown(_section_header("US Equity Factors"), unsafe_allow_html=True)
+        st.markdown(_render_style_box(quotes), unsafe_allow_html=True)
 
     # ── Commodities ───────────────────────────────────────────────────────
     st.markdown(_section_header("Commodities"), unsafe_allow_html=True)
