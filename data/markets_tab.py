@@ -100,6 +100,133 @@ STYLE_BOX = [
 ]
 _STYLE_BOX_TICKERS = [t for _, cols in STYLE_BOX for _, t in cols]
 
+# Tickers for the normalized performance chart (ETF proxies for clean intraday data)
+PERF_CHART_TICKERS = {
+    "SPY": ("S&P 500", "#6b8afc"),
+    "QQQ": ("Nasdaq 100", "#c084fc"),
+    "IWM": ("Russell 2000", "#fbbf24"),
+    "DIA": ("Dow Jones", "#f97066"),
+}
+
+PERF_PERIODS = {
+    "1D":  {"period": "1d",  "interval": "5m"},
+    "5D":  {"period": "5d",  "interval": "15m"},
+    "1M":  {"period": "1mo", "interval": "1h"},
+    "3M":  {"period": "3mo", "interval": "1d"},
+    "6M":  {"period": "6mo", "interval": "1d"},
+    "YTD": {"period": "ytd", "interval": "1d"},
+    "1Y":  {"period": "1y",  "interval": "1d"},
+}
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _fetch_perf_chart_data(period_key):
+    """
+    Fetch normalized performance data for the index comparison chart.
+    Returns dict: {ticker: [(datetime, pct_change), ...]}
+    """
+    try:
+        import yfinance as yf
+
+        cfg = PERF_PERIODS.get(period_key, PERF_PERIODS["1D"])
+        tickers_str = " ".join(PERF_CHART_TICKERS.keys())
+        data = yf.download(
+            tickers_str,
+            period=cfg["period"],
+            interval=cfg["interval"],
+            group_by="ticker",
+            progress=False,
+            threads=True,
+        )
+
+        result = {}
+        for ticker in PERF_CHART_TICKERS:
+            try:
+                df = data[ticker] if ticker in data.columns.get_level_values(0) else None
+                if df is None or df.empty:
+                    continue
+                close = df["Close"].dropna()
+                if hasattr(close, "columns"):
+                    close = close.iloc[:, 0]
+                if len(close) < 2:
+                    continue
+                # Normalize to % change from first value
+                base = float(close.iloc[0])
+                if base > 0:
+                    pct = ((close / base) - 1) * 100
+                    result[ticker] = pct
+            except Exception:
+                continue
+        return result
+    except Exception:
+        return {}
+
+
+def _render_perf_chart(period_key="1D"):
+    """Render the normalized performance Plotly chart."""
+    import plotly.graph_objects as go
+
+    chart_data = _fetch_perf_chart_data(period_key)
+    if not chart_data:
+        st.markdown(
+            '<div style="padding:40px;text-align:center;color:rgba(255,255,255,0.3);'
+            'font-size:13px;">Chart data unavailable</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    fig = go.Figure()
+
+    for ticker, pct_series in chart_data.items():
+        name, color = PERF_CHART_TICKERS[ticker]
+        final_pct = float(pct_series.iloc[-1])
+        fig.add_trace(go.Scatter(
+            x=pct_series.index,
+            y=pct_series.values,
+            name=f"{name}  {final_pct:+.2f}%",
+            line=dict(color=color, width=2),
+            hovertemplate=f"{name}<br>%{{x}}<br>%{{y:+.2f}}%<extra></extra>",
+        ))
+
+    # Zero line
+    fig.add_hline(y=0, line=dict(color="rgba(255,255,255,0.15)", width=1, dash="dot"))
+
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="DM Sans", color="rgba(255,255,255,0.5)", size=10),
+        margin=dict(l=45, r=10, t=10, b=10),
+        height=295,
+        xaxis=dict(
+            gridcolor="rgba(255,255,255,0.04)",
+            showline=False,
+            tickfont=dict(size=9),
+        ),
+        yaxis=dict(
+            gridcolor="rgba(255,255,255,0.04)",
+            showline=False,
+            tickfont=dict(size=10),
+            ticksuffix="%",
+            zeroline=False,
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+            bgcolor="rgba(0,0,0,0)",
+            font=dict(size=11),
+        ),
+        hovermode="x unified",
+        showlegend=True,
+    )
+
+    st.plotly_chart(fig, use_container_width=True, config={
+        "displayModeBar": False, "scrollZoom": False,
+        "doubleClick": False, "showTips": False, "staticPlot": False,
+    })
+
 # Collect all tickers for batch fetch
 _ALL_GROUPS = [INDICES, DIVIDEND_BENCHMARKS, SECTORS, FIXED_INCOME, GLOBAL_DEVELOPED, GLOBAL_EMERGING, COMMODITIES]
 _ALL_TICKERS = []
@@ -108,6 +235,9 @@ for group in _ALL_GROUPS:
         if ticker not in _ALL_TICKERS:
             _ALL_TICKERS.append(ticker)
 for t in _STYLE_BOX_TICKERS:
+    if t not in _ALL_TICKERS:
+        _ALL_TICKERS.append(t)
+for t in PERF_CHART_TICKERS:
     if t not in _ALL_TICKERS:
         _ALL_TICKERS.append(t)
 
@@ -386,6 +516,25 @@ def render_markets_tab():
         """Sort items by change_pct descending (best performers on top)."""
         return sorted(items, key=lambda x: quotes.get(x[1], {}).get("change_pct", 0), reverse=True)
 
+    # ── Normalized Performance Chart + US Equity Factors (top row) ─────────
+    col_chart, col_style = st.columns([3, 1])
+    with col_chart:
+        st.markdown(_section_header("Normalized Performance"), unsafe_allow_html=True)
+        # Period selector
+        period_cols = st.columns(len(PERF_PERIODS))
+        selected_period = st.session_state.get("mkt_perf_period", "1D")
+        for i, pkey in enumerate(PERF_PERIODS):
+            with period_cols[i]:
+                if st.button(pkey, key=f"mkt_perf_{pkey}", use_container_width=True,
+                             type="primary" if pkey == selected_period else "secondary"):
+                    st.session_state["mkt_perf_period"] = pkey
+                    selected_period = pkey
+        _render_perf_chart(selected_period)
+
+    with col_style:
+        st.markdown(_section_header("US Equity Factors"), unsafe_allow_html=True)
+        st.markdown(_render_style_box(quotes), unsafe_allow_html=True)
+
     # ── Indices & Dividend Benchmarks (side by side) ────────────────────────
     col_idx, col_div = st.columns(2)
     with col_idx:
@@ -395,14 +544,9 @@ def render_markets_tab():
         st.markdown(_section_header("Dividend Benchmarks"), unsafe_allow_html=True)
         st.markdown(_render_market_table(_sort_by_change(DIVIDEND_BENCHMARKS), quotes, section_label="Benchmark"), unsafe_allow_html=True)
 
-    # ── Sector ETFs & US Equity Factors (side by side) ──────────────────────
-    col_sectors, col_factors = st.columns([3, 2])
-    with col_sectors:
-        st.markdown(_section_header("S&P Sector ETFs"), unsafe_allow_html=True)
-        st.markdown(_render_market_table(_sort_by_change(SECTORS), quotes, section_label="Sector"), unsafe_allow_html=True)
-    with col_factors:
-        st.markdown(_section_header("US Equity Factors"), unsafe_allow_html=True)
-        st.markdown(_render_style_box(quotes), unsafe_allow_html=True)
+    # ── S&P Sector ETFs (full width since style box moved to top) ─────────
+    st.markdown(_section_header("S&P Sector ETFs"), unsafe_allow_html=True)
+    st.markdown(_render_market_table(_sort_by_change(SECTORS), quotes, section_label="Sector"), unsafe_allow_html=True)
 
     # ── Fixed Income ──────────────────────────────────────────────────────
     st.markdown(_section_header("Fixed Income ETFs"), unsafe_allow_html=True)
