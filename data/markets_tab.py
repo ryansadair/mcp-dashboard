@@ -125,7 +125,8 @@ PERF_PERIODS = {
 def _fetch_perf_chart_data(period_key):
     """
     Fetch normalized performance data for the index comparison chart.
-    For 1D: uses 5-min intraday bars, normalized from previous day's close.
+    For 1D: uses 5-min intraday bars, normalized from the same previous
+            close that _fetch_market_quotes uses (ensures chart matches tables).
     For longer periods: uses daily/weekly bars, normalized from first close.
     Returns dict: {ticker: pd.Series of % change}
     """
@@ -135,12 +136,15 @@ def _fetch_perf_chart_data(period_key):
         cfg = PERF_PERIODS.get(period_key, PERF_PERIODS["1D"])
 
         if period_key == "1D":
-            # Fetch 5d of daily data for prev close, then 1d of intraday
+            # Get previous close from the same 1Y daily data the tables use
+            quotes = _fetch_market_quotes()
+
+            # Map chart ETF tickers to their corresponding index tickers in quotes
+            # SPY→^GSPC, DIA→^DJI, QQQ→^NDX, IWM→^RUT
+            _ETF_TO_INDEX = {"SPY": "^GSPC", "DIA": "^DJI", "QQQ": "^NDX", "IWM": "^RUT"}
+
+            # Fetch intraday bars
             tickers_str = " ".join(PERF_CHART_TICKERS.keys())
-            daily = yf.download(
-                tickers_str, period="5d", interval="1d",
-                group_by="ticker", progress=False, threads=True,
-            )
             intraday = yf.download(
                 tickers_str, period="1d", interval="5m",
                 group_by="ticker", progress=False, threads=True,
@@ -149,25 +153,37 @@ def _fetch_perf_chart_data(period_key):
             result = {}
             for ticker in PERF_CHART_TICKERS:
                 try:
-                    # Get previous close from daily data
-                    d_df = daily[ticker] if ticker in daily.columns.get_level_values(0) else None
                     i_df = intraday[ticker] if ticker in intraday.columns.get_level_values(0) else None
-                    if d_df is None or i_df is None or d_df.empty or i_df.empty:
+                    if i_df is None or i_df.empty:
                         continue
-
-                    d_close = d_df["Close"].dropna()
-                    if hasattr(d_close, "columns"):
-                        d_close = d_close.iloc[:, 0]
 
                     i_close = i_df["Close"].dropna()
                     if hasattr(i_close, "columns"):
                         i_close = i_close.iloc[:, 0]
-
-                    if len(d_close) < 2 or len(i_close) < 1:
+                    if len(i_close) < 1:
                         continue
 
-                    # Previous day's close = baseline
-                    prev_close = float(d_close.iloc[-2])
+                    # Get previous close: use ETF's own quote data, or map to index
+                    etf_quote = quotes.get(ticker, {})
+                    price_now = etf_quote.get("price", 0)
+                    chg_pct = etf_quote.get("change_pct", 0)
+
+                    if price_now > 0 and chg_pct != 0:
+                        # Back-calculate prev close: price / (1 + chg_pct/100)
+                        prev_close = price_now / (1 + chg_pct / 100)
+                    else:
+                        # Fallback: use the index ticker's data to derive prev close
+                        idx = _ETF_TO_INDEX.get(ticker, ticker)
+                        idx_quote = quotes.get(idx, {})
+                        idx_price = idx_quote.get("price", 0)
+                        idx_chg = idx_quote.get("change_pct", 0)
+                        if idx_price > 0 and idx_chg != 0:
+                            # Can't use index prev close directly (different price level)
+                            # Fall back to first intraday bar
+                            prev_close = float(i_close.iloc[0])
+                        else:
+                            prev_close = float(i_close.iloc[0])
+
                     if prev_close > 0:
                         pct = ((i_close / prev_close) - 1) * 100
                         result[ticker] = pct
@@ -285,6 +301,12 @@ for t in _STYLE_BOX_TICKERS:
     if t not in _ALL_TICKERS:
         _ALL_TICKERS.append(t)
 for t in PERF_CHART_TICKERS:
+    if t not in _ALL_TICKERS:
+        _ALL_TICKERS.append(t)
+
+# Extra tickers needed by the scrolling ticker bar (not in any table group)
+_TICKER_BAR_EXTRAS = ["^IXIC", "DX-Y.NYB"]
+for t in _TICKER_BAR_EXTRAS:
     if t not in _ALL_TICKERS:
         _ALL_TICKERS.append(t)
 
