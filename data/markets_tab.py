@@ -109,12 +109,12 @@ PERF_CHART_TICKERS = {
 }
 
 PERF_PERIODS = {
+    "1D":  {"period": "1d",  "interval": "5m"},
     "1M":  {"period": "1mo", "interval": "1h"},
     "3M":  {"period": "3mo", "interval": "1d"},
     "6M":  {"period": "6mo", "interval": "1d"},
     "YTD": {"period": "ytd", "interval": "1d"},
     "1Y":  {"period": "1y",  "interval": "1d"},
-    "2Y":  {"period": "2y",  "interval": "1d"},
     "3Y":  {"period": "3y",  "interval": "1wk"},
     "5Y":  {"period": "5y",  "interval": "1wk"},
     "Max": {"period": "max", "interval": "1mo"},
@@ -535,7 +535,7 @@ def render_markets_tab():
         st.markdown(_section_header("Normalized Performance"), unsafe_allow_html=True)
         # Period selector
         period_cols = st.columns(len(PERF_PERIODS))
-        selected_period = st.session_state.get("mkt_perf_period", "1Y")
+        selected_period = st.session_state.get("mkt_perf_period", "1D")
         for i, pkey in enumerate(PERF_PERIODS):
             with period_cols[i]:
                 if st.button(pkey, key=f"mkt_perf_{pkey}", use_container_width=True,
@@ -561,6 +561,10 @@ def render_markets_tab():
     st.markdown(_section_header("S&P Sector ETFs"), unsafe_allow_html=True)
     st.markdown(_render_market_table(_sort_by_change(SECTORS), quotes, section_label="Sector"), unsafe_allow_html=True)
 
+    # ── Commodities ───────────────────────────────────────────────────────
+    st.markdown(_section_header("Commodities"), unsafe_allow_html=True)
+    st.markdown(_render_market_table(_sort_by_change(COMMODITIES), quotes, section_label="Commodity"), unsafe_allow_html=True)
+
     # ── Fixed Income ──────────────────────────────────────────────────────
     st.markdown(_section_header("Fixed Income ETFs"), unsafe_allow_html=True)
     st.markdown(_render_market_table(_sort_by_change(FIXED_INCOME), quotes, section_label="Category"), unsafe_allow_html=True)
@@ -583,10 +587,6 @@ def render_markets_tab():
             unsafe_allow_html=True,
         )
         st.markdown(_render_market_table(_sort_by_change(GLOBAL_EMERGING), quotes, section_label="Market"), unsafe_allow_html=True)
-
-    # ── Commodities ───────────────────────────────────────────────────────
-    st.markdown(_section_header("Commodities"), unsafe_allow_html=True)
-    st.markdown(_render_market_table(_sort_by_change(COMMODITIES), quotes, section_label="Commodity"), unsafe_allow_html=True)
 
     # ── Footer ────────────────────────────────────────────────────────────
     st.caption(f"Data: yfinance (ETF proxies) · Cached 15 min · {datetime.now().strftime('%I:%M %p')}")
