@@ -519,14 +519,21 @@ def render_markets_tab():
         return sorted(items, key=lambda x: quotes.get(x[1], {}).get("change_pct", 0), reverse=True)
 
     # ── Normalized Performance Chart + US Equity Factors (top row) ─────────
-    # Mobile: inject CSS to stack these columns vertically
+    # Mobile stacking: wrap in a named container so CSS can target it reliably
     st.markdown(
         '<style>'
-        '@media (max-width: 640px) {'
-        '  [data-testid="stColumns"]:first-of-type { flex-direction: column !important; }'
-        '  [data-testid="stColumns"]:first-of-type > [data-testid="stColumn"] { width: 100% !important; flex: 1 1 100% !important; }'
+        '.mkt-top-row [data-testid="stHorizontalBlock"] {'
+        '  flex-wrap: wrap;'
         '}'
-        '</style>',
+        '@media (max-width: 768px) {'
+        '  .mkt-top-row [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {'
+        '    width: 100% !important;'
+        '    flex: 1 1 100% !important;'
+        '    min-width: 100% !important;'
+        '  }'
+        '}'
+        '</style>'
+        '<div class="mkt-top-row">',
         unsafe_allow_html=True,
     )
 
@@ -547,6 +554,8 @@ def render_markets_tab():
     with col_style:
         st.markdown(_section_header("US Equity Factors"), unsafe_allow_html=True)
         st.markdown(_render_style_box(quotes), unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Indices & Dividend Benchmarks (side by side) ────────────────────────
     col_idx, col_div = st.columns(2)
