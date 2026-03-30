@@ -125,41 +125,86 @@ PERF_PERIODS = {
 def _fetch_perf_chart_data(period_key):
     """
     Fetch normalized performance data for the index comparison chart.
-    Returns dict: {ticker: [(datetime, pct_change), ...]}
+    For 1D: uses 5-min intraday bars, normalized from previous day's close.
+    For longer periods: uses daily/weekly bars, normalized from first close.
+    Returns dict: {ticker: pd.Series of % change}
     """
     try:
         import yfinance as yf
 
         cfg = PERF_PERIODS.get(period_key, PERF_PERIODS["1D"])
-        tickers_str = " ".join(PERF_CHART_TICKERS.keys())
-        data = yf.download(
-            tickers_str,
-            period=cfg["period"],
-            interval=cfg["interval"],
-            group_by="ticker",
-            progress=False,
-            threads=True,
-        )
 
-        result = {}
-        for ticker in PERF_CHART_TICKERS:
-            try:
-                df = data[ticker] if ticker in data.columns.get_level_values(0) else None
-                if df is None or df.empty:
+        if period_key == "1D":
+            # Fetch 5d of daily data for prev close, then 1d of intraday
+            tickers_str = " ".join(PERF_CHART_TICKERS.keys())
+            daily = yf.download(
+                tickers_str, period="5d", interval="1d",
+                group_by="ticker", progress=False, threads=True,
+            )
+            intraday = yf.download(
+                tickers_str, period="1d", interval="5m",
+                group_by="ticker", progress=False, threads=True,
+            )
+
+            result = {}
+            for ticker in PERF_CHART_TICKERS:
+                try:
+                    # Get previous close from daily data
+                    d_df = daily[ticker] if ticker in daily.columns.get_level_values(0) else None
+                    i_df = intraday[ticker] if ticker in intraday.columns.get_level_values(0) else None
+                    if d_df is None or i_df is None or d_df.empty or i_df.empty:
+                        continue
+
+                    d_close = d_df["Close"].dropna()
+                    if hasattr(d_close, "columns"):
+                        d_close = d_close.iloc[:, 0]
+
+                    i_close = i_df["Close"].dropna()
+                    if hasattr(i_close, "columns"):
+                        i_close = i_close.iloc[:, 0]
+
+                    if len(d_close) < 2 or len(i_close) < 1:
+                        continue
+
+                    # Previous day's close = baseline
+                    prev_close = float(d_close.iloc[-2])
+                    if prev_close > 0:
+                        pct = ((i_close / prev_close) - 1) * 100
+                        result[ticker] = pct
+                except Exception:
                     continue
-                close = df["Close"].dropna()
-                if hasattr(close, "columns"):
-                    close = close.iloc[:, 0]
-                if len(close) < 2:
+            return result
+
+        else:
+            # Longer periods: normalize from first close
+            tickers_str = " ".join(PERF_CHART_TICKERS.keys())
+            data = yf.download(
+                tickers_str,
+                period=cfg["period"],
+                interval=cfg["interval"],
+                group_by="ticker",
+                progress=False,
+                threads=True,
+            )
+
+            result = {}
+            for ticker in PERF_CHART_TICKERS:
+                try:
+                    df = data[ticker] if ticker in data.columns.get_level_values(0) else None
+                    if df is None or df.empty:
+                        continue
+                    close = df["Close"].dropna()
+                    if hasattr(close, "columns"):
+                        close = close.iloc[:, 0]
+                    if len(close) < 2:
+                        continue
+                    base = float(close.iloc[0])
+                    if base > 0:
+                        pct = ((close / base) - 1) * 100
+                        result[ticker] = pct
+                except Exception:
                     continue
-                # Normalize to % change from first value
-                base = float(close.iloc[0])
-                if base > 0:
-                    pct = ((close / base) - 1) * 100
-                    result[ticker] = pct
-            except Exception:
-                continue
-        return result
+            return result
     except Exception:
         return {}
 
