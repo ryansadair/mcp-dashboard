@@ -187,6 +187,12 @@ def _fetch_perf_chart_data(period_key):
 
                     if prev_close > 0:
                         pct = ((i_close / prev_close) - 1) * 100
+                        # Convert UTC timestamps to Pacific for display
+                        try:
+                            from zoneinfo import ZoneInfo
+                            pct.index = pct.index.tz_convert(ZoneInfo("America/Los_Angeles"))
+                        except Exception:
+                            pass
                         result[ticker] = pct
                 except Exception:
                     continue
