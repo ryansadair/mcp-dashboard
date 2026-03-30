@@ -55,6 +55,7 @@ SECTORS = [
 ]
 
 FIXED_INCOME = [
+    ("10Y Treasury Yield", "^TNX"),
     ("U.S. Treasuries", "GOVT"),
     ("T.I.P.S.",        "TIP"),
     ("High Grade",      "LQD"),
