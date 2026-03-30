@@ -1,9 +1,29 @@
 import streamlit as st
-from data.market_data import get_index_data
 
 
 def render_market_ticker():
-    raw = get_index_data()
+    # Primary: use the same data source as the Markets tab tables
+    # Fallback: get_index_data() from market_data.py (separate yfinance call)
+    raw = {}
+    _source = "index"
+
+    try:
+        from data.markets_tab import _fetch_market_quotes
+        mkt = _fetch_market_quotes()
+        if mkt:
+            # Map to the format the ticker bar expects: {symbol: {price, change_pct}}
+            raw = {sym: {"price": d.get("price", 0), "change_pct": d.get("change_pct", 0)}
+                   for sym, d in mkt.items()}
+            _source = "markets"
+    except Exception:
+        pass
+
+    if not raw:
+        try:
+            from data.market_data import get_index_data
+            raw = get_index_data() or {}
+        except Exception:
+            pass
 
     if not raw:
         st.markdown(
