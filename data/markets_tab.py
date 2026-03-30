@@ -109,13 +109,15 @@ PERF_CHART_TICKERS = {
 }
 
 PERF_PERIODS = {
-    "1D":  {"period": "1d",  "interval": "5m"},
-    "5D":  {"period": "5d",  "interval": "15m"},
     "1M":  {"period": "1mo", "interval": "1h"},
     "3M":  {"period": "3mo", "interval": "1d"},
     "6M":  {"period": "6mo", "interval": "1d"},
     "YTD": {"period": "ytd", "interval": "1d"},
     "1Y":  {"period": "1y",  "interval": "1d"},
+    "2Y":  {"period": "2y",  "interval": "1d"},
+    "3Y":  {"period": "3y",  "interval": "1wk"},
+    "5Y":  {"period": "5y",  "interval": "1wk"},
+    "Max": {"period": "max", "interval": "1mo"},
 }
 
 
@@ -196,7 +198,7 @@ def _render_perf_chart(period_key="1D"):
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="DM Sans", color="rgba(255,255,255,0.5)", size=10),
         margin=dict(l=45, r=10, t=10, b=10),
-        height=295,
+        height=340,
         xaxis=dict(
             gridcolor="rgba(255,255,255,0.04)",
             showline=False,
@@ -466,9 +468,9 @@ def _render_style_box(quotes):
             text_color = "rgba(255,255,255,0.9)" if abs(pct) > 0.3 else "rgba(255,255,255,0.6)"
 
             html += (
-                f'<div style="flex:1;background:{bg};border-radius:6px;padding:14px 8px;'
-                f'text-align:center;min-height:48px;display:flex;align-items:center;justify-content:center;">'
-                f'<span style="font-size:14px;font-weight:700;color:{text_color};'
+                f'<div style="flex:1;background:{bg};border-radius:6px;padding:24px 8px;'
+                f'text-align:center;min-height:72px;display:flex;align-items:center;justify-content:center;">'
+                f'<span style="font-size:16px;font-weight:700;color:{text_color};'
                 f'font-family:\'DM Serif Display\',serif;">{pct:+.2f}%</span>'
                 f'</div>'
             )
@@ -517,12 +519,23 @@ def render_markets_tab():
         return sorted(items, key=lambda x: quotes.get(x[1], {}).get("change_pct", 0), reverse=True)
 
     # ── Normalized Performance Chart + US Equity Factors (top row) ─────────
-    col_chart, col_style = st.columns([3, 1])
+    # Mobile: inject CSS to stack these columns vertically
+    st.markdown(
+        '<style>'
+        '@media (max-width: 640px) {'
+        '  [data-testid="stColumns"]:first-of-type { flex-direction: column !important; }'
+        '  [data-testid="stColumns"]:first-of-type > [data-testid="stColumn"] { width: 100% !important; flex: 1 1 100% !important; }'
+        '}'
+        '</style>',
+        unsafe_allow_html=True,
+    )
+
+    col_chart, col_style = st.columns([5, 2])
     with col_chart:
         st.markdown(_section_header("Normalized Performance"), unsafe_allow_html=True)
         # Period selector
         period_cols = st.columns(len(PERF_PERIODS))
-        selected_period = st.session_state.get("mkt_perf_period", "1D")
+        selected_period = st.session_state.get("mkt_perf_period", "1Y")
         for i, pkey in enumerate(PERF_PERIODS):
             with period_cols[i]:
                 if st.button(pkey, key=f"mkt_perf_{pkey}", use_container_width=True,
