@@ -271,6 +271,7 @@ def _render_perf_chart(period_key="1D"):
             gridcolor="rgba(255,255,255,0.04)",
             showline=False,
             tickfont=dict(size=9),
+            fixedrange=True,
         ),
         yaxis=dict(
             gridcolor="rgba(255,255,255,0.04)",
@@ -278,6 +279,7 @@ def _render_perf_chart(period_key="1D"):
             tickfont=dict(size=10),
             ticksuffix="%",
             zeroline=False,
+            fixedrange=True,
         ),
         legend=dict(
             orientation="h",
@@ -294,7 +296,7 @@ def _render_perf_chart(period_key="1D"):
 
     st.plotly_chart(fig, use_container_width=True, config={
         "displayModeBar": False, "scrollZoom": False,
-        "doubleClick": False, "showTips": False, "staticPlot": False,
+        "doubleClick": False, "showTips": False,
     })
 
 # Collect all tickers for batch fetch
