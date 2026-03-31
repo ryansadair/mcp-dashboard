@@ -140,7 +140,7 @@ Displayed at the top of most tabs. Each card shows a real-time metric for the se
 
 <div class="doc-subsection">Market Ticker Bar</div>
 <div class="doc-body">
-The scrolling bar at the top shows real-time quotes for S&P 500, DJIA, Nasdaq, VIX, US 10Y Treasury, and Brent Crude. Data is fetched from Supabase (prefetched from yfinance every 15 minutes during market hours via GitHub Actions).
+The scrolling bar at the top shows real-time quotes for S&P 500, DJIA, Nasdaq 100, 10Y Treasury, Gold, Crude Oil, US Dollar, and Bitcoin. Data is sourced from the same batched yfinance call used by the Markets tab tables, ensuring exact parity between the ticker bar and tables. Cached 15 minutes.
 </div>
 
 <div class="doc-subsection">Sector Allocation</div>
@@ -389,7 +389,12 @@ st.markdown('<div class="doc-section">Markets Tab</div>', unsafe_allow_html=True
 
 st.markdown("""
 <div class="doc-body">
-Broad market snapshot using ETF proxies, sorted by daily performance (best to worst) within each section. All data from a single batched yfinance call (~45 tickers), cached 15 minutes.
+Broad market snapshot using ETF proxies and actual index tickers, sorted by daily performance (best to worst) within each section. All data from a single batched yfinance call (~50 tickers), cached 15 minutes. Row hover highlights on all tables.
+</div>
+
+<div class="doc-subsection">Normalized Performance Chart</div>
+<div class="doc-body">
+Koyfin-style multi-line chart comparing S&P 500, Nasdaq 100, Russell 2000, and Dow Jones, normalized to percentage change. Uses actual index tickers (^GSPC, ^NDX, ^RUT, ^DJI) — not ETF proxies — so the chart values match the tables exactly. For the 1D view, the previous close baseline is derived from the same data source as the tables. Intraday timestamps are converted to Pacific time. Period selector: 1D, 1M, 3M, 6M, YTD, 1Y, 3Y, 5Y, Max. Touch-to-zoom disabled for mobile usability.
 </div>
 
 <table class="doc-table">
@@ -397,10 +402,10 @@ Broad market snapshot using ETF proxies, sorted by daily performance (best to wo
 <tr><td>Indices</td><td>Nasdaq 100, DJIA, Russell 2000, Russell 1000 Value/Growth, AGG, Bitcoin</td><td>Bitcoin uses BTC-USD</td></tr>
 <tr><td>Dividend Benchmarks</td><td>S&P 500, SPYD, SDY, REGL, S&P 400, Russell 3000, DWX, DVY</td><td>Key benchmarks for dividend strategies</td></tr>
 <tr><td>S&P Sector ETFs</td><td>XLK, XLV, XLF, XLY, XLP, XLI, XLE, XLU, XLRE, XLB, XLC</td><td>All 11 GICS sectors</td></tr>
-<tr><td>Fixed Income</td><td>GOVT, TIP, LQD, HYG, MUB, CWB</td><td>Government, TIPS, IG, HY, Munis, Convertibles</td></tr>
+<tr><td>Commodities</td><td>GC=F, SI=F, CL=F, BZ=F, NG=F, HG=F</td><td>Actual futures contracts, not ETF proxies</td></tr>
+<tr><td>Fixed Income</td><td>^TNX, GOVT, TIP, LQD, HYG, MUB, CWB</td><td>10Y Treasury yield + Government, TIPS, IG, HY, Munis, Convertibles</td></tr>
 <tr><td>Global Developed</td><td>EFA, EWJ, EWU, EWG, EWA, EWQ</td><td>Broad + major countries</td></tr>
 <tr><td>Global Emerging</td><td>EEM, FXI, EPI, EWZ, EWW, EWY, EZA</td><td>Broad + major countries</td></tr>
-<tr><td>Commodities</td><td>GC=F, SI=F, CL=F, BZ=F, NG=F, HG=F</td><td>Actual futures contracts, not ETF proxies</td></tr>
 </table>
 
 <div class="doc-subsection">US Equity Factors Style Box</div>
@@ -426,6 +431,11 @@ st.markdown("""
 RSS feeds from MarketWatch Top Stories, CNBC Top News, and CNBC Economy. Fetched via the feedparser library, cached 15 minutes. Up to 12 headlines displayed, sorted newest first. Headlines link to the original article.
 </div>
 
+<div class="doc-subsection">Holdings News</div>
+<div class="doc-body">
+News articles specific to portfolio holdings, fetched via yfinance's .news property for all tickers across all strategies. Each headline is tagged with a gold ticker badge. Up to 15 articles displayed, cached 15 minutes. Iterates through tickers with rate limiting (0.1s delay) and stops early once enough headlines are collected.
+</div>
+
 <div class="doc-subsection">Portfolio Alerts</div>
 <div class="doc-body">
 Computed live from Supabase data across all strategies (all unique tickers from the Tamarac export). Four alert categories:
@@ -433,8 +443,8 @@ Computed live from Supabase data across all strategies (all unique tickers from 
 
 <table class="doc-table">
 <tr><th>Alert Type</th><th>Trigger</th><th>Data Source</th></tr>
-<tr><td>Price Movers</td><td>Any holding with a daily move exceeding ±2%</td><td><span class="doc-source">Supabase</span></td></tr>
-<tr><td>Dividend Events</td><td>Ex-dividend dates within 14 days; dividend growth/decline alerts based on 1Y change</td><td><span class="doc-source">Supabase</span> <span class="doc-source">Fish CCC</span></td></tr>
+<tr><td>Price Movers</td><td>Any holding with a daily move exceeding +/-2%</td><td><span class="doc-source">Supabase</span></td></tr>
+<tr><td>Dividend Events</td><td>Ex-dividend dates within 14 days (ex-dates only; dividend growth/decline alerts removed due to ADR/FX distortion)</td><td><span class="doc-source">Supabase</span></td></tr>
 <tr><td>Upcoming Earnings</td><td>Holdings reporting within the next 14 days</td><td><span class="doc-source">yfinance</span> (cached 1hr)</td></tr>
 <tr><td>52-Week Proximity</td><td>Holdings within 5% of their 52-week high or low</td><td><span class="doc-source">Supabase</span></td></tr>
 </table>
