@@ -36,7 +36,7 @@ def render_market_ticker():
     DISPLAY = [
         ("^GSPC",    "S&P 500",     ""),
         ("^DJI",     "DJIA",        ""),
-        ("^IXIC",    "Nasdaq",      ""),
+        ("^NDX",     "Nasdaq 100",  ""),
         ("^TNX",     "10Y Treasury","%"),
         ("GC=F",     "Gold",        "$"),
         ("CL=F",     "Crude Oil",   "$"),
