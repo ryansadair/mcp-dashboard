@@ -101,12 +101,12 @@ STYLE_BOX = [
 ]
 _STYLE_BOX_TICKERS = [t for _, cols in STYLE_BOX for _, t in cols]
 
-# Tickers for the normalized performance chart (ETF proxies for clean intraday data)
+# Tickers for the normalized performance chart (actual indices, not ETF proxies)
 PERF_CHART_TICKERS = {
-    "SPY": ("S&P 500", "#6b8afc"),
-    "QQQ": ("Nasdaq 100", "#c084fc"),
-    "IWM": ("Russell 2000", "#fbbf24"),
-    "DIA": ("Dow Jones", "#f97066"),
+    "^GSPC": ("S&P 500", "#6b8afc"),
+    "^NDX":  ("Nasdaq 100", "#c084fc"),
+    "^RUT":  ("Russell 2000", "#fbbf24"),
+    "^DJI":  ("Dow Jones", "#f97066"),
 }
 
 PERF_PERIODS = {
@@ -137,14 +137,10 @@ def _fetch_perf_chart_data(period_key):
         cfg = PERF_PERIODS.get(period_key, PERF_PERIODS["1D"])
 
         if period_key == "1D":
-            # Get previous close from the same 1Y daily data the tables use
+            # Get previous close from the same data the tables use
             quotes = _fetch_market_quotes()
 
-            # Map chart ETF tickers to their corresponding index tickers in quotes
-            # SPY→^GSPC, DIA→^DJI, QQQ→^NDX, IWM→^RUT
-            _ETF_TO_INDEX = {"SPY": "^GSPC", "DIA": "^DJI", "QQQ": "^NDX", "IWM": "^RUT"}
-
-            # Fetch intraday bars
+            # Fetch intraday bars for the index tickers
             tickers_str = " ".join(PERF_CHART_TICKERS.keys())
             intraday = yf.download(
                 tickers_str, period="1d", interval="5m",
@@ -164,26 +160,15 @@ def _fetch_perf_chart_data(period_key):
                     if len(i_close) < 1:
                         continue
 
-                    # Get previous close: use ETF's own quote data, or map to index
-                    etf_quote = quotes.get(ticker, {})
-                    price_now = etf_quote.get("price", 0)
-                    chg_pct = etf_quote.get("change_pct", 0)
+                    # Derive prev close from the same quote data the tables use
+                    q = quotes.get(ticker, {})
+                    price_now = q.get("price", 0)
+                    chg_pct = q.get("change_pct", 0)
 
                     if price_now > 0 and chg_pct != 0:
-                        # Back-calculate prev close: price / (1 + chg_pct/100)
                         prev_close = price_now / (1 + chg_pct / 100)
                     else:
-                        # Fallback: use the index ticker's data to derive prev close
-                        idx = _ETF_TO_INDEX.get(ticker, ticker)
-                        idx_quote = quotes.get(idx, {})
-                        idx_price = idx_quote.get("price", 0)
-                        idx_chg = idx_quote.get("change_pct", 0)
-                        if idx_price > 0 and idx_chg != 0:
-                            # Can't use index prev close directly (different price level)
-                            # Fall back to first intraday bar
-                            prev_close = float(i_close.iloc[0])
-                        else:
-                            prev_close = float(i_close.iloc[0])
+                        prev_close = float(i_close.iloc[0])
 
                     if prev_close > 0:
                         pct = ((i_close / prev_close) - 1) * 100
@@ -271,7 +256,6 @@ def _render_perf_chart(period_key="1D"):
             gridcolor="rgba(255,255,255,0.04)",
             showline=False,
             tickfont=dict(size=9),
-            fixedrange=True,
         ),
         yaxis=dict(
             gridcolor="rgba(255,255,255,0.04)",
@@ -279,7 +263,6 @@ def _render_perf_chart(period_key="1D"):
             tickfont=dict(size=10),
             ticksuffix="%",
             zeroline=False,
-            fixedrange=True,
         ),
         legend=dict(
             orientation="h",
@@ -296,7 +279,7 @@ def _render_perf_chart(period_key="1D"):
 
     st.plotly_chart(fig, use_container_width=True, config={
         "displayModeBar": False, "scrollZoom": False,
-        "doubleClick": False, "showTips": False,
+        "doubleClick": False, "showTips": False, "staticPlot": False,
     })
 
 # Collect all tickers for batch fetch
