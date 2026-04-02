@@ -26,7 +26,6 @@ INDICES = [
     ("Russell 1000 Value", "^RLV"),
     ("Russell 1000 Growth","^RLG"),
     ("US Agg Bond",        "AGG"),
-    ("Bitcoin",            "BTC-USD"),
 ]
 
 DIVIDEND_BENCHMARKS = [
@@ -90,6 +89,7 @@ COMMODITIES = [
     ("Brent Crude", "BZ=F"),
     ("Natural Gas", "NG=F"),
     ("Copper",      "HG=F"),
+    ("Bitcoin",     "BTC-USD"),
 ]
 
 # US Equity Factors — Morningstar-style 3x3 grid (iShares Russell ETFs)
@@ -281,6 +281,206 @@ def _render_perf_chart(period_key="1D"):
         "displayModeBar": False, "scrollZoom": False,
         "doubleClick": False, "showTips": False, "staticPlot": False,
     })
+
+
+# ── Section Charts ─────────────────────────────────────────────────────────
+# Color palette for section-level multi-line charts (up to ~12 lines)
+_SECTION_COLORS = [
+    "#6b8afc", "#c084fc", "#fbbf24", "#f97066", "#569542",
+    "#34d399", "#f472b6", "#C9A84C", "#60a5fa", "#a78bfa",
+    "#fb923c", "#07415A",
+]
+
+# Chart period options — same as the normalized perf chart at top of tab
+SECTION_CHART_PERIODS = {
+    "1D":  {"period": "1d",  "interval": "5m"},
+    "1M":  {"period": "1mo", "interval": "1h"},
+    "3M":  {"period": "3mo", "interval": "1d"},
+    "6M":  {"period": "6mo", "interval": "1d"},
+    "YTD": {"period": "ytd", "interval": "1d"},
+    "1Y":  {"period": "1y",  "interval": "1d"},
+    "3Y":  {"period": "3y",  "interval": "1wk"},
+    "5Y":  {"period": "5y",  "interval": "1wk"},
+    "Max": {"period": "max", "interval": "1mo"},
+}
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _fetch_section_chart_data(tickers_tuple, period_key):
+    """
+    Fetch normalized % change data for a group of tickers.
+    tickers_tuple: tuple of (name, ticker) pairs (must be hashable for caching).
+    Returns dict: {ticker: pd.Series of % change}
+    """
+    try:
+        import yfinance as yf
+
+        cfg = SECTION_CHART_PERIODS.get(period_key, SECTION_CHART_PERIODS["1D"])
+        ticker_list = [t for _, t in tickers_tuple]
+        tickers_str = " ".join(ticker_list)
+
+        if period_key == "1D":
+            # Intraday: normalize from previous close via _fetch_market_quotes
+            quotes = _fetch_market_quotes()
+            intraday = yf.download(
+                tickers_str, period="1d", interval="5m",
+                group_by="ticker", progress=False, threads=True,
+            )
+            result = {}
+            for _, ticker in tickers_tuple:
+                try:
+                    if len(ticker_list) == 1:
+                        i_df = intraday
+                    else:
+                        i_df = intraday[ticker] if ticker in intraday.columns.get_level_values(0) else None
+                    if i_df is None or i_df.empty:
+                        continue
+                    i_close = i_df["Close"].dropna()
+                    if hasattr(i_close, "columns"):
+                        i_close = i_close.iloc[:, 0]
+                    if len(i_close) < 1:
+                        continue
+                    q = quotes.get(ticker, {})
+                    price_now = q.get("price", 0)
+                    chg_pct = q.get("change_pct", 0)
+                    if price_now > 0 and chg_pct != 0:
+                        prev_close = price_now / (1 + chg_pct / 100)
+                    else:
+                        prev_close = float(i_close.iloc[0])
+                    if prev_close > 0:
+                        pct = ((i_close / prev_close) - 1) * 100
+                        try:
+                            from zoneinfo import ZoneInfo
+                            pct.index = pct.index.tz_convert(ZoneInfo("America/Los_Angeles"))
+                        except Exception:
+                            pass
+                        result[ticker] = pct
+                except Exception:
+                    continue
+            return result
+        else:
+            # Longer periods: normalize from first close
+            data = yf.download(
+                tickers_str,
+                period=cfg["period"],
+                interval=cfg["interval"],
+                group_by="ticker",
+                progress=False,
+                threads=True,
+            )
+            result = {}
+            for _, ticker in tickers_tuple:
+                try:
+                    if len(ticker_list) == 1:
+                        df = data
+                    else:
+                        df = data[ticker] if ticker in data.columns.get_level_values(0) else None
+                    if df is None or df.empty:
+                        continue
+                    close = df["Close"].dropna()
+                    if hasattr(close, "columns"):
+                        close = close.iloc[:, 0]
+                    if len(close) < 2:
+                        continue
+                    base = float(close.iloc[0])
+                    if base > 0:
+                        pct = ((close / base) - 1) * 100
+                        result[ticker] = pct
+                except Exception:
+                    continue
+            return result
+    except Exception:
+        return {}
+
+
+def _render_section_chart(items, period_key, session_key):
+    """
+    Render a normalized % change Plotly chart for a section of tickers.
+    items: list of (name, ticker) pairs.
+    Matches exact styling of performance_tab charts:
+      - PLOTLY_DARK theme, crosshair spikes, fixedrange, no zoom on mobile
+    """
+    import plotly.graph_objects as go
+
+    chart_data = _fetch_section_chart_data(tuple(items), period_key)
+    if not chart_data:
+        st.markdown(
+            '<div style="padding:40px;text-align:center;color:rgba(255,255,255,0.3);'
+            'font-size:13px;">Chart data unavailable</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    fig = go.Figure()
+    name_map = {t: n for n, t in items}
+
+    for idx, (ticker, pct_series) in enumerate(chart_data.items()):
+        name = name_map.get(ticker, ticker)
+        color = _SECTION_COLORS[idx % len(_SECTION_COLORS)]
+        final_pct = float(pct_series.iloc[-1])
+        fig.add_trace(go.Scatter(
+            x=pct_series.index,
+            y=pct_series.values,
+            name=f"{name}  {final_pct:+.2f}%",
+            line=dict(color=color, width=2),
+            hovertemplate=f"{name}<br>%{{x}}<br>%{{y:+.2f}}%<extra></extra>",
+        ))
+
+    # Zero line
+    fig.add_hline(y=0, line=dict(color="rgba(255,255,255,0.15)", width=1, dash="dot"))
+
+    # Spike / crosshair axes — matches performance_tab pattern exactly
+    _spike = dict(
+        showspikes=True, spikecolor="rgba(255,255,255,0.15)",
+        spikethickness=1, spikemode="across", spikedash="solid",
+    )
+    _xaxis = dict(gridcolor="rgba(255,255,255,0.04)", showline=False,
+                  tickfont=dict(size=9), fixedrange=True, **_spike)
+    _yaxis = dict(gridcolor="rgba(255,255,255,0.04)", showline=False,
+                  tickfont=dict(size=10), ticksuffix="%", zeroline=False,
+                  fixedrange=True, **_spike)
+
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="DM Sans", color="rgba(255,255,255,0.5)", size=10),
+        margin=dict(l=45, r=10, t=10, b=10),
+        height=340,
+        xaxis=_xaxis,
+        yaxis=_yaxis,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom", y=1.02,
+            xanchor="left", x=0,
+            bgcolor="rgba(0,0,0,0)",
+            font=dict(size=11),
+        ),
+        hovermode="x unified",
+        dragmode=False,
+        showlegend=True,
+    )
+
+    st.plotly_chart(fig, use_container_width=True, config={
+        "displayModeBar": False, "scrollZoom": False,
+        "doubleClick": False, "showTips": False, "staticPlot": False,
+    })
+
+
+def _render_section_with_periods(title, items, session_prefix):
+    """Render a section header + period selector + chart."""
+    st.markdown(_section_header(title), unsafe_allow_html=True)
+
+    period_cols = st.columns(len(SECTION_CHART_PERIODS))
+    skey = f"mkt_chart_{session_prefix}"
+    selected = st.session_state.get(skey, "1D")
+    for i, pkey in enumerate(SECTION_CHART_PERIODS):
+        with period_cols[i]:
+            if st.button(pkey, key=f"{skey}_{pkey}", use_container_width=True,
+                         type="primary" if pkey == selected else "secondary"):
+                st.session_state[skey] = pkey
+                selected = pkey
+
+    _render_section_chart(items, selected, skey)
 
 # Collect all tickers for batch fetch
 _ALL_GROUPS = [INDICES, DIVIDEND_BENCHMARKS, SECTORS, FIXED_INCOME, GLOBAL_DEVELOPED, GLOBAL_EMERGING, COMMODITIES]
@@ -551,7 +751,7 @@ def _render_style_box(quotes):
 # ══════════════════════════════════════════════════════════════════════════
 
 def render_markets_tab():
-    """Render the full Markets tab."""
+    """Render the full Markets tab with inner Tables / Charts sub-tabs."""
 
     # Row hover highlight (matches holdings/dividends tab behavior)
     st.markdown(
@@ -570,70 +770,106 @@ def render_markets_tab():
         unsafe_allow_html=True,
     )
 
-    with st.spinner("Fetching market data..."):
-        quotes = _fetch_market_quotes()
+    tab_tables, tab_charts = st.tabs(["Tables", "Charts"])
 
-    def _sort_by_change(items):
-        """Sort items by change_pct descending (best performers on top)."""
-        return sorted(items, key=lambda x: quotes.get(x[1], {}).get("change_pct", 0), reverse=True)
+    # ══════════════════════════════════════════════════════════════════════
+    # TABLES SUB-TAB (existing layout)
+    # ══════════════════════════════════════════════════════════════════════
+    with tab_tables:
+        with st.spinner("Fetching market data..."):
+            quotes = _fetch_market_quotes()
 
-    # ── Normalized Performance Chart (full width) ──────────────────────────
-    st.markdown(_section_header("Normalized Performance"), unsafe_allow_html=True)
-    # Period selector
-    period_cols = st.columns(len(PERF_PERIODS))
-    selected_period = st.session_state.get("mkt_perf_period", "1D")
-    for i, pkey in enumerate(PERF_PERIODS):
-        with period_cols[i]:
-            if st.button(pkey, key=f"mkt_perf_{pkey}", use_container_width=True,
-                         type="primary" if pkey == selected_period else "secondary"):
-                st.session_state["mkt_perf_period"] = pkey
-                selected_period = pkey
-    _render_perf_chart(selected_period)
+        def _sort_by_change(items):
+            """Sort items by change_pct descending (best performers on top)."""
+            return sorted(items, key=lambda x: quotes.get(x[1], {}).get("change_pct", 0), reverse=True)
 
-    # ── Indices & Dividend Benchmarks (side by side) ────────────────────────
-    col_idx, col_div = st.columns(2)
-    with col_idx:
-        st.markdown(_section_header("Indices"), unsafe_allow_html=True)
-        st.markdown(_render_market_table(_sort_by_change(INDICES), quotes, section_label="Index"), unsafe_allow_html=True)
-    with col_div:
-        st.markdown(_section_header("Dividend Benchmarks"), unsafe_allow_html=True)
-        st.markdown(_render_market_table(_sort_by_change(DIVIDEND_BENCHMARKS), quotes, section_label="Benchmark"), unsafe_allow_html=True)
+        # ── Normalized Performance Chart (full width) ────────────────────
+        st.markdown(_section_header("Normalized Performance"), unsafe_allow_html=True)
+        period_cols = st.columns(len(PERF_PERIODS))
+        selected_period = st.session_state.get("mkt_perf_period", "1D")
+        for i, pkey in enumerate(PERF_PERIODS):
+            with period_cols[i]:
+                if st.button(pkey, key=f"mkt_perf_{pkey}", use_container_width=True,
+                             type="primary" if pkey == selected_period else "secondary"):
+                    st.session_state["mkt_perf_period"] = pkey
+                    selected_period = pkey
+        _render_perf_chart(selected_period)
 
-    # ── Sector ETFs & US Equity Factors (side by side) ──────────────────────
-    col_sectors, col_factors = st.columns([3, 2])
-    with col_sectors:
-        st.markdown(_section_header("S&P Sector ETFs"), unsafe_allow_html=True)
-        st.markdown(_render_market_table(_sort_by_change(SECTORS), quotes, section_label="Sector"), unsafe_allow_html=True)
-    with col_factors:
-        st.markdown(_section_header("US Equity Factors"), unsafe_allow_html=True)
-        st.markdown(_render_style_box(quotes), unsafe_allow_html=True)
+        # ── Indices & Dividend Benchmarks (side by side) ─────────────────
+        col_idx, col_div = st.columns(2)
+        with col_idx:
+            st.markdown(_section_header("Indices"), unsafe_allow_html=True)
+            st.markdown(_render_market_table(_sort_by_change(INDICES), quotes, section_label="Index"), unsafe_allow_html=True)
+        with col_div:
+            st.markdown(_section_header("Dividend Benchmarks"), unsafe_allow_html=True)
+            st.markdown(_render_market_table(_sort_by_change(DIVIDEND_BENCHMARKS), quotes, section_label="Benchmark"), unsafe_allow_html=True)
 
-    # ── Commodities ───────────────────────────────────────────────────────
-    st.markdown(_section_header("Commodities"), unsafe_allow_html=True)
-    st.markdown(_render_market_table(_sort_by_change(COMMODITIES), quotes, section_label="Commodity"), unsafe_allow_html=True)
+        # ── Sector ETFs & US Equity Factors (side by side) ───────────────
+        col_sectors, col_factors = st.columns([3, 2])
+        with col_sectors:
+            st.markdown(_section_header("S&P Sector ETFs"), unsafe_allow_html=True)
+            st.markdown(_render_market_table(_sort_by_change(SECTORS), quotes, section_label="Sector"), unsafe_allow_html=True)
+        with col_factors:
+            st.markdown(_section_header("US Equity Factors"), unsafe_allow_html=True)
+            st.markdown(_render_style_box(quotes), unsafe_allow_html=True)
 
-    # ── Fixed Income ──────────────────────────────────────────────────────
-    st.markdown(_section_header("Fixed Income ETFs"), unsafe_allow_html=True)
-    st.markdown(_render_market_table(_sort_by_change(FIXED_INCOME), quotes, section_label="Category"), unsafe_allow_html=True)
+        # ── Commodities ──────────────────────────────────────────────────
+        st.markdown(_section_header("Commodities"), unsafe_allow_html=True)
+        st.markdown(_render_market_table(_sort_by_change(COMMODITIES), quotes, section_label="Commodity"), unsafe_allow_html=True)
 
-    # ── Global Markets ────────────────────────────────────────────────────
-    st.markdown(_section_header("Global Markets"), unsafe_allow_html=True)
+        # ── Fixed Income ─────────────────────────────────────────────────
+        st.markdown(_section_header("Fixed Income ETFs"), unsafe_allow_html=True)
+        st.markdown(_render_market_table(_sort_by_change(FIXED_INCOME), quotes, section_label="Category"), unsafe_allow_html=True)
 
-    col_dev, col_em = st.columns(2)
-    with col_dev:
+        # ── Global Markets ───────────────────────────────────────────────
+        st.markdown(_section_header("Global Markets"), unsafe_allow_html=True)
+        col_dev, col_em = st.columns(2)
+        with col_dev:
+            st.markdown(
+                '<div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.4);'
+                'text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Developed</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(_render_market_table(_sort_by_change(GLOBAL_DEVELOPED), quotes, section_label="Market"), unsafe_allow_html=True)
+        with col_em:
+            st.markdown(
+                '<div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.4);'
+                'text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Emerging</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(_render_market_table(_sort_by_change(GLOBAL_EMERGING), quotes, section_label="Market"), unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # CHARTS SUB-TAB (normalized % change for each section)
+    # ══════════════════════════════════════════════════════════════════════
+    with tab_charts:
         st.markdown(
-            '<div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.4);'
-            'text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Developed</div>',
+            '<div style="font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:16px">'
+            'Normalized % change · Same period options as performance tab · Hover for values'
+            '</div>',
             unsafe_allow_html=True,
         )
-        st.markdown(_render_market_table(_sort_by_change(GLOBAL_DEVELOPED), quotes, section_label="Market"), unsafe_allow_html=True)
-    with col_em:
-        st.markdown(
-            '<div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.4);'
-            'text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px">Emerging</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(_render_market_table(_sort_by_change(GLOBAL_EMERGING), quotes, section_label="Market"), unsafe_allow_html=True)
+
+        # Indices
+        _render_section_with_periods("Indices", INDICES, "idx")
+
+        # Dividend Benchmarks
+        _render_section_with_periods("Dividend Benchmarks", DIVIDEND_BENCHMARKS, "divbench")
+
+        # S&P Sector ETFs
+        _render_section_with_periods("S&P Sector ETFs", SECTORS, "sectors")
+
+        # Commodities
+        _render_section_with_periods("Commodities", COMMODITIES, "commod")
+
+        # Fixed Income ETFs
+        _render_section_with_periods("Fixed Income ETFs", FIXED_INCOME, "fi")
+
+        # Global Developed
+        _render_section_with_periods("Global Markets — Developed", GLOBAL_DEVELOPED, "gldev")
+
+        # Global Emerging
+        _render_section_with_periods("Global Markets — Emerging", GLOBAL_EMERGING, "glem")
 
     # ── Footer ────────────────────────────────────────────────────────────
     st.caption(f"Data: yfinance (ETF proxies) · Cached 15 min · {datetime.now().strftime('%I:%M %p')}")
