@@ -783,18 +783,6 @@ def render_markets_tab():
             """Sort items by change_pct descending (best performers on top)."""
             return sorted(items, key=lambda x: quotes.get(x[1], {}).get("change_pct", 0), reverse=True)
 
-        # ── Normalized Performance Chart (full width) ────────────────────
-        st.markdown(_section_header("Normalized Performance"), unsafe_allow_html=True)
-        period_cols = st.columns(len(PERF_PERIODS))
-        selected_period = st.session_state.get("mkt_perf_period", "1D")
-        for i, pkey in enumerate(PERF_PERIODS):
-            with period_cols[i]:
-                if st.button(pkey, key=f"mkt_perf_{pkey}", use_container_width=True,
-                             type="primary" if pkey == selected_period else "secondary"):
-                    st.session_state["mkt_perf_period"] = pkey
-                    selected_period = pkey
-        _render_perf_chart(selected_period)
-
         # ── Indices & Dividend Benchmarks (side by side) ─────────────────
         col_idx, col_div = st.columns(2)
         with col_idx:
@@ -849,6 +837,18 @@ def render_markets_tab():
             '</div>',
             unsafe_allow_html=True,
         )
+
+        # ── Normalized Performance Chart (lead chart) ────────────────────
+        st.markdown(_section_header("Normalized Performance"), unsafe_allow_html=True)
+        period_cols = st.columns(len(PERF_PERIODS))
+        selected_period = st.session_state.get("mkt_perf_period", "1D")
+        for i, pkey in enumerate(PERF_PERIODS):
+            with period_cols[i]:
+                if st.button(pkey, key=f"mkt_perf_{pkey}", use_container_width=True,
+                             type="primary" if pkey == selected_period else "secondary"):
+                    st.session_state["mkt_perf_period"] = pkey
+                    selected_period = pkey
+        _render_perf_chart(selected_period)
 
         # Indices
         _render_section_with_periods("Indices", INDICES, "idx")
