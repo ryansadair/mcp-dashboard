@@ -1162,7 +1162,12 @@ with tab_holdings:
                                         showline=False,
                                         tickfont=dict(size=9, color="rgba(255,255,255,0.25)"),
                                         nticks=4,
-                                        tickformat="%b" if _sel_label in ("YTD", "Max") or (_sel_days and _sel_days > 90) else "%b %d",
+                                        tickformat=(
+                                            "%b %d" if _sel_label in ("1M", "3M") else
+                                            "%b '%y" if _sel_label in ("6M", "YTD", "1Y") else
+                                            "%Y" if _sel_label in ("2Y", "3Y", "5Y", "Max") else
+                                            "%b %d"
+                                        ),
                                     )
                                     _fig.update_yaxes(
                                         visible=True,
