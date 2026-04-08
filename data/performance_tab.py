@@ -3,7 +3,7 @@ Martin Capital Partners — Performance Tab
 Composite returns visualization: cumulative chart, period summary,
 monthly heatmap, risk metrics, and annual returns.
 
-Data source: Composite Returns.xls via data/composite_returns.py
+Data source: Composite Returns (.xls or .xlsx) via data/composite_returns.py
 """
 
 import streamlit as st
@@ -81,8 +81,8 @@ def _data_unavailable_card(msg="Composite returns data unavailable", detail=None
 
 
 @st.cache_data(ttl=3600)
-def _load_cached_composite():
-    """Cache composite data for 1 hour."""
+def _load_cached_composite(_v=2):
+    """Cache composite data for 1 hour. Bump _v to bust cache after format changes."""
     return load_composite_data()
 
 
@@ -96,14 +96,14 @@ def render_performance_tab(active_strategy):
 
     if not data["available"]:
         _data_unavailable_card(
-            detail=data.get("error", "Composite Returns.xls not found on this machine.")
+            detail=data.get("error", "Composite Returns file not found on this machine (.xls or .xlsx).")
         )
         return
 
     if active_strategy not in data["composites"]:
         _data_unavailable_card(
             msg=f"No composite data for {active_strategy}",
-            detail="This strategy is not in Composite Returns.xls."
+            detail="This strategy is not in the Composite Returns file."
         )
         return
 
