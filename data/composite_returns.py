@@ -22,20 +22,23 @@ try:
 except ImportError:
     xlrd = None
 
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
+
 logger = logging.getLogger(__name__)
 
 # ── File Location ───────────────────────────────────────────────────────────
-# OneDrive path (Windows / local dev)
-ONEDRIVE_PATH = (
+# OneDrive paths (Windows / local dev) — check both extensions
+ONEDRIVE_DIR = (
     r"C:\Users\RyanAdair\Martin Capital Partners LLC"
     r"\Eugene - Documents\Performance\Composite Returns"
-    r"\Composite Returns.xls"
 )
 
 # Fallback: check data/ folder (for Streamlit Cloud if file is committed)
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(_THIS_DIR)
-DATA_FOLDER_PATH = os.path.join(_THIS_DIR, "Composite Returns.xls")
 
 
 # ── Strategy Block Definitions ──────────────────────────────────────────────
@@ -121,19 +124,26 @@ PERIOD_COLS = {
 # ── Helper Functions ────────────────────────────────────────────────────────
 
 def _find_composite_file():
-    """Locate Composite Returns.xls — OneDrive first, then data/ fallback."""
-    if os.path.isfile(ONEDRIVE_PATH):
-        logger.info(f"Composite returns found at OneDrive path")
-        return ONEDRIVE_PATH
-    if os.path.isfile(DATA_FOLDER_PATH):
-        logger.info(f"Composite returns found in data/ folder")
-        return DATA_FOLDER_PATH
-    logger.warning("Composite Returns.xls not found in any expected location")
+    """Locate Composite Returns file — checks .xlsx first, then .xls, in OneDrive then data/."""
+    # Search order: newest format first, OneDrive first
+    candidates = [
+        os.path.join(ONEDRIVE_DIR, "Composite Returns.xlsx"),
+        os.path.join(ONEDRIVE_DIR, "Composite Returns.xls"),
+        os.path.join(_THIS_DIR, "Composite Returns.xlsx"),
+        os.path.join(_THIS_DIR, "Composite Returns.xls"),
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            logger.info(f"Composite returns found: {path}")
+            return path
+    logger.warning("Composite Returns file not found in any expected location (.xlsx or .xls)")
     return None
 
 
 def _excel_date_to_datetime(serial, datemode=0):
     """Convert Excel date serial number to Python datetime."""
+    if isinstance(serial, datetime):
+        return serial  # openpyxl already returns datetime objects
     try:
         return xlrd.xldate_as_datetime(serial, datemode)
     except Exception:
@@ -148,6 +158,26 @@ def _safe_float(val):
         return float(val)
     except (ValueError, TypeError):
         return np.nan
+
+
+class _OpenpyxlSheetWrapper:
+    """
+    Wraps an openpyxl worksheet to provide the same API as xlrd:
+      ws.cell_value(row, col)  — 0-indexed
+      ws.nrows
+      ws.ncols
+    This lets existing parsers work unchanged with both backends.
+    """
+
+    def __init__(self, ws):
+        self._ws = ws
+        self.nrows = ws.max_row or 0
+        self.ncols = ws.max_column or 0
+
+    def cell_value(self, row, col):
+        """Return cell value using 0-indexed row/col (like xlrd)."""
+        val = self._ws.cell(row=row + 1, column=col + 1).value
+        return val if val is not None else ''
 
 
 # ── Core Parser ─────────────────────────────────────────────────────────────
@@ -312,55 +342,105 @@ def load_composite_data():
         "error": None,
     }
 
-    if xlrd is None:
-        result["error"] = "xlrd library not installed — cannot read .xls files"
+    if xlrd is None and openpyxl is None:
+        result["error"] = "Neither xlrd nor openpyxl installed — cannot read Excel files"
         logger.error(result["error"])
         return result
 
     filepath = _find_composite_file()
     if filepath is None:
         result["error"] = (
-            "Composite Returns.xls not found. "
-            "Expected at OneDrive path or in data/ folder."
+            "Composite Returns file not found. "
+            "Expected at OneDrive path or in data/ folder (.xls or .xlsx)."
         )
         return result
 
+    is_xlsx = filepath.lower().endswith(".xlsx")
+
+    if is_xlsx and openpyxl is None:
+        result["error"] = "openpyxl not installed — cannot read .xlsx files"
+        logger.error(result["error"])
+        return result
+    if not is_xlsx and xlrd is None:
+        result["error"] = "xlrd not installed — cannot read .xls files"
+        logger.error(result["error"])
+        return result
+
     try:
-        wb = xlrd.open_workbook(filepath)
-        result["file_path"] = filepath
+        if is_xlsx:
+            # ── openpyxl path (.xlsx) ──
+            wb_ox = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
+            result["file_path"] = filepath
+            datemode = 0  # not used for openpyxl (returns native datetimes)
 
-        # ── Parse "as of" date from row 1, col 1
-        ws_main = wb.sheet_by_name("Composite Returns")
-        as_of_val = ws_main.cell_value(1, 1)
-        if as_of_val and isinstance(as_of_val, float):
-            result["as_of"] = xlrd.xldate_as_datetime(as_of_val, wb.datemode)
+            ws_main = _OpenpyxlSheetWrapper(wb_ox["Composite Returns"])
 
-        # ── Parse each equity composite block
-        for strategy in ["QDVD", "SMID", "DAC", "OR"]:
+            # Parse "as of" date from row 1, col 1
+            as_of_val = ws_main.cell_value(1, 1)
+            if isinstance(as_of_val, datetime):
+                result["as_of"] = as_of_val
+            elif as_of_val and isinstance(as_of_val, (int, float)):
+                try:
+                    result["as_of"] = xlrd.xldate_as_datetime(as_of_val, 0) if xlrd else None
+                except Exception:
+                    pass
+
+            # Parse each equity composite block
+            for strategy in ["QDVD", "SMID", "DAC", "OR"]:
+                try:
+                    df = _parse_composite_block(ws_main, strategy, datemode)
+                    if not df.empty:
+                        result["composites"][strategy] = df
+                        logger.info(f"  {strategy}: {len(df)} rows, "
+                                    f"{df['date'].min().strftime('%Y-%m')} to "
+                                    f"{df['date'].max().strftime('%Y-%m')}")
+                except Exception as e:
+                    logger.error(f"  Error parsing {strategy}: {e}")
+
+            # Parse Period Returns sheet
             try:
-                df = _parse_composite_block(ws_main, strategy, wb.datemode)
-                if not df.empty:
-                    result["composites"][strategy] = df
-                    logger.info(f"  {strategy}: {len(df)} rows, "
-                                f"{df['date'].min().strftime('%Y-%m')} to "
-                                f"{df['date'].max().strftime('%Y-%m')}")
+                ws_period = _OpenpyxlSheetWrapper(wb_ox["Period Returns"])
+                result["period_returns"] = _parse_period_returns(ws_period, datemode)
+                result["annual_returns"] = _parse_annual_returns(ws_period, datemode)
             except Exception as e:
-                logger.error(f"  Error parsing {strategy}: {e}")
+                logger.error(f"  Error parsing Period Returns: {e}")
 
-        # ── Parse Period Returns sheet
-        try:
-            ws_period = wb.sheet_by_name("Period Returns")
-            result["period_returns"] = _parse_period_returns(ws_period, wb.datemode)
-            result["annual_returns"] = _parse_annual_returns(ws_period, wb.datemode)
-        except Exception as e:
-            logger.error(f"  Error parsing Period Returns: {e}")
+            wb_ox.close()
+
+        else:
+            # ── xlrd path (.xls) ──
+            wb = xlrd.open_workbook(filepath)
+            result["file_path"] = filepath
+
+            ws_main = wb.sheet_by_name("Composite Returns")
+            as_of_val = ws_main.cell_value(1, 1)
+            if as_of_val and isinstance(as_of_val, float):
+                result["as_of"] = xlrd.xldate_as_datetime(as_of_val, wb.datemode)
+
+            for strategy in ["QDVD", "SMID", "DAC", "OR"]:
+                try:
+                    df = _parse_composite_block(ws_main, strategy, wb.datemode)
+                    if not df.empty:
+                        result["composites"][strategy] = df
+                        logger.info(f"  {strategy}: {len(df)} rows, "
+                                    f"{df['date'].min().strftime('%Y-%m')} to "
+                                    f"{df['date'].max().strftime('%Y-%m')}")
+                except Exception as e:
+                    logger.error(f"  Error parsing {strategy}: {e}")
+
+            try:
+                ws_period = wb.sheet_by_name("Period Returns")
+                result["period_returns"] = _parse_period_returns(ws_period, wb.datemode)
+                result["annual_returns"] = _parse_annual_returns(ws_period, wb.datemode)
+            except Exception as e:
+                logger.error(f"  Error parsing Period Returns: {e}")
 
         result["available"] = len(result["composites"]) > 0
         logger.info(f"Composite returns loaded: {len(result['composites'])} strategies, "
                      f"as of {result['as_of']}")
 
     except Exception as e:
-        result["error"] = f"Error reading Composite Returns.xls: {e}"
+        result["error"] = f"Error reading Composite Returns file: {e}"
         logger.error(result["error"])
 
     return result
