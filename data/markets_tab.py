@@ -279,9 +279,7 @@ def _render_perf_chart(period_key="1D"):
 
     st.plotly_chart(fig, use_container_width=True, config={
         "displayModeBar": False, "scrollZoom": False,
-        "doubleClick": False, "showTips": False, "staticPlot": False,
-        "modeBarButtonsToRemove": ["zoom2d", "pan2d", "select2d", "lasso2d",
-                                    "zoomIn2d", "zoomOut2d", "autoScale2d"],
+        "doubleClick": False, "showTips": False, "staticPlot": True,
     })
 
 
@@ -464,9 +462,7 @@ def _render_section_chart(items, period_key, session_key):
 
     st.plotly_chart(fig, use_container_width=True, config={
         "displayModeBar": False, "scrollZoom": False,
-        "doubleClick": False, "showTips": False, "staticPlot": False,
-        "modeBarButtonsToRemove": ["zoom2d", "pan2d", "select2d", "lasso2d",
-                                    "zoomIn2d", "zoomOut2d", "autoScale2d"],
+        "doubleClick": False, "showTips": False, "staticPlot": True,
     })
 
 
