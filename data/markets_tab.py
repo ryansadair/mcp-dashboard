@@ -279,7 +279,7 @@ def _render_perf_chart(period_key="1D"):
 
     st.plotly_chart(fig, use_container_width=True, config={
         "displayModeBar": False, "scrollZoom": False,
-        "doubleClick": False, "showTips": False, "staticPlot": True,
+        "doubleClick": False, "showTips": False, "staticPlot": False,
     })
 
 
@@ -429,16 +429,11 @@ def _render_section_chart(items, period_key, session_key):
     # Zero line
     fig.add_hline(y=0, line=dict(color="rgba(255,255,255,0.15)", width=1, dash="dot"))
 
-    # Spike / crosshair axes — matches performance_tab pattern exactly
+    # Spike / crosshair axes — use separate update calls (same pattern as Holdings price charts)
     _spike = dict(
         showspikes=True, spikecolor="rgba(255,255,255,0.15)",
         spikethickness=1, spikemode="across", spikedash="solid",
     )
-    _xaxis = dict(gridcolor="rgba(255,255,255,0.04)", showline=False,
-                  tickfont=dict(size=9), fixedrange=True, **_spike)
-    _yaxis = dict(gridcolor="rgba(255,255,255,0.04)", showline=False,
-                  tickfont=dict(size=10), ticksuffix="%", zeroline=False,
-                  fixedrange=True, **_spike)
 
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
@@ -446,8 +441,6 @@ def _render_section_chart(items, period_key, session_key):
         font=dict(family="DM Sans", color="rgba(255,255,255,0.5)", size=10),
         margin=dict(l=45, r=10, t=10, b=10),
         height=340,
-        xaxis=_xaxis,
-        yaxis=_yaxis,
         legend=dict(
             orientation="h",
             yanchor="bottom", y=1.02,
@@ -459,10 +452,19 @@ def _render_section_chart(items, period_key, session_key):
         dragmode=False,
         showlegend=True,
     )
+    fig.update_xaxes(
+        gridcolor="rgba(255,255,255,0.04)", showline=False,
+        tickfont=dict(size=9), fixedrange=True, **_spike,
+    )
+    fig.update_yaxes(
+        gridcolor="rgba(255,255,255,0.04)", showline=False,
+        tickfont=dict(size=10), ticksuffix="%", zeroline=False,
+        fixedrange=True, **_spike,
+    )
 
     st.plotly_chart(fig, use_container_width=True, config={
         "displayModeBar": False, "scrollZoom": False,
-        "doubleClick": False, "showTips": False, "staticPlot": True,
+        "doubleClick": False, "showTips": False, "staticPlot": False,
     })
 
 
