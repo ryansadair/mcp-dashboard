@@ -43,8 +43,8 @@ _PROJECT_ROOT = os.path.dirname(_THIS_DIR)
 
 # ── Strategy Block Definitions ──────────────────────────────────────────────
 # Each strategy composite is a block in the "Composite Returns" sheet.
-# start_row = row of the strategy label (e.g., "QDVD Composite")
-# header_row = start_row + 1 (contains column headers)
+# label_row is now auto-detected by scanning for the label text.
+# header_row = label_row + 1 (contains column headers)
 # data starts at header_row + 1
 #
 # Column layout (consistent across all blocks):
@@ -61,52 +61,83 @@ _PROJECT_ROOT = os.path.dirname(_THIS_DIR)
 #  10: Cumulative Gross Value
 #  11+: Benchmark columns (vary by strategy)
 
-COMPOSITE_BLOCKS = {
+# Label text to search for (0-indexed row will be stored at parse time)
+COMPOSITE_LABELS = {
+    "QDVD": "QDVD Composite",
+    "SMID": "SMID Composite",
+    "DAC":  "DAC Composite",
+    "OR":   "OR Composite",
+}
+
+# Benchmark column layout per strategy (column indices are stable)
+COMPOSITE_BENCHMARKS_COLS = {
     "QDVD": {
-        "label_row": 2,
-        "benchmarks": {
-            "primary": {"name": "S&P 500 High Dividend", "qtr_col": 15, "mo_col": 16, "cum_col": 17, "val_col": 18},
-            "secondary": {"name": "S&P 500", "qtr_col": 11, "mo_col": 12, "cum_col": 13, "val_col": 14},
-        },
+        "primary": {"name": "S&P 500 High Dividend", "qtr_col": 15, "mo_col": 16, "cum_col": 17, "val_col": 18},
+        "secondary": {"name": "S&P 500", "qtr_col": 11, "mo_col": 12, "cum_col": 13, "val_col": 14},
     },
     "SMID": {
-        "label_row": 159,
-        "benchmarks": {
-            "primary": {"name": "S&P Mid Cap 400", "qtr_col": 11, "mo_col": 12, "cum_col": 13, "val_col": 14},
-            "secondary": {"name": "S&P 400 Aristocrats", "qtr_col": 15, "mo_col": 16, "cum_col": 17, "val_col": 18},
-        },
+        "primary": {"name": "S&P Mid Cap 400", "qtr_col": 11, "mo_col": 12, "cum_col": 13, "val_col": 14},
+        "secondary": {"name": "S&P 400 Aristocrats", "qtr_col": 15, "mo_col": 16, "cum_col": 17, "val_col": 18},
     },
     "DAC": {
-        "label_row": 296,
-        "benchmarks": {
-            "primary": {"name": "Russell 3000", "qtr_col": 11, "mo_col": 12, "cum_col": 13, "val_col": 14},
-            "secondary": {"name": "Dow Jones Select Dividend", "qtr_col": 15, "mo_col": 16, "cum_col": 17, "val_col": 18},
-        },
+        "primary": {"name": "Russell 3000", "qtr_col": 11, "mo_col": 12, "cum_col": 13, "val_col": 14},
+        "secondary": {"name": "Dow Jones Select Dividend", "qtr_col": 15, "mo_col": 16, "cum_col": 17, "val_col": 18},
     },
     "OR": {
-        "label_row": 421,
-        "benchmarks": {
-            "primary": {"name": "S&P 500", "qtr_col": 11, "mo_col": 12, "cum_col": 13, "val_col": 14},
-            # OR only has one benchmark
-        },
+        "primary": {"name": "S&P 500", "qtr_col": 11, "mo_col": 12, "cum_col": 13, "val_col": 14},
     },
 }
 
-# ── Period Returns Sheet Mapping ────────────────────────────────────────────
-# Row indices in the "Period Returns" sheet for each strategy/benchmark
-PERIOD_RETURNS_ROWS = {
-    "QDVD": 5,
-    "SMID": 6,
-    "DAC": 7,
-    "OR": 8,
-    # Benchmarks
-    "S&P 500": 12,
-    "S&P 500 High Dividend": 11,
-    "S&P Mid Cap 400": 14,
-    "S&P 400 Aristocrats": 13,
-    "Russell 3000": 16,
-    "Dow Jones Select Dividend": 15,
+# Build COMPOSITE_BLOCKS at parse time (label_row filled in by _detect_block_rows)
+COMPOSITE_BLOCKS = {
+    s: {"label_row": None, "benchmarks": COMPOSITE_BENCHMARKS_COLS[s]}
+    for s in COMPOSITE_LABELS
 }
+
+
+def _detect_block_rows(ws):
+    """Scan the Composite Returns sheet and set label_row for each strategy."""
+    for r in range(ws.nrows):
+        val = ws.cell_value(r, 0)
+        if not val or not isinstance(val, str):
+            continue
+        for strategy, label in COMPOSITE_LABELS.items():
+            if label in val:
+                COMPOSITE_BLOCKS[strategy]["label_row"] = r
+                logger.info(f"  {strategy} block found at row {r}")
+                break
+
+
+# ── Period Returns Sheet Mapping ────────────────────────────────────────────
+# Auto-detected by matching column A text (no hardcoded rows)
+
+# Names to look for in column A of the Period Returns sheet
+PERIOD_RETURNS_NAMES = {
+    "QDVD": "Quality Dividend Strategy",
+    "SMID": "Quality SMID Dividend Strategy",
+    "DAC": "Quality All-Cap Dividend Strategy",
+    "OR": "Oregon Dividend Strategy",
+    "S&P 500": "S&P 500",
+    "S&P 500 High Dividend": "S&P 500 High Dividend",
+    "S&P Mid Cap 400": "S&P Mid Cap 400",
+    "S&P 400 Aristocrats": "S&P 400 Aristocrats",
+    "Russell 3000": "Russell 3000",
+    "Dow Jones Select Dividend": "Dow Jones Select D",  # may be truncated in spreadsheet
+}
+
+
+def _detect_period_rows(ws):
+    """Scan Period Returns sheet and return {name: row_index} (0-indexed)."""
+    result = {}
+    for r in range(ws.nrows):
+        val = ws.cell_value(r, 0)
+        if not val or not isinstance(val, str):
+            continue
+        for key, search_text in PERIOD_RETURNS_NAMES.items():
+            if key not in result and search_text in val:
+                result[key] = r
+                break
+    return result
 
 # Column indices in Period Returns: {col: period_label}
 PERIOD_COLS = {
@@ -193,6 +224,9 @@ def _parse_composite_block(ws, strategy, datemode):
         bench2_name, bench2_qtr, bench2_mo, bench2_cum, bench2_val
     """
     block = COMPOSITE_BLOCKS[strategy]
+    if block["label_row"] is None:
+        logger.warning(f"  {strategy}: label row not found — skipping")
+        return pd.DataFrame()
     header_row = block["label_row"] + 1
     data_start = header_row + 1
     benchmarks = block["benchmarks"]
@@ -251,10 +285,12 @@ def _parse_composite_block(ws, strategy, datemode):
 def _parse_period_returns(ws, datemode):
     """
     Parse the Period Returns summary sheet.
+    Auto-detects row positions by matching strategy/benchmark names in column A.
     Returns a dict: {strategy_or_benchmark_name: {period_label: value}}
     """
+    row_map = _detect_period_rows(ws)
     result = {}
-    for name, row_idx in PERIOD_RETURNS_ROWS.items():
+    for name, row_idx in row_map.items():
         if row_idx >= ws.nrows:
             continue
         periods = {}
@@ -273,11 +309,19 @@ def _parse_period_returns(ws, datemode):
 def _parse_annual_returns(ws, datemode):
     """
     Parse the annual returns table from Period Returns sheet.
+    Auto-detects header row by searching for 'Calendar Year' or 'Year' in column A.
     Returns a DataFrame with columns: Year, QDVD, SMID, DAC, OR, + benchmarks
     """
-    # Annual returns start at row 29 (header), data from row 30
-    header_row = 29
-    if header_row >= ws.nrows:
+    # Auto-detect header row
+    header_row = None
+    for r in range(ws.nrows):
+        val = ws.cell_value(r, 0)
+        if val and isinstance(val, str) and ('Calendar Year' in val or val.strip() == 'Year'):
+            header_row = r
+            break
+
+    if header_row is None or header_row >= ws.nrows:
+        logger.warning("Annual returns header row not found in Period Returns sheet")
         return pd.DataFrame()
 
     # Read column headers
@@ -375,6 +419,9 @@ def load_composite_data():
 
             ws_main = _OpenpyxlSheetWrapper(wb_ox["Composite Returns"])
 
+            # Auto-detect strategy block positions
+            _detect_block_rows(ws_main)
+
             # Parse "as of" date from row 1, col 1
             as_of_val = ws_main.cell_value(1, 1)
             if isinstance(as_of_val, datetime):
@@ -413,6 +460,10 @@ def load_composite_data():
             result["file_path"] = filepath
 
             ws_main = wb.sheet_by_name("Composite Returns")
+
+            # Auto-detect strategy block positions
+            _detect_block_rows(ws_main)
+
             as_of_val = ws_main.cell_value(1, 1)
             if as_of_val and isinstance(as_of_val, float):
                 result["as_of"] = xlrd.xldate_as_datetime(as_of_val, wb.datemode)
