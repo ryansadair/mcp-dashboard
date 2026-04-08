@@ -159,16 +159,16 @@ def _render_period_returns(data, strategy, color):
             alpha_html = f'<div style="font-size:10px; color:{a_color}; margin-top:2px;">{a_sign}{alpha:.2f}% α</div>'
 
         with cols[i]:
-            st.markdown(f"""<div style="
-                background: rgba(255,255,255,0.02);
-                border: 1px solid rgba(255,255,255,0.05);
-                border-radius: 8px;
-                padding: 12px 14px;
-            ">
-                <div style="font-size:10px; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;">{label}</div>
-                <div style="font-size:20px; font-weight:700; color:{val_color};">{val_pct:+.2f}%</div>
-                {alpha_html}
-            </div>""", unsafe_allow_html=True)
+            card_html = (
+                f'<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);'
+                f'border-radius:8px;padding:12px 14px;">'
+                f'<div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;'
+                f'letter-spacing:0.06em;margin-bottom:4px;">{label}</div>'
+                f'<div style="font-size:20px;font-weight:700;color:{val_color};">{val_pct:+.2f}%</div>'
+                f'{alpha_html}'
+                f'</div>'
+            )
+            st.markdown(card_html, unsafe_allow_html=True)
 
 
 # ── Cumulative Performance Chart ────────────────────────────────────────────
