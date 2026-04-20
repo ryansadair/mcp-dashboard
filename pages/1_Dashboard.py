@@ -1218,17 +1218,6 @@ with tab_holdings:
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# PERFORMANCE — Composite Returns (Sprint 10)
-# ══════════════════════════════════════════════════════════════════════════
-with tab_perf:
-    _render_strategy_header("perf")
-    if COMPOSITE_AVAILABLE:
-        render_performance_tab(active)
-    else:
-        st.info("Performance module not available. Ensure data/composite_returns.py and data/performance_tab.py are present.")
-
-
-# ══════════════════════════════════════════════════════════════════════════
 # DIVIDENDS — Sprint 4: full dividend intelligence with sub-tabs
 # ══════════════════════════════════════════════════════════════════════════
 with tab_divs:
@@ -1322,6 +1311,24 @@ with tab_alerts:
         st.info("Alerts module not found. Ensure `data/alerts_tab.py` is in the data folder.")
     else:
         st.info("Alerts require Tamarac holdings data. Upload a Tamarac export to enable alerts.")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# PERFORMANCE — Composite Returns (Sprint 10)
+# ──────────────────────────────────────────────────────────────────────────
+# Rendered LAST in script execution order (even though it appears 3rd in
+# the visual tab row) so that if Performance is slow — e.g. on a cold
+# return from idle where disk-cache I/O dominates — no other tab blocks
+# waiting for it. Streamlit's st.tabs() runs every tab body top-to-bottom
+# on each rerun regardless of which is visible; ordering Performance last
+# means Dividends/Watchlist/Macro/Markets/Alerts all render before it.
+# ══════════════════════════════════════════════════════════════════════════
+with tab_perf:
+    _render_strategy_header("perf")
+    if COMPOSITE_AVAILABLE:
+        render_performance_tab(active)
+    else:
+        st.info("Performance module not available. Ensure data/composite_returns.py and data/performance_tab.py are present.")
 
 
 # ── Footer ─────────────────────────────────────────────────────────────────
