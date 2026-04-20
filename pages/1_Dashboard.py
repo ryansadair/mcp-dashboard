@@ -118,8 +118,8 @@ except ImportError:
 if not check_password():
     st.stop()
 
-# ── Auto-refresh + visibility-aware keep-alive ────────────────────────────
-# Three mechanisms work together to keep the dashboard responsive:
+# ── Auto-refresh + disk cache strategy ────────────────────────────────────
+# Two mechanisms work together to keep the dashboard fast and robust:
 #
 # 1. st_autorefresh (5 min):
 #    - Reruns the script while the tab is visible
@@ -131,56 +131,16 @@ if not check_password():
 # 2. Disk cache (utils/disk_cache.py):
 #    - Heavy computations (performance metrics, dividend enrichment) are
 #      persisted to data/cache/disk/ so they survive session eviction.
-#    - When the tab comes back after being evicted, the rebuild reads
-#      from disk (~100ms) instead of recomputing from scratch.
+#    - When the tab comes back after the session was evicted, Streamlit's
+#      WebSocket reconnects transparently and the script reruns against
+#      the disk cache (~100ms) instead of recomputing from scratch.
 #
-# 3. Visibility reload (JS below):
-#    - If the tab has been hidden long enough that the session was
-#      definitely evicted (>10 min), force a full page reload when the
-#      user returns. This avoids the awkward "stale broken state" where
-#      the UI is rendered but the server no longer knows about it.
-#    - If hidden <10 min, do nothing — st_autorefresh catches up cleanly.
+# We deliberately do NOT force a reload on visibilitychange: it would
+# re-trigger the login gate for users who were idle, which is worse UX
+# than the rare "slightly slower first interaction after a long idle"
+# that the disk cache already mostly fixes anyway.
 from streamlit_autorefresh import st_autorefresh
 st_autorefresh(interval=300 * 1000, key="data_refresh")
-
-import streamlit.components.v1 as components
-components.html(
-    """
-    <script>
-    (function() {
-        if (window.__mcpVisibilityWired) return;
-        window.__mcpVisibilityWired = true;
-
-        // Streamlit Cloud evicts idle sessions after ~10 minutes.
-        // If we've been hidden longer than this threshold, the WebSocket
-        // is likely dead and a full reload is the cleanest recovery.
-        const EVICTION_THRESHOLD_MS = 10 * 60 * 1000; // 10 min
-        let hiddenAt = null;
-
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                hiddenAt = Date.now();
-            } else if (hiddenAt !== null) {
-                const hiddenDuration = Date.now() - hiddenAt;
-                hiddenAt = null;
-                if (hiddenDuration > EVICTION_THRESHOLD_MS) {
-                    // Long enough to assume session eviction. Reload into
-                    // a fresh session — disk cache will make it fast.
-                    try {
-                        window.parent.location.reload();
-                    } catch (e) {
-                        window.location.reload();
-                    }
-                }
-                // else: st_autorefresh will tick within 5 min, which
-                //       rehydrates the UI without a reload
-            }
-        });
-    })();
-    </script>
-    """,
-    height=0,
-)
 
 inject_global_css()
 
