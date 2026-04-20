@@ -23,6 +23,7 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 from utils.config import BRAND, STRATEGIES
+from utils.disk_cache import disk_cached
 from data.dividends import (
     get_batch_dividend_details,
     compute_strategy_income,
@@ -250,6 +251,7 @@ def _build_enriched_df(tam_df, price_data, div_data):
 # Tamarac file is updated, so the cache invalidates on its own.
 
 @st.cache_data(ttl=1800, show_spinner=False, max_entries=32)
+@disk_cached(namespace="div_enriched", ttl=1800, version=1)
 def _enriched_df_for_strategy(strategy, ticker_tuple, _tamarac_parsed, _v=1):
     """Cached enrichment keyed on (strategy, ticker_tuple).
 

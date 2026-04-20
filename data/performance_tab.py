@@ -23,6 +23,7 @@ from data.composite_returns import (
 )
 from utils.config import BRAND, STRATEGIES
 from utils.mobile_css import inject_mobile_css
+from utils.disk_cache import disk_cached
 
 # ── Chart Theme ─────────────────────────────────────────────────────────────
 PLOTLY_DARK = dict(
@@ -94,6 +95,7 @@ def _load_cached_composite(_v=2):
 # hold many strategies in memory without pressure.
 
 @st.cache_data(ttl=3600, show_spinner=False)
+@disk_cached(namespace="perf_cumulative", ttl=3600, version=1)
 def _cached_cumulative(strategy: str, as_of_iso: str, _v=1):
     """Compute cumulative growth-of-$100 series + benchmarks. Keyed on strategy+as_of."""
     data = _load_cached_composite()
@@ -109,6 +111,7 @@ def _cached_cumulative(strategy: str, as_of_iso: str, _v=1):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
+@disk_cached(namespace="perf_risk", ttl=3600, version=1)
 def _cached_risk_metrics(strategy: str, as_of_iso: str, _v=1):
     """Compute Sharpe/Sortino/beta/drawdown etc. Keyed on strategy+as_of."""
     data = _load_cached_composite()
@@ -117,6 +120,7 @@ def _cached_risk_metrics(strategy: str, as_of_iso: str, _v=1):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
+@disk_cached(namespace="perf_heatmap", ttl=3600, version=1)
 def _cached_heatmap(strategy: str, as_of_iso: str, _v=1):
     """Build monthly heatmap pivot. Keyed on strategy+as_of."""
     data = _load_cached_composite()
