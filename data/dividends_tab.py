@@ -152,6 +152,14 @@ def _build_enriched_df(tam_df, price_data, div_data):
             fish = get_fish_metrics(sym)
             div_hist = get_dividend_history(sym)
 
+        # Consecutive years: Fish first, yfinance fallback
+        # (computed early because _fish_has_growth below references consec_years)
+        if _STREAKS_AVAILABLE:
+            ccc_years, _ = get_streak(sym)
+            consec_years = ccc_years if ccc_years > 0 else (dd.get("consecutive_years", 0) or 0)
+        else:
+            consec_years = dd.get("consecutive_years", 0) or 0
+
         # Annualized dividend amount: Fish first (col 12), yfinance fallback
         div_rate = fish.get("div_amount", 0) or (dd.get("dividend_rate", 0) or 0)
 
@@ -184,13 +192,6 @@ def _build_enriched_df(tam_df, price_data, div_data):
 
         # Payout ratio: Fish first, yfinance fallback
         payout_ratio = fish.get("payout_ratio", 0) or (dd.get("payout_ratio", 0) or 0)
-
-        # Consecutive years: Fish first, yfinance fallback
-        if _STREAKS_AVAILABLE:
-            ccc_years, _ = get_streak(sym)
-            consec_years = ccc_years if ccc_years > 0 else (dd.get("consecutive_years", 0) or 0)
-        else:
-            consec_years = dd.get("consecutive_years", 0) or 0
 
         # New Fish-only fields
         chowder        = fish.get("chowder", 0)
@@ -235,6 +236,68 @@ def _build_enriched_df(tam_df, price_data, div_data):
         })
 
     return pd.DataFrame(rows).sort_values("weight", ascending=False).reset_index(drop=True)
+
+
+# ── Cached strategy-level enrichment ─────────────────────────────────────
+# Wraps _build_enriched_df + the two .apply() calls so everything that
+# depends only on (strategy, ticker tuple) is memoized. First visit to a
+# strategy pays the full cost; every subsequent render — including strategy
+# switches, autorefreshes, and sub-tab clicks — is a cache hit.
+#
+# The cache key is (strategy, ticker_tuple). The underscore prefix on
+# `_tamarac_parsed` tells Streamlit to skip hashing that (large, unhashable)
+# argument. The ticker tuple acts as the data identity: it changes when the
+# Tamarac file is updated, so the cache invalidates on its own.
+
+@st.cache_data(ttl=1800, show_spinner=False, max_entries=32)
+def _enriched_df_for_strategy(strategy, ticker_tuple, _tamarac_parsed, _v=1):
+    """Cached enrichment keyed on (strategy, ticker_tuple).
+
+    Fetches price + dividend data from already-cached helpers, runs
+    _build_enriched_df, and appends the safety/growth_tier computed columns.
+    The _tamarac_parsed arg is passed through so we can reconstruct tam_df
+    on cache misses; leading underscore tells Streamlit not to hash it.
+    """
+    tam_df = get_holdings_for_strategy(_tamarac_parsed, strategy)
+    price_data = fetch_batch_prices(ticker_tuple)
+    div_data = get_batch_dividend_details(ticker_tuple)
+
+    edf = _build_enriched_df(tam_df, price_data, div_data)
+    edf["safety"] = edf.apply(
+        lambda r: _safety_grade(
+            r["payout_ratio"], r["growth_5y"], r["consec_years"],
+            r.get("fish_sourced", False)
+        ),
+        axis=1,
+    )
+    edf["growth_tier"] = edf.apply(
+        lambda r: _growth_tier(r["growth_5y"], r.get("fish_sourced", False)),
+        axis=1,
+    )
+    return edf
+
+
+def _enrich_for_strategy(tamarac_parsed, active_strategy):
+    """Fetch + enrich dividend data for a strategy, with per-strategy caching.
+
+    Returns (edf, tam_df, price_data, div_data) or (None, None, None, None)
+    if the strategy has no holdings.
+    """
+    tam_df = get_holdings_for_strategy(tamarac_parsed, active_strategy)
+    if tam_df.empty:
+        return None, None, None, None
+
+    ticker_tuple = tuple(tam_df["symbol"].tolist())
+
+    # The cached helper does the expensive work on cache misses. On hits,
+    # this returns instantly.
+    edf = _enriched_df_for_strategy(active_strategy, ticker_tuple, tamarac_parsed)
+
+    # We still return price_data and div_data for callers that need them
+    # (income dashboard uses them directly). These are cached, so cheap.
+    price_data = fetch_batch_prices(ticker_tuple)
+    div_data = get_batch_dividend_details(ticker_tuple)
+    return edf, tam_df, price_data, div_data
 
 
 def _safety_grade(payout, growth_5y, consec, fish_sourced=False):
@@ -387,23 +450,16 @@ def render_dividends_tab(tamarac_parsed, active_strategy, strat_config, kpis):
     """
     strat_color = strat_config["color"]
 
-    # ── Load data ──────────────────────────────────────────────────────────
-    tam_df = get_holdings_for_strategy(tamarac_parsed, active_strategy)
-    if tam_df.empty:
+    # ── Load + enrich data (cached per-strategy) ───────────────────────────
+    # Cache hits on strategy switch after first visit → instant.
+    with st.spinner("Loading dividend intelligence..."):
+        edf, tam_df, price_data, div_data = _enrich_for_strategy(
+            tamarac_parsed, active_strategy
+        )
+
+    if edf is None:
         st.info("No holdings for this strategy in Tamarac file.")
         return
-
-    tickers = tuple(tam_df["symbol"].tolist())
-
-    with st.spinner("Loading dividend intelligence..."):
-        price_data = fetch_batch_prices(tickers)
-        div_data   = get_batch_dividend_details(tickers)
-
-    edf = _build_enriched_df(tam_df, price_data, div_data)
-
-    # Add computed columns
-    edf["safety"]      = edf.apply(lambda r: _safety_grade(r["payout_ratio"], r["growth_5y"], r["consec_years"], r.get("fish_sourced", False)), axis=1)
-    edf["growth_tier"] = edf.apply(lambda r: _growth_tier(r["growth_5y"], r.get("fish_sourced", False)), axis=1)
 
     # ── Sub-tabs ───────────────────────────────────────────────────────────
     sub_announce, sub_detail, sub_safety = st.tabs([
