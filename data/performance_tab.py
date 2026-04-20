@@ -81,9 +81,18 @@ def _data_unavailable_card(msg="Composite returns data unavailable", detail=None
         st.caption(detail)
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
+@disk_cached(namespace="perf_composite_raw", ttl=3600, version=2)
 def _load_cached_composite(_v=2):
-    """Cache composite data for 1 hour. Bump _v to bust cache after format changes."""
+    """Cache composite data for 1 hour.
+
+    Three-tier cache: memory (per session) → disk (survives session eviction)
+    → Excel parse. On return-from-idle, disk layer avoids the multi-second
+    openpyxl/xlrd parse that was blocking every tab after Performance.
+
+    Bump the outer version (decorator) to force disk cache busts after Excel
+    format changes; bump _v for behavioral changes to the parser.
+    """
     return load_composite_data()
 
 
