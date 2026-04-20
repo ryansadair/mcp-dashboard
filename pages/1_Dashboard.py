@@ -302,13 +302,11 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
-    "Overview", "Holdings", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "News & Alerts"
-])
-
 # ── Strategy selector (single source of truth, above all tabs) ──────────
 # One widget, one session-state key — eliminates the sync-across-tabs
-# fragility that caused "need to refresh to switch strategy" bugs.
+# fragility that caused "need to refresh to switch strategy" bugs. The
+# selectbox is rendered BEFORE st.tabs() so it appears above the tab row
+# rather than below the tab panels.
 if "active_strategy" not in st.session_state:
     st.session_state["active_strategy"] = "QDVD"
 
@@ -353,15 +351,8 @@ def _on_strategy_change():
     selected_label = st.session_state["strategy_select_main"]
     st.session_state["active_strategy"] = strat_keys[strat_labels.index(selected_label)]
 
-def _render_strategy_header(tab_key):
-    """Render KPI cards inside a tab. The strategy selector itself lives
-    once at the top of the page (above the tab panels), so this now only
-    emits the KPI row — the tab_key argument is retained for API compat."""
-    render_kpi_cards(active, kpis, bench_ytd)
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-
-# Render selector in a container just below the tab row
-_sel_col, _kpi_col = st.columns([1, 3])
+# Render the selector in a narrow column above the tab row
+_sel_col, _spacer_col = st.columns([1, 3])
 with _sel_col:
     _current_idx = strat_keys.index(st.session_state["active_strategy"])
     st.selectbox(
@@ -372,6 +363,17 @@ with _sel_col:
         label_visibility="collapsed",
         on_change=_on_strategy_change,
     )
+
+tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
+    "Overview", "Holdings", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "News & Alerts"
+])
+
+def _render_strategy_header(tab_key):
+    """Render KPI cards inside a tab. The strategy selector itself lives
+    once at the top of the page (above the tab row), so this now only
+    emits the KPI row — the tab_key argument is retained for API compat."""
+    render_kpi_cards(active, kpis, bench_ytd)
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 # Pre-compute active strategy data (used by KPI cards and all tab content)
 active = st.session_state["active_strategy"]
