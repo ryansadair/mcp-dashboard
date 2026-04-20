@@ -86,6 +86,44 @@ def _load_cached_composite(_v=2):
     return load_composite_data()
 
 
+# ── Per-strategy computation caches ─────────────────────────────────────────
+# These are keyed on (strategy, as_of_iso) so they auto-invalidate when the
+# quarterly Composite Returns file updates. All four functions are pure and
+# safe to cache — they depend only on comp_df (already cached upstream).
+# Cache entries are small (dicts of Series/DataFrames / floats), so we can
+# hold many strategies in memory without pressure.
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _cached_cumulative(strategy: str, as_of_iso: str, _v=1):
+    """Compute cumulative growth-of-$100 series + benchmarks. Keyed on strategy+as_of."""
+    data = _load_cached_composite()
+    comp_df = data["composites"][strategy]
+    strat_cum = get_cumulative_series(comp_df, "gross")
+    bench1_name, bench1_cum = get_benchmark_cumulative(comp_df, "primary")
+    bench2_name, bench2_cum = get_benchmark_cumulative(comp_df, "secondary")
+    return {
+        "strat_cum": strat_cum,
+        "bench1_name": bench1_name, "bench1_cum": bench1_cum,
+        "bench2_name": bench2_name, "bench2_cum": bench2_cum,
+    }
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _cached_risk_metrics(strategy: str, as_of_iso: str, _v=1):
+    """Compute Sharpe/Sortino/beta/drawdown etc. Keyed on strategy+as_of."""
+    data = _load_cached_composite()
+    comp_df = data["composites"][strategy]
+    return compute_risk_metrics(comp_df, return_type="gross")
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _cached_heatmap(strategy: str, as_of_iso: str, _v=1):
+    """Build monthly heatmap pivot. Keyed on strategy+as_of."""
+    data = _load_cached_composite()
+    comp_df = data["composites"][strategy]
+    return build_monthly_heatmap_data(comp_df, return_type="gross")
+
+
 def render_performance_tab(active_strategy):
     """
     Render the Performance tab for the given strategy.
@@ -111,16 +149,18 @@ def render_performance_tab(active_strategy):
     strat_color = STRATEGY_COLORS.get(active_strategy, BRAND["green"])
     strat_name = STRATEGY_NAMES.get(active_strategy, active_strategy)
 
-    # As-of date
+    # As-of date — used as a cache key so computations auto-invalidate
+    # when the quarterly Composite Returns file updates.
     as_of = data.get("as_of")
+    as_of_iso = as_of.isoformat() if as_of else "none"
     if as_of:
         st.caption(f"Source: Composite Returns as of {as_of.strftime('%B %d, %Y')} · Gross of fees")
 
     _render_period_returns(data, active_strategy, strat_color)
-    _render_cumulative_chart(comp_df, active_strategy, strat_color, strat_name)
+    _render_cumulative_chart(comp_df, active_strategy, strat_color, strat_name, as_of_iso)
 
-    _render_risk_metrics(comp_df, active_strategy, strat_color)
-    _render_monthly_heatmap(comp_df, active_strategy, strat_color)
+    _render_risk_metrics(comp_df, active_strategy, strat_color, as_of_iso)
+    _render_monthly_heatmap(comp_df, active_strategy, strat_color, as_of_iso)
 
     _render_annual_returns(data, active_strategy, strat_color)
 
@@ -173,11 +213,14 @@ def _render_period_returns(data, strategy, color):
 
 # ── Cumulative Performance Chart ────────────────────────────────────────────
 
-def _render_cumulative_chart(comp_df, strategy, color, name):
+def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
     """Cumulative growth of $100 chart with benchmark overlays."""
-    strat_cum = get_cumulative_series(comp_df, "gross")
-    bench1_name, bench1_cum = get_benchmark_cumulative(comp_df, "primary")
-    bench2_name, bench2_cum = get_benchmark_cumulative(comp_df, "secondary")
+    cached = _cached_cumulative(strategy, as_of_iso)
+    strat_cum = cached["strat_cum"]
+    bench1_name = cached["bench1_name"]
+    bench1_cum = cached["bench1_cum"]
+    bench2_name = cached["bench2_name"]
+    bench2_cum = cached["bench2_cum"]
 
     fig = go.Figure()
     r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
@@ -228,9 +271,9 @@ def _render_cumulative_chart(comp_df, strategy, color, name):
 
 # ── Risk Metrics ────────────────────────────────────────────────────────────
 
-def _render_risk_metrics(comp_df, strategy, color):
+def _render_risk_metrics(comp_df, strategy, color, as_of_iso):
     """Render risk metrics as a compact flex grid — fits full page width."""
-    risk = compute_risk_metrics(comp_df, return_type="gross")
+    risk = _cached_risk_metrics(strategy, as_of_iso)
 
     if risk is None:
         _data_unavailable_card("Insufficient data for risk metrics", "Need 12+ months")
@@ -272,12 +315,12 @@ def _render_risk_metrics(comp_df, strategy, color):
 
 # ── Monthly Returns Heatmap ─────────────────────────────────────────────────
 
-def _render_monthly_heatmap(comp_df, strategy, color):
+def _render_monthly_heatmap(comp_df, strategy, color, as_of_iso):
     """Render heatmap using Plotly (avoids HTML size limit).
     Uses a minimum width of 760px so the 13-column grid never gets
     squeezed — on narrow screens the chart container scrolls horizontally.
     """
-    hm = build_monthly_heatmap_data(comp_df, return_type="gross")
+    hm = _cached_heatmap(strategy, as_of_iso)
 
     if hm.empty:
         _data_unavailable_card("No heatmap data available")

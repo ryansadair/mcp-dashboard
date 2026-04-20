@@ -118,11 +118,14 @@ except ImportError:
 if not check_password():
     st.stop()
 
-# ── Auto-refresh every 60 seconds ─────────────────────────────────────────
-# Page reruns every minute (header time stays current).
+# ── Auto-refresh every 5 minutes ──────────────────────────────────────────
+# Page reruns every 5 minutes (header time stays reasonably current).
 # Market data only re-fetches when @st.cache_data TTL (15 min) expires.
+# Previous 60s interval caused ~15 unnecessary reruns per cache window and
+# compounded with Performance tab recompute cost. 5 min is well below the
+# 15-min data TTL so no data is ever visibly stale.
 from streamlit_autorefresh import st_autorefresh
-st_autorefresh(interval=60 * 1000, key="data_refresh")
+st_autorefresh(interval=300 * 1000, key="data_refresh")
 
 inject_global_css()
 
@@ -303,7 +306,9 @@ tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_ma
     "Overview", "Holdings", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "News & Alerts"
 ])
 
-# ── Strategy selector ─────────────────────────────────────────────────────
+# ── Strategy selector (single source of truth, above all tabs) ──────────
+# One widget, one session-state key — eliminates the sync-across-tabs
+# fragility that caused "need to refresh to switch strategy" bugs.
 if "active_strategy" not in st.session_state:
     st.session_state["active_strategy"] = "QDVD"
 
@@ -343,34 +348,32 @@ st.markdown("""
 strat_keys   = list(STRATEGIES.keys())
 strat_labels = [f"{STRATEGIES[k]['full_name']}  ({k})" for k in strat_keys]
 
-def _on_strategy_change(tab_key):
-    """Callback for strategy selectbox — syncs widget value to session state
-    and updates other tabs' selectbox values to match."""
-    widget_key = f"strategy_select_{tab_key}"
-    selected_label = st.session_state[widget_key]
-    selected_key = strat_keys[strat_labels.index(selected_label)]
-    st.session_state["active_strategy"] = selected_key
-    # Sync other tabs' selectbox keys so they show the correct strategy
-    all_tab_keys = ["overview", "holdings", "perf", "divs", "watchlist", "macro", "markets", "alerts"]
-    for tk in all_tab_keys:
-        other_key = f"strategy_select_{tk}"
-        if other_key != widget_key and other_key in st.session_state:
-            st.session_state[other_key] = selected_label
+def _on_strategy_change():
+    """Single callback — syncs the one selectbox value to active_strategy."""
+    selected_label = st.session_state["strategy_select_main"]
+    st.session_state["active_strategy"] = strat_keys[strat_labels.index(selected_label)]
 
 def _render_strategy_header(tab_key):
-    """Render strategy selector + KPI cards inside a tab."""
-    current_idx = strat_keys.index(st.session_state["active_strategy"])
-    st.selectbox(
-        "Strategy", options=strat_labels, index=current_idx,
-        key=f"strategy_select_{tab_key}", label_visibility="collapsed",
-        on_change=_on_strategy_change, args=(tab_key,),
-    )
-
-    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+    """Render KPI cards inside a tab. The strategy selector itself lives
+    once at the top of the page (above the tab panels), so this now only
+    emits the KPI row — the tab_key argument is retained for API compat."""
     render_kpi_cards(active, kpis, bench_ytd)
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
-# Pre-compute active strategy data (used by _render_strategy_header and tab content)
+# Render selector in a container just below the tab row
+_sel_col, _kpi_col = st.columns([1, 3])
+with _sel_col:
+    _current_idx = strat_keys.index(st.session_state["active_strategy"])
+    st.selectbox(
+        "Strategy",
+        options=strat_labels,
+        index=_current_idx,
+        key="strategy_select_main",
+        label_visibility="collapsed",
+        on_change=_on_strategy_change,
+    )
+
+# Pre-compute active strategy data (used by KPI cards and all tab content)
 active = st.session_state["active_strategy"]
 strat = STRATEGIES[active]
 kpis = get_strategy_kpis(active)
