@@ -231,6 +231,111 @@ def _sb_get_financials(ticker):
         return pd.DataFrame(), pd.DataFrame()
 
 
+def _sb_write_ticker_cache(ticker, yf_info, yf_divs):
+    """Write-through cache: if a ticker was fetched from yfinance but NOT
+    already in Supabase, cache the essentials back so future lookups are
+    instant even if yfinance is throttled.
+
+    Deliberately does NOT overwrite existing rows — portfolio tickers are
+    owned by prefetch_data.py and we don't want ad-hoc lookups to clobber
+    curated data. Silent on any error; write-through is opportunistic.
+    """
+    if not yf_info:
+        return
+    try:
+        # Check if ticker already exists (don't clobber prefetch rows)
+        existing = requests.get(
+            f"{SUPABASE_URL}/rest/v1/prices",
+            headers=_SB_HEADERS,
+            params={"select": "ticker", "ticker": f"eq.{ticker}", "limit": "1"},
+            timeout=5,
+        ).json()
+        if existing:
+            return  # prefetch owns this row; do nothing
+
+        # Map yfinance → Supabase schema (mirror of _sb_get_ticker's mapping)
+        price_row = {
+            "ticker":              ticker,
+            "long_name":           yf_info.get("longName", "") or yf_info.get("shortName", ticker),
+            "name":                yf_info.get("shortName", "") or yf_info.get("longName", ticker),
+            "sector":              yf_info.get("sector", "") or "",
+            "industry":            yf_info.get("industry", "") or "",
+            "price":               yf_info.get("currentPrice") or yf_info.get("regularMarketPrice") or 0,
+            "previous_close":      yf_info.get("previousClose", 0) or 0,
+            "market_cap":          yf_info.get("marketCap", 0) or 0,
+            "pe_ratio":            yf_info.get("trailingPE", 0) or 0,
+            "forward_pe":          yf_info.get("forwardPE", 0) or 0,
+            "price_to_book":       yf_info.get("priceToBook", 0) or 0,
+            "beta":                yf_info.get("beta", 0) or 0,
+            "week52_high":         yf_info.get("fiftyTwoWeekHigh", 0) or 0,
+            "week52_low":          yf_info.get("fiftyTwoWeekLow", 0) or 0,
+            "peg_ratio":           yf_info.get("pegRatio", 0) or 0,
+            "price_to_sales":      yf_info.get("priceToSalesTrailing12Months", 0) or 0,
+            "ev_ebitda":           yf_info.get("enterpriseToEbitda", 0) or 0,
+            "enterprise_value":    yf_info.get("enterpriseValue", 0) or 0,
+            "return_on_equity":    yf_info.get("returnOnEquity", 0) or 0,
+            "debt_to_equity":      yf_info.get("debtToEquity", 0) or 0,
+            "current_ratio":       yf_info.get("currentRatio", 0) or 0,
+            "free_cashflow":       yf_info.get("freeCashflow", 0) or 0,
+            "gross_margins":       yf_info.get("grossMargins", 0) or 0,
+            "operating_margins":   yf_info.get("operatingMargins", 0) or 0,
+            "profit_margins":      yf_info.get("profitMargins", 0) or 0,
+            "long_business_summary": yf_info.get("longBusinessSummary", "") or "",
+            "full_time_employees": yf_info.get("fullTimeEmployees", 0) or 0,
+            "country":             yf_info.get("country", "") or "",
+            "website":             yf_info.get("website", "") or "",
+            "updated_at":          datetime.utcnow().isoformat(),
+        }
+
+        # POST to prices table
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/prices",
+            headers={**_SB_HEADERS, "Prefer": "return=minimal"},
+            json=price_row,
+            timeout=5,
+        )
+
+        # Also write dividend row if we have one
+        div_yield = yf_info.get("dividendYield", 0) or 0
+        div_rate = yf_info.get("dividendRate", 0) or 0
+        if div_yield or div_rate:
+            # yfinance dividendYield can be decimal (0.03) or percent (3.0);
+            # normalize to percent to match prefetch convention.
+            if div_yield and div_yield < 1:
+                div_yield = div_yield * 100
+            payout = yf_info.get("payoutRatio", 0) or 0
+            if payout and payout < 1:
+                payout = payout * 100
+
+            div_row = {
+                "ticker":              ticker,
+                "dividend_yield":      round(div_yield, 4),
+                "dividend_rate":       round(div_rate, 4),
+                "payout_ratio":        round(payout, 2),
+                "five_year_avg_yield": round(yf_info.get("fiveYearAvgDividendYield", 0) or 0, 2),
+                "updated_at":          datetime.utcnow().isoformat(),
+            }
+            ex_ts = yf_info.get("exDividendDate")
+            if ex_ts:
+                try:
+                    div_row["ex_dividend_date"] = (
+                        datetime.fromtimestamp(ex_ts).strftime("%Y-%m-%d")
+                        if isinstance(ex_ts, (int, float)) else str(ex_ts)
+                    )
+                except Exception:
+                    pass
+
+            requests.post(
+                f"{SUPABASE_URL}/rest/v1/dividends",
+                headers={**_SB_HEADERS, "Prefer": "return=minimal"},
+                json=div_row,
+                timeout=5,
+            )
+    except Exception:
+        # Write-through is best-effort — never break the detail page over it
+        pass
+
+
 if not check_password():
     st.stop()
 
@@ -372,16 +477,47 @@ if not ticker_input:
 # ── Fetch all data ────────────────────────────────────────────────────────
 def _fetch_yfinance_with_retry(ticker, max_retries=3, delay=2):
     """
-    Call yfinance with retry logic for rate limit (429) errors.
+    Call yfinance with retry logic for rate-limit (429) errors and for silent
+    throttles where tk.info comes back empty / near-empty without raising.
+
+    Empirically, Yahoo sometimes returns an empty dict from tk.info when
+    throttled instead of raising an exception — the old code treated that as
+    success and returned blank fields, which is what users see as the
+    "yfinance rate limited" banner with everything showing "—". Detecting the
+    empty-dict case and retrying recovers most of these.
+
     Returns (yf_info, hist, div_hist, financials, quarterly_financials, recs)
-    or raises the last exception if all retries fail.
+    or raises the last exception / RuntimeError if all retries fail.
     """
     import time
+
+    def _looks_empty(info):
+        """Yahoo returns {} or near-empty dicts for throttled or unknown
+        tickers. Real responses always have at least a name or a price."""
+        if not info:
+            return True
+        # A real response for any listed ticker has at least one of these.
+        # We use regularMarketPrice over currentPrice because it's set even
+        # for tickers where currentPrice is missing.
+        return not any(info.get(k) for k in (
+            "longName", "shortName", "regularMarketPrice", "currentPrice"
+        ))
+
     last_err = None
     for attempt in range(max_retries):
         try:
             tk      = yf.Ticker(ticker)
             yf_info = tk.info or {}
+
+            # Silent-throttle detection: treat empty info like a rate limit,
+            # since that's almost always what's happening.
+            if _looks_empty(yf_info):
+                if attempt < max_retries - 1:
+                    time.sleep(delay * (attempt + 1))  # 2s, 4s
+                    continue
+                # Final attempt still empty — raise so caller shows the banner
+                raise RuntimeError("yfinance returned empty info (likely throttled)")
+
             hist    = tk.history(period="max")
             divs    = tk.dividends
             fins    = pd.DataFrame()
@@ -403,9 +539,10 @@ def _fetch_yfinance_with_retry(ticker, max_retries=3, delay=2):
         except Exception as e:
             last_err = e
             err_str = str(e).lower()
-            if "too many requests" in err_str or "rate limit" in err_str or "429" in err_str:
+            if ("too many requests" in err_str or "rate limit" in err_str
+                    or "429" in err_str or "throttled" in err_str):
                 if attempt < max_retries - 1:
-                    time.sleep(delay * (attempt + 1))  # back off: 2s, 4s
+                    time.sleep(delay * (attempt + 1))  # 2s, 4s
                     continue
             break  # non-rate-limit error, don't retry
     raise last_err
@@ -447,6 +584,12 @@ def fetch_stock_data(ticker, _v=2):
         if not sb_has_fins and not yf_fins.empty:
             financials = yf_fins
             quarterly_financials = yf_qfins
+
+        # Write-through cache for ad-hoc tickers so future lookups are
+        # instant even if yfinance is throttled. No-op for tickers already
+        # in Supabase (portfolio + watchlist names are owned by prefetch).
+        if not info.get("_from_supabase"):
+            _sb_write_ticker_cache(ticker, yf_info, yf_divs)
 
     except Exception as e:
         err_str = str(e).lower()
