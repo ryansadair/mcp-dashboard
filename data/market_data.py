@@ -77,12 +77,14 @@ def _load_index_cache():
 # ── Public API ─────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=900, show_spinner=False)
-def fetch_batch_prices(tickers_tuple):
+def fetch_batch_prices(tickers_tuple, _cache_v=2):
     """
     Fetch price data for a batch of tickers.
     Returns: { "TICK": { "price": 123.45, "change_1d_pct": 0.5, ... }, ... }
 
     Priority: Supabase -> local JSON cache -> live yfinance
+
+    _cache_v: bump this number to force a cache miss after deploying fixes.
     """
     results = {}
     missing = list(tickers_tuple)

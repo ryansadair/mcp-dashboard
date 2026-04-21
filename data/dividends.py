@@ -106,7 +106,7 @@ def _safe_payout_ratio(info):
 # ── Public API ─────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_dividend_details(ticker, _cache_v=4):
+def get_dividend_details(ticker, _cache_v=5):
     """
     Get comprehensive dividend data for a single ticker.
     Priority: Supabase -> JSON cache -> yfinance live.
@@ -215,7 +215,7 @@ def get_dividend_details(ticker, _cache_v=4):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_batch_dividend_details(tickers_tuple, _cache_v=4):
+def get_batch_dividend_details(tickers_tuple, _cache_v=5):
     """Fetch dividend details for a batch of tickers.
     Priority: Supabase -> local JSON cache -> yfinance per-ticker fallback.
     """
