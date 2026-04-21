@@ -130,14 +130,18 @@ def _build_enriched_df(tam_df, price_data, div_data):
         yoc_pct = (float(yoc_raw) * 100 if 0 < float(yoc_raw) < 1
                    else float(yoc_raw)) if yoc_raw else None
 
-        # Current yield: Tamarac first, Supabase/yfinance dividend_yield fallback.
-        # Supabase stores dividend_yield as a percentage already (e.g. 3.01).
+        # Current yield: Tamarac first, then Supabase `dividends` table, then
+        # Supabase `prices` table. Different fields update at different rates
+        # and one can have zero while the other is populated.
+        # All three sources store dividend_yield as a percentage (e.g. 3.01).
         cy_raw = h.get("current_yield", 0) or 0
         if cy_raw:
             cy_pct = float(cy_raw) * 100 if 0 < float(cy_raw) < 1 else float(cy_raw)
         else:
-            # Fallback: Supabase dividend_yield (already in percentage form)
-            cy_pct = float(dd.get("dividend_yield", 0) or 0)
+            _dd_yield = float(dd.get("dividend_yield", 0) or 0)
+            _mkt_yield = float(mkt.get("dividend_yield", 0) or 0)
+            # Pick whichever source has a non-zero value; prefer dividends table
+            cy_pct = _dd_yield if _dd_yield > 0 else _mkt_yield
 
         # Quantity from Tamarac (pulled early because annual_income derives from it)
         qty = float(h.get("quantity", 0) or 0)
