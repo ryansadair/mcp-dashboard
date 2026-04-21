@@ -122,25 +122,40 @@ def _build_enriched_df(tam_df, price_data, div_data):
         mkt = price_data.get(sym, {})
         dd  = div_data.get(sym, {})
 
-        # Yield on Cost from Tamarac (decimal → percentage)
+        # Yield on Cost from Tamarac (decimal → percentage).
+        # Tamarac API template 41 no longer returns yield_at_cost — it's 0 until
+        # we move to a richer template. None signals "unavailable" so the UI
+        # can render em-dash instead of a misleading 0.00%.
         yoc_raw = h.get("yield_at_cost", 0) or 0
-        yoc_pct = float(yoc_raw) * 100 if 0 < float(yoc_raw) < 1 else float(yoc_raw)
+        yoc_pct = (float(yoc_raw) * 100 if 0 < float(yoc_raw) < 1
+                   else float(yoc_raw)) if yoc_raw else None
 
-        # Current yield from Tamarac (decimal → percentage)
+        # Current yield: Tamarac first, Supabase/yfinance dividend_yield fallback.
+        # Supabase stores dividend_yield as a percentage already (e.g. 3.01).
         cy_raw = h.get("current_yield", 0) or 0
-        cy_pct = float(cy_raw) * 100 if 0 < float(cy_raw) < 1 else float(cy_raw)
+        if cy_raw:
+            cy_pct = float(cy_raw) * 100 if 0 < float(cy_raw) < 1 else float(cy_raw)
+        else:
+            # Fallback: Supabase dividend_yield (already in percentage form)
+            cy_pct = float(dd.get("dividend_yield", 0) or 0)
 
-        # Annual income from Tamarac
-        annual_inc = float(h.get("annual_income", 0) or 0)
+        # Quantity from Tamarac (pulled early because annual_income derives from it)
+        qty = float(h.get("quantity", 0) or 0)
+
+        # Annual income: Tamarac first, else compute from dividend_rate × quantity.
+        # dividend_rate is the annual per-share payment; × shares = annual income.
+        tam_annual = h.get("annual_income", 0) or 0
+        if tam_annual:
+            annual_inc = float(tam_annual)
+        else:
+            _rate = dd.get("dividend_rate", 0) or 0
+            annual_inc = float(_rate) * qty
 
         # Value (market value) from Tamarac
         value = float(h.get("value", 0) or 0)
 
-        # Cost basis from Tamarac
+        # Cost basis from Tamarac (template 41 returns 0; UI should render em-dash)
         cost_basis = float(h.get("cost_basis", 0) or 0)
-
-        # Quantity from Tamarac
-        qty = float(h.get("quantity", 0) or 0)
 
         # Dividend data: prefer Fish CCC spreadsheet, fallback to Supabase/yfinance
         div_yield    = dd.get("dividend_yield", 0) or 0
@@ -216,7 +231,7 @@ def _build_enriched_df(tam_df, price_data, div_data):
             "sector":        sector,
             "chg_1d":        chg_1d,
             # Dividend metrics (Fish CCC preferred, yfinance fallback)
-            "yield_on_cost": round(yoc_pct, 2),
+            "yield_on_cost": round(yoc_pct, 2) if yoc_pct is not None else None,
             "current_yield": round(cy_pct, 2),
             "div_yield":     round(div_yield, 2),
             "div_rate":      round(div_rate, 4),
@@ -509,11 +524,13 @@ def _render_income_dashboard(edf, tam_df, div_data, active_strategy, strat_color
     total_value    = edf["value"].sum()
     total_cost     = edf["cost_basis"].sum()
 
-    # Weighted average yield on cost (weight by portfolio weight)
+    # Weighted average yield on cost (weight by portfolio weight, skip None rows)
     wtd_yoc = 0
     total_wt = edf["weight"].sum()
-    if total_wt > 0:
-        wtd_yoc = (edf["yield_on_cost"] * edf["weight"]).sum() / total_wt
+    _yoc_edf = edf[edf["yield_on_cost"].notna()]
+    _yoc_wt = _yoc_edf["weight"].sum()
+    if _yoc_wt > 0:
+        wtd_yoc = (_yoc_edf["yield_on_cost"] * _yoc_edf["weight"]).sum() / _yoc_wt
 
     # Weighted current yield
     wtd_cy = 0
@@ -555,6 +572,7 @@ def _render_income_dashboard(edf, tam_df, div_data, active_strategy, strat_color
 
         # Build comparison data
         yoc_df = edf[["symbol", "current_yield", "yield_on_cost", "weight_pct"]].copy()
+        yoc_df = yoc_df[yoc_df["yield_on_cost"].notna()]
         yoc_df = yoc_df.sort_values("yield_on_cost", ascending=True)
 
         fig_yoc = go.Figure()
@@ -777,7 +795,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
         .format({
             "Wt%":            "{:.2f}%",
             "Curr Yield":     "{:.2f}%",
-            "Yield on Cost":  "{:.2f}%",
+            "Yield on Cost":  lambda v: "—" if v is None or pd.isna(v) else f"{v:.2f}%",
             "Div Amount":     "${:.2f}",
             "1Y Growth":      "{:+.2f}%",
             "3Y Growth":      "{:+.2f}%",
@@ -838,43 +856,56 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             unsafe_allow_html=True,
         )
 
-        # Build comparison data
+        # Build comparison data. yield_on_cost is None when Tamarac doesn't
+        # supply cost basis (current template 41 export) — filter those out.
         yoc_df = edf[["symbol", "current_yield", "yield_on_cost", "weight_pct"]].copy()
+        yoc_df = yoc_df[yoc_df["yield_on_cost"].notna()]
         yoc_df = yoc_df.sort_values("yield_on_cost", ascending=True)
 
-        fig_yoc = go.Figure()
-        fig_yoc.add_trace(go.Bar(
-            y=yoc_df["symbol"], x=yoc_df["current_yield"], orientation="h",
-            name="Current Yield",
-            marker=dict(color=BLUE, opacity=0.7),
-            text=[f"{v:.2f}%" for v in yoc_df["current_yield"]],
-            textposition="outside",
-            textfont=dict(size=9, color="rgba(255,255,255,0.5)"),
-        ))
-        fig_yoc.add_trace(go.Bar(
-            y=yoc_df["symbol"], x=yoc_df["yield_on_cost"], orientation="h",
-            name="Yield on Cost",
-            marker=dict(color=GREEN, opacity=0.7),
-            text=[f"{v:.2f}%" for v in yoc_df["yield_on_cost"]],
-            textposition="outside",
-            textfont=dict(size=9, color="rgba(255,255,255,0.5)"),
-        ))
-        _yoc_layout = {**PLOTLY_DARK}
-        _yoc_layout["margin"] = dict(l=10, r=60, t=30, b=10)
-        _yoc_layout["legend"] = dict(
-            orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-            font=dict(size=10, color="rgba(255,255,255,0.5)"),
-            bgcolor="rgba(0,0,0,0)",
-        )
-        fig_yoc.update_layout(
-            **_yoc_layout,
-            barmode="group",
-            height=max(300, len(yoc_df) * 28 + 80),
-            xaxis={**_XAXIS, "ticksuffix": "%"},
-            yaxis={**_YAXIS, "tickfont": dict(size=10)},
-            showlegend=True,
-        )
-        st.plotly_chart(fig_yoc, use_container_width=True, config=PLOTLY_CONFIG)
+        if yoc_df.empty:
+            st.markdown(
+                "<div style='padding:40px 0;color:rgba(255,255,255,0.35);"
+                "font-size:12px;text-align:center;'>"
+                "Yield-on-cost data unavailable<br/>"
+                "<span style='font-size:10px;opacity:0.6'>"
+                "Tamarac cost basis not in current export"
+                "</span></div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            fig_yoc = go.Figure()
+            fig_yoc.add_trace(go.Bar(
+                y=yoc_df["symbol"], x=yoc_df["current_yield"], orientation="h",
+                name="Current Yield",
+                marker=dict(color=BLUE, opacity=0.7),
+                text=[f"{v:.2f}%" for v in yoc_df["current_yield"]],
+                textposition="outside",
+                textfont=dict(size=9, color="rgba(255,255,255,0.5)"),
+            ))
+            fig_yoc.add_trace(go.Bar(
+                y=yoc_df["symbol"], x=yoc_df["yield_on_cost"], orientation="h",
+                name="Yield on Cost",
+                marker=dict(color=GREEN, opacity=0.7),
+                text=[f"{v:.2f}%" for v in yoc_df["yield_on_cost"]],
+                textposition="outside",
+                textfont=dict(size=9, color="rgba(255,255,255,0.5)"),
+            ))
+            _yoc_layout = {**PLOTLY_DARK}
+            _yoc_layout["margin"] = dict(l=10, r=60, t=30, b=10)
+            _yoc_layout["legend"] = dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
+                font=dict(size=10, color="rgba(255,255,255,0.5)"),
+                bgcolor="rgba(0,0,0,0)",
+            )
+            fig_yoc.update_layout(
+                **_yoc_layout,
+                barmode="group",
+                height=max(300, len(yoc_df) * 28 + 80),
+                xaxis={**_XAXIS, "ticksuffix": "%"},
+                yaxis={**_YAXIS, "tickfont": dict(size=10)},
+                showlegend=True,
+            )
+            st.plotly_chart(fig_yoc, use_container_width=True, config=PLOTLY_CONFIG)
 
     # ── Consecutive Increases chart (moved from Income Dashboard) ──────────
     with col_streak:

@@ -813,9 +813,14 @@ with tab_holdings:
                     sym = h["symbol"]
                     mkt = price_data.get(sym, {})
                     chg_val = mkt.get("change_1d_pct", 0) or 0
-                    yoc = h.get("yield_at_cost", 0) or 0
-                    # yoc may be decimal (0.0558) or already percentage (5.58)
-                    yoc_pct = float(yoc) * 100 if 0 < float(yoc) < 1 else float(yoc)
+                    # Yield on Cost & Unit Cost: Tamarac API template 41 no longer
+                    # returns cost-basis data, so these render as "—" until we move
+                    # to a richer template. Keep the fields wired so nothing breaks.
+                    yoc_raw = h.get("yield_at_cost", 0) or 0
+                    yoc_pct = (float(yoc_raw) * 100 if 0 < float(yoc_raw) < 1
+                               else float(yoc_raw)) if yoc_raw else None
+                    unit_cost_val = h.get("unit_cost", 0) or 0
+                    unit_cost = float(unit_cost_val) if unit_cost_val else None
 
                     # Notion proprietary metrics
                     nm = notion_data.get(sym.upper(), {})
@@ -827,13 +832,13 @@ with tab_holdings:
                         "Weight %": round(h["weight_pct"], 2),
                         "1D Chg %": chg_val,
                         "Price": mkt.get("price", 0),
-                        "Yield on Cost %": round(yoc_pct, 2),
+                        "Yield on Cost %": round(yoc_pct, 2) if yoc_pct is not None else None,
                         "Div Yield %": mkt.get("dividend_yield", 0),
                         "MCP Target": nm.get("mcp_target") if nm.get("mcp_target") is not None else "—",
                         "Baseline": nm.get("div_baseline") if nm.get("div_baseline") is not None else "—",
                         "Style": nm.get("style_bucket", "—") or "—",
                         "P/E": round(mkt.get("pe_ratio", 0), 1) if mkt.get("pe_ratio") else "—",
-                        "Unit Cost": round(float(h.get("unit_cost", 0) or 0), 2),
+                        "Unit Cost": round(unit_cost, 2) if unit_cost is not None else None,
                         "% From 52W Hi": round(
                             ((mkt.get("price", 0) - mkt.get("52w_high", 0)) / mkt.get("52w_high", 1)) * 100, 1
                         ) if mkt.get("52w_high") else 0,
@@ -868,10 +873,10 @@ with tab_holdings:
                     "Weight %": "{:.2f}",
                     "Price": "${:.2f}",
                     "1D Chg %": "{:+.2f}%",
-                    "Yield on Cost %": "{:.2f}%",
+                    "Yield on Cost %": lambda v: "—" if v is None or pd.isna(v) else f"{v:.2f}%",
                     "Div Yield %": "{:.2f}%",
                     "MCP Target": lambda v: f"${v:,.0f}" if isinstance(v, (int, float)) else v,
-                    "Unit Cost": "${:.2f}",
+                    "Unit Cost": lambda v: "—" if v is None or pd.isna(v) else f"${v:.2f}",
                     "% From 52W Hi": "{:+.2f}%",
                 })
 
