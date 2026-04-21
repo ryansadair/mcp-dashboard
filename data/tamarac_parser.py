@@ -48,86 +48,204 @@ def clean_tamarac_value(val):
     return s
 
 
+def _parse_sheet_rows(rows):
+    """
+    Parse one Tamarac sheet (already materialized rows) into a DataFrame with
+    standardized column names. Used by both the auto-pulled file and the
+    manual-fallback file, which share the same multi-sheet format.
+
+    Returns an empty DataFrame if the sheet has no data rows.
+    """
+    if len(rows) < 2:
+        return pd.DataFrame()
+
+    headers_raw = rows[0]
+    headers = [clean_tamarac_value(h).lower().replace(" ", "_") for h in headers_raw]
+
+    data = []
+    for row in rows[1:]:
+        record = {}
+        for j, val in enumerate(row):
+            col = headers[j] if j < len(headers) else f"col_{j}"
+            if col == "as_of_date":
+                record[col] = val if isinstance(val, datetime) else None
+            elif col == "weight":
+                try:
+                    str_val = str(val).strip() if val else ""
+                    if str_val.endswith("%"):
+                        record[col] = float(str_val.rstrip("%")) / 100
+                    else:
+                        record[col] = float(val) if val else 0.0
+                except (ValueError, TypeError):
+                    record[col] = 0.0
+            elif col in ("quantity", "yield_at_cost", "current_yield",
+                         "unit_cost", "cost_basis", "value", "price",
+                         "annual_income", "cumulative_income"):
+                try:
+                    str_val = str(val).strip() if val else ""
+                    if str_val.endswith("%"):
+                        record[col] = float(str_val.rstrip("%")) / 100
+                    else:
+                        record[col] = float(val) if val else 0.0
+                except (ValueError, TypeError):
+                    record[col] = 0.0
+            else:
+                record[col] = clean_tamarac_value(val)
+        data.append(record)
+
+    df = pd.DataFrame(data)
+
+    # Rename columns to standard names
+    col_map = {
+        "as_of_date": "as_of_date",
+        "data_for": "strategy_raw",
+        "weight": "weight",
+        "symbol": "symbol",
+        "cusip": "cusip",
+        "description": "description",
+        "quantity": "quantity",
+        "open_date": "open_date",
+        "value": "value",
+        "price": "price",
+        "unit_cost": "unit_cost",
+        "cost_basis": "cost_basis",
+        "annual_income": "annual_income",
+        "cumulative_income": "cumulative_income",
+        "yield_at_cost": "yield_at_cost",
+        "current_yield": "current_yield",
+    }
+    df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+    return df
+
+
+# Per-ticker cost/yield fields that the manual file provides and the
+# auto-pulled API export does not. Merged by (strategy_code, symbol).
+_MANUAL_MERGE_FIELDS = [
+    "unit_cost",
+    "cost_basis",
+    "annual_income",
+    "cumulative_income",
+    "yield_at_cost",
+    "current_yield",
+]
+
+
+def _build_manual_lookup(manual_filepath):
+    """
+    Parse Tamarac_Holdings_Manual.xlsx (if present) and return a dict keyed by
+    (strategy_code, symbol) -> {unit_cost, cost_basis, ...}
+
+    Returns {} if file is missing or unreadable; callers should treat an empty
+    lookup as "no manual data available" and proceed without merging.
+    """
+    if not manual_filepath or not os.path.exists(manual_filepath):
+        return {}
+    try:
+        wb = openpyxl.load_workbook(manual_filepath, read_only=True)
+    except Exception:
+        return {}
+
+    lookup = {}
+    for sheet_name in wb.sheetnames:
+        try:
+            rows = list(wb[sheet_name].iter_rows(values_only=True))
+        except Exception:
+            continue
+        df = _parse_sheet_rows(rows)
+        if df.empty or "symbol" not in df.columns:
+            continue
+        for _, r in df.iterrows():
+            sym = str(r.get("symbol") or "").strip().upper()
+            if not sym:
+                continue
+            key = (sheet_name, sym)
+            lookup[key] = {
+                f: r.get(f, 0) for f in _MANUAL_MERGE_FIELDS if f in df.columns
+            }
+    wb.close()
+    return lookup
+
+
+def _apply_manual_lookup(df, strategy_code, lookup):
+    """
+    For each row in df, if (strategy_code, symbol) is in the lookup, copy
+    the manual cost/yield fields into the row. Creates the columns if they
+    don't already exist (the auto-pulled file won't have them).
+    """
+    if df.empty or not lookup:
+        return df
+
+    # Ensure all target columns exist so downstream .get() calls see real
+    # floats (0.0) rather than KeyError / NaN surprises.
+    for field in _MANUAL_MERGE_FIELDS:
+        if field not in df.columns:
+            df[field] = 0.0
+
+    def _fill(row):
+        sym = str(row.get("symbol") or "").strip().upper()
+        manual = lookup.get((strategy_code, sym))
+        if not manual:
+            return row
+        for field, val in manual.items():
+            # Only overwrite when the manual value is meaningful (non-zero).
+            # Lets the auto-pull win in the rare case it actually provides
+            # one of these fields and the manual file has it as 0.
+            if val is not None and val != 0:
+                row[field] = val
+        return row
+
+    return df.apply(_fill, axis=1)
+
+
 def parse_tamarac_excel(filepath):
     """
     Parse a Tamarac Holdings Excel export.
+
     Returns dict: {strategy_code: DataFrame} where each DF has columns:
-        as_of_date, strategy, weight, symbol, cusip, description, quantity
+        as_of_date, strategy_raw, weight, symbol, cusip, description, quantity,
+        unit_cost, cost_basis, annual_income, cumulative_income,
+        yield_at_cost, current_yield, is_cash
+
+    Data source strategy:
+      1. Auto-pulled file (filepath) — fresh daily positions/weights/quantities
+         but lacks cost basis and yield data (Tamarac API template 41 limit).
+      2. Manual file (Tamarac_Holdings_Manual.xlsx in same folder, if present) —
+         updated on a slower cadence. We use it purely as a per-(strategy,ticker)
+         lookup to fill in unit_cost, cost_basis, annual_income, cumulative_income,
+         yield_at_cost, current_yield. Positions/weights always come from (1).
+
+      If the manual file is missing, those six fields will be 0.0 and the
+      dashboard will render them as em-dashes where appropriate.
     """
     wb = openpyxl.load_workbook(filepath, read_only=True)
     result = {}
 
     for sheet_name in wb.sheetnames:
-        ws = wb[sheet_name]
-        rows = list(ws.iter_rows(values_only=True))
-
-        if len(rows) < 2:
+        rows = list(wb[sheet_name].iter_rows(values_only=True))
+        df = _parse_sheet_rows(rows)
+        if df.empty:
             continue
 
-        # Parse header
-        headers_raw = rows[0]
-        headers = [clean_tamarac_value(h).lower().replace(" ", "_") for h in headers_raw]
-
-        # Parse data rows
-        data = []
-        for row in rows[1:]:
-            record = {}
-            for j, val in enumerate(row):
-                col = headers[j] if j < len(headers) else f"col_{j}"
-                if col == "as_of_date":
-                    record[col] = val if isinstance(val, datetime) else None
-                elif col == "weight":
-                    try:
-                        str_val = str(val).strip() if val else ""
-                        if str_val.endswith("%"):
-                            record[col] = float(str_val.rstrip("%")) / 100
-                        else:
-                            record[col] = float(val) if val else 0.0
-                    except (ValueError, TypeError):
-                        record[col] = 0.0
-                elif col in ("quantity", "yield_at_cost", "current_yield", "unit_cost", "cost_basis", "value", "price", "annual_income", "cumulative_income"):
-                    try:
-                        # Handle percentage strings like "5.58%" from Tamarac
-                        str_val = str(val).strip() if val else ""
-                        if str_val.endswith("%"):
-                            record[col] = float(str_val.rstrip("%")) / 100
-                        else:
-                            record[col] = float(val) if val else 0.0
-                    except (ValueError, TypeError):
-                        record[col] = 0.0
-                else:
-                    record[col] = clean_tamarac_value(val)
-            data.append(record)
-
-        df = pd.DataFrame(data)
-
-        # Rename columns to standard names
-        col_map = {
-            "as_of_date": "as_of_date",
-            "data_for": "strategy_raw",
-            "weight": "weight",
-            "symbol": "symbol",
-            "cusip": "cusip",
-            "description": "description",
-            "quantity": "quantity",
-            "open_date": "open_date",
-            "value": "value",
-            "price": "price",
-            "unit_cost": "unit_cost",
-            "cost_basis": "cost_basis",
-            "annual_income": "annual_income",
-            "cumulative_income": "cumulative_income",
-            "yield_at_cost": "yield_at_cost",
-            "current_yield": "current_yield",
-        }
-        df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
-
         # Filter out CASH rows for holdings display (keep for weight calc)
-        df["is_cash"] = df["symbol"].str.upper() == "CASH"
+        if "symbol" in df.columns:
+            df["is_cash"] = df["symbol"].astype(str).str.upper() == "CASH"
+        else:
+            df["is_cash"] = False
 
         result[sheet_name] = df
 
     wb.close()
+
+    # ── Merge in manual cost/yield data if the fallback file exists ───────
+    # Looks for Tamarac_Holdings_Manual.xlsx in the SAME directory as the
+    # auto-pulled file. The manual file is optional — absent = zero fields.
+    folder = os.path.dirname(os.path.abspath(filepath))
+    manual_path = os.path.join(folder, "Tamarac_Holdings_Manual.xlsx")
+    lookup = _build_manual_lookup(manual_path)
+    if lookup:
+        for strategy_code, df in result.items():
+            result[strategy_code] = _apply_manual_lookup(df, strategy_code, lookup)
+
     return result
 
 
