@@ -9,7 +9,9 @@ from yfinance, and upserts to Supabase.
 Run modes:
     --mode quick   Prices + indices only (~2 min, runs every 15 min)
     --mode full    Everything: prices, dividends, indices, benchmarks,
-                   price history, dividend history, financials (~15 min)
+                   price history, financials (~12 min)
+                   NOTE: dividend_history removed — Fish CCC file in data/
+                   is the authoritative source for historical dividends.
     --mode eod     Prices + indices + benchmarks (final EOD snapshot, ~3 min)
 
 Environment variables (set via GitHub Secrets):
@@ -604,42 +606,6 @@ def fetch_price_history(tickers):
 # DIVIDEND HISTORY (full mode only)
 # ══════════════════════════════════════════════════════════════════════════
 
-def fetch_dividend_history(tickers):
-    """Fetch annual dividend totals per ticker."""
-    import yfinance as yf
-    import pandas as pd
-
-    all_rows = []
-    current_year = datetime.now().year
-    total = len(tickers)
-    for i, ticker in enumerate(tickers, 1):
-        try:
-            divs = yf.Ticker(ticker).dividends
-            if divs is None or divs.empty:
-                continue
-            df = divs.reset_index()
-            df.columns = ["date", "amount"]
-            df["year"] = pd.to_datetime(df["date"]).dt.year
-            annual = df[df["year"] < current_year].groupby("year")["amount"].sum()
-            for year, amt in annual.items():
-                all_rows.append({
-                    "id": f"{ticker}_{year}", "ticker": ticker,
-                    "year": int(year), "amount": round(float(amt), 4),
-                    "fetched_at": _utc_now().isoformat(),
-                })
-            if i % 10 == 0 or i == total:
-                print(f"  Div history: {i}/{total} ({ticker})")
-        except Exception as e:
-            print(f"  [ERROR] Div history {ticker}: {e}")
-        time.sleep(0.3)
-    print(f"  Div history: {len(all_rows)} total rows to upsert")
-    return all_rows
-
-
-# ══════════════════════════════════════════════════════════════════════════
-# FINANCIALS (full mode only)
-# ══════════════════════════════════════════════════════════════════════════
-
 def fetch_financials(tickers):
     """Fetch quarterly financials. Skips tickers updated within 7 days."""
     import yfinance as yf
@@ -714,7 +680,7 @@ def fetch_financials(tickers):
 
 def push_to_supabase(prices=None, dividends=None, indices=None,
                      benchmarks=None, price_history=None,
-                     div_history=None, financials=None):
+                     financials=None):
     """Upsert all fetched data to Supabase."""
 
     if prices:
@@ -776,11 +742,6 @@ def push_to_supabase(prices=None, dividends=None, indices=None,
             print(f"  Pushing: benchmark_history ({len(all_history)} rows)...")
             if sb_upsert("benchmark_history", all_history):
                 print(f"    ✓ benchmark_history OK")
-
-    if div_history:
-        print(f"  Pushing: dividend_history ({len(div_history)} rows)...")
-        if sb_upsert("dividend_history", div_history):
-            print(f"    ✓ dividend_history OK")
 
     if financials:
         print(f"  Pushing: financials ({len(financials)} rows)...")
@@ -916,7 +877,6 @@ def main():
     dividends = None
     benchmarks = None
     price_hist = None
-    div_hist = None
     financials_data = None
 
     if mode in ("full", "eod"):
@@ -930,10 +890,11 @@ def main():
         print(f"\n[6] Fetching price history...")
         price_hist = fetch_price_history(tickers)
 
-        print(f"\n[7] Fetching dividend history...")
-        div_hist = fetch_dividend_history(tickers)
+        # Dividend history previously fetched here — removed in favor of
+        # the Fish CCC spreadsheet (data/Fish_*.xlsx), which is the
+        # authoritative source for historical dividends and streak data.
 
-        print(f"\n[8] Fetching financials...")
+        print(f"\n[7] Fetching financials...")
         financials_data = fetch_financials(tickers)
 
     elapsed = round(time.time() - start, 1)
@@ -948,7 +909,6 @@ def main():
             indices=indices,
             benchmarks=benchmarks,
             price_history=price_hist,
-            div_history=div_hist,
             financials=financials_data,
         )
     else:
