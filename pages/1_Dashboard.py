@@ -379,28 +379,9 @@ with _sel_col:
         on_change=_on_strategy_change,
     )
 
-# ═══════════════════════════════════════════════════════════════════════════
-# DIAGNOSTIC TIMING [temp] — remove after identifying slow tabs
-# ═══════════════════════════════════════════════════════════════════════════
-# Times the execution of each tab body. Streamlit's st.tabs() runs every
-# tab body on every rerun, so this measures the total cost of a strategy
-# swap. Prefix [DASH] for easy grep/filter in Streamlit Cloud logs.
-import time as _time_mod_dash
-_DASH_STATE = {"start": _time_mod_dash.perf_counter(),
-               "last": _time_mod_dash.perf_counter()}
-def _dash_tick(label):
-    now = _time_mod_dash.perf_counter()
-    step_ms = (now - _DASH_STATE["last"]) * 1000
-    total_ms = (now - _DASH_STATE["start"]) * 1000
-    print(f"[DASH] {label}: {step_ms:.0f}ms  (total: {total_ms:.0f}ms)", flush=True)
-    _DASH_STATE["last"] = now
-
-_dash_tick("before st.tabs")
-
 tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
     "Overview", "Holdings", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "News & Alerts"
 ])
-_dash_tick("st.tabs() called")
 
 def _render_strategy_header(tab_key):
     """Render KPI cards inside a tab. The strategy selector itself lives
@@ -488,13 +469,10 @@ _XAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(
 _YAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10))
 
 
-_dash_tick("pre-tab setup done (KPIs + themes)")
-
 # ══════════════════════════════════════════════════════════════════════════
 # OVERVIEW
 # ══════════════════════════════════════════════════════════════════════════
 with tab_overview:
-    _dash_tick("ENTER tab_overview")
     _render_strategy_header("overview")
     left, right = st.columns([3, 2])
 
@@ -795,14 +773,12 @@ with tab_overview:
                         f"</div>",
                         unsafe_allow_html=True,
                     )
-    _dash_tick("EXIT tab_overview")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # HOLDINGS — Sprint 2 upgrade: real Tamarac + live yfinance
 # ══════════════════════════════════════════════════════════════════════════
 with tab_holdings:
-    _dash_tick("ENTER tab_holdings")
     _render_strategy_header("holdings")
 
     # ── Sub-tabs: Holdings Detail | Price Charts ──────────────────────────
@@ -1037,220 +1013,265 @@ with tab_holdings:
                 st.dataframe(show_df, width="stretch", hide_index=True)
 
     # ═══════════════════════════════════════════════════════════════════════
-    # SUB-TAB 2: PRICE CHARTS GRID
+    # SUB-TAB 2: PRICE CHARTS GRID — lazy-loaded (Sprint 17)
+    # ───────────────────────────────────────────────────────────────────────
+    # Why gated: this grid runs on every top-level interaction (Streamlit's
+    # st.tabs() renders all tabs every rerun), burning 20-35s on yfinance
+    # fetches + Plotly rendering for 18 charts. Since users rarely need all
+    # charts simultaneously, we gate behind an explicit "Load charts" click.
+    # The flag is keyed to active strategy — swapping strategies resets it.
     # ═══════════════════════════════════════════════════════════════════════
     with sub_charts:
         if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
             _charts_tam = get_holdings_for_strategy(tamarac_parsed, active)
             if not _charts_tam.empty:
-                _charts_tam = _charts_tam.sort_values("description", ascending=True)
-                _chart_tickers = _charts_tam["symbol"].tolist()
-                _chart_names = dict(zip(_charts_tam["symbol"], _charts_tam["description"]))
+                # ── Lazy-load gate ──────────────────────────────────────────
+                # Only render the heavy chart grid if user has explicitly
+                # loaded charts for the CURRENT strategy this session.
+                _loaded_key = "hc_loaded_for"
+                _charts_active = st.session_state.get(_loaded_key) == active
 
-                # Period selector — matches Stock Detail page
-                _period_map = {"1M": 21, "3M": 63, "6M": 126, "YTD": None, "1Y": 252, "2Y": 504, "3Y": 756, "5Y": 1260, "Max": 0}
-                if "hc_period" not in st.session_state:
-                    st.session_state["hc_period"] = "1Y"
+                if not _charts_active:
+                    st.markdown(
+                        f"<div style='padding:40px 20px;text-align:center;"
+                        f"background:rgba(255,255,255,0.02);border-radius:10px;"
+                        f"border:1px solid rgba(255,255,255,0.05);margin:12px 0;'>"
+                        f"<div style='font-size:14px;color:rgba(255,255,255,0.7);"
+                        f"margin-bottom:8px;font-weight:600;'>"
+                        f"Price charts for {len(_charts_tam)} holdings</div>"
+                        f"<div style='font-size:12px;color:rgba(255,255,255,0.4);"
+                        f"margin-bottom:18px;'>"
+                        f"Loading charts takes ~20-30 seconds on first view per strategy."
+                        f"</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+                    _bcol1, _bcol2, _bcol3 = st.columns([1, 1, 1])
+                    with _bcol2:
+                        if st.button(
+                            f"Load {len(_charts_tam)} charts",
+                            key=f"hc_load_{active}",
+                            type="primary",
+                            width="stretch",
+                        ):
+                            st.session_state[_loaded_key] = active
+                            st.rerun()
+                else:
+                    # ── Charts loaded — render normally ─────────────────────
+                    _charts_tam = _charts_tam.sort_values("description", ascending=True)
+                    _chart_tickers = _charts_tam["symbol"].tolist()
+                    _chart_names = dict(zip(_charts_tam["symbol"], _charts_tam["description"]))
 
-                _pcols = st.columns(len(_period_map))
-                for _pi, (_plabel, _) in enumerate(_period_map.items()):
-                    with _pcols[_pi]:
-                        if st.button(_plabel, key=f"hc_p_{_plabel}", width="stretch",
-                                     type="primary" if st.session_state["hc_period"] == _plabel else "secondary"):
-                            st.session_state["hc_period"] = _plabel
+                    # Optional: small "unload" button so user can free up rerun speed
+                    _hdr_left, _hdr_right = st.columns([5, 1])
+                    with _hdr_right:
+                        if st.button("Hide charts", key=f"hc_hide_{active}",
+                                     width="stretch", type="secondary"):
+                            st.session_state.pop(_loaded_key, None)
                             st.rerun()
 
-                # Batch download max history — slice client-side per period
-                @st.cache_data(ttl=900, show_spinner=False)
-                def _fetch_chart_batch(tickers_tuple, _v=2):
-                    import yfinance as yf
-                    try:
-                        return yf.download(
-                            " ".join(tickers_tuple),
-                            period="max",
-                            interval="1d",
-                            group_by="ticker",
-                            progress=False,
-                            threads=True,
-                        )
-                    except Exception:
-                        return None
+                    # Period selector — matches Stock Detail page
+                    _period_map = {"1M": 21, "3M": 63, "6M": 126, "YTD": None, "1Y": 252, "2Y": 504, "3Y": 756, "5Y": 1260, "Max": 0}
+                    if "hc_period" not in st.session_state:
+                        st.session_state["hc_period"] = "1Y"
 
-                with st.spinner(f"Loading {len(_chart_tickers)} charts..."):
-                    _batch_data = _fetch_chart_batch(tuple(_chart_tickers))
+                    _pcols = st.columns(len(_period_map))
+                    for _pi, (_plabel, _) in enumerate(_period_map.items()):
+                        with _pcols[_pi]:
+                            if st.button(_plabel, key=f"hc_p_{_plabel}", width="stretch",
+                                         type="primary" if st.session_state["hc_period"] == _plabel else "secondary"):
+                                st.session_state["hc_period"] = _plabel
+                                st.rerun()
 
-                if _batch_data is not None and not _batch_data.empty:
-                    _sel_label = st.session_state["hc_period"]
-                    _sel_days = _period_map[_sel_label]
+                    # Batch download max history — slice client-side per period
+                    @st.cache_data(ttl=900, show_spinner=False)
+                    def _fetch_chart_batch(tickers_tuple, _v=2):
+                        import yfinance as yf
+                        try:
+                            return yf.download(
+                                " ".join(tickers_tuple),
+                                period="max",
+                                interval="1d",
+                                group_by="ticker",
+                                progress=False,
+                                threads=True,
+                            )
+                        except Exception:
+                            return None
 
-                    # Render 4-column grid of mini charts
-                    _ncols = 4
-                    _rows_of_tickers = [_chart_tickers[i:i + _ncols] for i in range(0, len(_chart_tickers), _ncols)]
+                    with st.spinner(f"Loading {len(_chart_tickers)} charts..."):
+                        _batch_data = _fetch_chart_batch(tuple(_chart_tickers))
 
-                    for _row_tickers in _rows_of_tickers:
-                        _cols = st.columns(_ncols)
-                        for _ci, _tk in enumerate(_row_tickers):
-                            with _cols[_ci]:
-                                try:
-                                    if len(_chart_tickers) == 1:
-                                        _tk_full = _batch_data
-                                    else:
-                                        _tk_full = _batch_data[_tk] if _tk in _batch_data.columns.get_level_values(0) else None
+                    if _batch_data is not None and not _batch_data.empty:
+                        _sel_label = st.session_state["hc_period"]
+                        _sel_days = _period_map[_sel_label]
 
-                                    if _tk_full is None or _tk_full.empty or _tk_full.dropna(subset=["Close"]).empty:
-                                        st.caption(f"{_tk} — no data")
-                                        continue
+                        # Render 4-column grid of mini charts
+                        _ncols = 4
+                        _rows_of_tickers = [_chart_tickers[i:i + _ncols] for i in range(0, len(_chart_tickers), _ncols)]
 
-                                    _tk_full = _tk_full.dropna(subset=["Close"]).copy()
+                        for _row_tickers in _rows_of_tickers:
+                            _cols = st.columns(_ncols)
+                            for _ci, _tk in enumerate(_row_tickers):
+                                with _cols[_ci]:
+                                    try:
+                                        if len(_chart_tickers) == 1:
+                                            _tk_full = _batch_data
+                                        else:
+                                            _tk_full = _batch_data[_tk] if _tk in _batch_data.columns.get_level_values(0) else None
 
-                                    # Compute MAs on full history before slicing
-                                    _tk_full["MA50"] = _tk_full["Close"].rolling(50).mean()
-                                    _tk_full["MA200"] = _tk_full["Close"].rolling(200).mean()
+                                        if _tk_full is None or _tk_full.empty or _tk_full.dropna(subset=["Close"]).empty:
+                                            st.caption(f"{_tk} — no data")
+                                            continue
 
-                                    # Slice to selected period
-                                    if _sel_label == "YTD":
-                                        _year_start = datetime(datetime.now().year, 1, 1).strftime("%Y-%m-%d")
-                                        _tk_df = _tk_full[_tk_full.index >= _year_start]
-                                    elif _sel_label == "Max" or _sel_days == 0:
-                                        _tk_df = _tk_full
-                                    else:
-                                        _tk_df = _tk_full.tail(_sel_days)
+                                        _tk_full = _tk_full.dropna(subset=["Close"]).copy()
 
-                                    if _tk_df.empty:
-                                        st.caption(f"{_tk} — no data")
-                                        continue
+                                        # Compute MAs on full history before slicing
+                                        _tk_full["MA50"] = _tk_full["Close"].rolling(50).mean()
+                                        _tk_full["MA200"] = _tk_full["Close"].rolling(200).mean()
 
-                                    _close = _tk_df["Close"]
-                                    _first = float(_close.iloc[0])
-                                    _last = float(_close.iloc[-1])
-                                    _chg_pct = ((_last - _first) / _first * 100) if _first > 0 else 0
-                                    _chg_color = "#569542" if _chg_pct >= 0 else "#c45454"
+                                        # Slice to selected period
+                                        if _sel_label == "YTD":
+                                            _year_start = datetime(datetime.now().year, 1, 1).strftime("%Y-%m-%d")
+                                            _tk_df = _tk_full[_tk_full.index >= _year_start]
+                                        elif _sel_label == "Max" or _sel_days == 0:
+                                            _tk_df = _tk_full
+                                        else:
+                                            _tk_df = _tk_full.tail(_sel_days)
 
-                                    # Compact header: TICKER  +X.X%  $Price
-                                    st.markdown(
-                                        f"<div style='display:flex;align-items:baseline;gap:8px;padding:2px 0 0;'>"
-                                        f"<span style='font-size:13px;font-weight:700;color:#C9A84C;'>{_tk}</span>"
-                                        f"<span style='font-size:12px;font-weight:600;color:{_chg_color};'>{_chg_pct:+.2f}%</span>"
-                                        f"<span style='font-size:11px;color:rgba(255,255,255,0.4);'>${_last:,.2f}</span>"
-                                        f"</div>"
-                                        f"<div style='font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:2px;'>"
-                                        f"{_chart_names.get(_tk, '')[:30]}</div>",
-                                        unsafe_allow_html=True,
-                                    )
+                                        if _tk_df.empty:
+                                            st.caption(f"{_tk} — no data")
+                                            continue
 
-                                    # Mini price chart with MAs
-                                    _fig = go.Figure()
+                                        _close = _tk_df["Close"]
+                                        _first = float(_close.iloc[0])
+                                        _last = float(_close.iloc[-1])
+                                        _chg_pct = ((_last - _first) / _first * 100) if _first > 0 else 0
+                                        _chg_color = "#569542" if _chg_pct >= 0 else "#c45454"
 
-                                    # For Max period, fill from zero; otherwise fill from period low
-                                    _use_zero_base = (_sel_label == "Max")
-                                    _all_vals = _close.dropna()
-                                    _y_min = 0 if _use_zero_base else float(_all_vals.min())
-                                    _y_max = float(_all_vals.max())
+                                        # Compact header: TICKER  +X.X%  $Price
+                                        st.markdown(
+                                            f"<div style='display:flex;align-items:baseline;gap:8px;padding:2px 0 0;'>"
+                                            f"<span style='font-size:13px;font-weight:700;color:#C9A84C;'>{_tk}</span>"
+                                            f"<span style='font-size:12px;font-weight:600;color:{_chg_color};'>{_chg_pct:+.2f}%</span>"
+                                            f"<span style='font-size:11px;color:rgba(255,255,255,0.4);'>${_last:,.2f}</span>"
+                                            f"</div>"
+                                            f"<div style='font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:2px;'>"
+                                            f"{_chart_names.get(_tk, '')[:30]}</div>",
+                                            unsafe_allow_html=True,
+                                        )
 
-                                    if _use_zero_base:
-                                        _fig.add_trace(go.Scatter(
-                                            x=_tk_df.index, y=_close,
-                                            mode="lines", name="Price",
-                                            line=dict(color=_chg_color, width=1.5),
-                                            fill="tozeroy",
-                                            fillcolor=("rgba(86,149,66,0.06)" if _chg_pct >= 0 else "rgba(196,84,84,0.06)"),
-                                            hovertemplate="%{x|%b %d}<br>$%{y:.2f}<extra></extra>",
-                                        ))
-                                    else:
-                                        _price_range = _y_max - _y_min if _y_max > _y_min else 1
-                                        _y_floor = max(0, _y_min - _price_range * 0.05)
+                                        # Mini price chart with MAs
+                                        _fig = go.Figure()
 
-                                        _fig.add_trace(go.Scatter(
-                                            x=_tk_df.index,
-                                            y=[_y_floor] * len(_tk_df),
-                                            mode="lines", name="_base",
-                                            line=dict(width=0), showlegend=False,
-                                            hoverinfo="skip",
-                                        ))
-                                        _fig.add_trace(go.Scatter(
-                                            x=_tk_df.index, y=_close,
-                                            mode="lines", name="Price",
-                                            line=dict(color=_chg_color, width=1.5),
-                                            fill="tonexty",
-                                            fillcolor=("rgba(86,149,66,0.06)" if _chg_pct >= 0 else "rgba(196,84,84,0.06)"),
-                                            hovertemplate="%{x|%b %d}<br>$%{y:.2f}<extra></extra>",
-                                        ))
+                                        # For Max period, fill from zero; otherwise fill from period low
+                                        _use_zero_base = (_sel_label == "Max")
+                                        _all_vals = _close.dropna()
+                                        _y_min = 0 if _use_zero_base else float(_all_vals.min())
+                                        _y_max = float(_all_vals.max())
 
-                                    # 50-day MA
-                                    if not _tk_df["MA50"].isna().all():
-                                        _fig.add_trace(go.Scatter(
-                                            x=_tk_df.index, y=_tk_df["MA50"],
-                                            mode="lines", name="50 MA",
-                                            line=dict(color="#C9A84C", width=1, dash="dot"),
-                                            hoverinfo="skip",
-                                        ))
+                                        if _use_zero_base:
+                                            _fig.add_trace(go.Scatter(
+                                                x=_tk_df.index, y=_close,
+                                                mode="lines", name="Price",
+                                                line=dict(color=_chg_color, width=1.5),
+                                                fill="tozeroy",
+                                                fillcolor=("rgba(86,149,66,0.06)" if _chg_pct >= 0 else "rgba(196,84,84,0.06)"),
+                                                hovertemplate="%{x|%b %d}<br>$%{y:.2f}<extra></extra>",
+                                            ))
+                                        else:
+                                            _price_range = _y_max - _y_min if _y_max > _y_min else 1
+                                            _y_floor = max(0, _y_min - _price_range * 0.05)
 
-                                    # 200-day MA
-                                    if not _tk_df["MA200"].isna().all():
-                                        _fig.add_trace(go.Scatter(
-                                            x=_tk_df.index, y=_tk_df["MA200"],
-                                            mode="lines", name="200 MA",
-                                            line=dict(color="rgba(255,255,255,0.25)", width=1, dash="dash"),
-                                            hoverinfo="skip",
-                                        ))
+                                            _fig.add_trace(go.Scatter(
+                                                x=_tk_df.index,
+                                                y=[_y_floor] * len(_tk_df),
+                                                mode="lines", name="_base",
+                                                line=dict(width=0), showlegend=False,
+                                                hoverinfo="skip",
+                                            ))
+                                            _fig.add_trace(go.Scatter(
+                                                x=_tk_df.index, y=_close,
+                                                mode="lines", name="Price",
+                                                line=dict(color=_chg_color, width=1.5),
+                                                fill="tonexty",
+                                                fillcolor=("rgba(86,149,66,0.06)" if _chg_pct >= 0 else "rgba(196,84,84,0.06)"),
+                                                hovertemplate="%{x|%b %d}<br>$%{y:.2f}<extra></extra>",
+                                            ))
 
-                                    _fig_layout = {**PLOTLY_DARK}
-                                    _fig_layout["margin"] = dict(l=0, r=42, t=0, b=20)
-                                    _fig.update_layout(
-                                        **_fig_layout,
-                                        height=160,
-                                        showlegend=False,
-                                        hovermode="x unified",
-                                        dragmode=False,
-                                    )
-                                    _fig.update_xaxes(
-                                        visible=True,
-                                        fixedrange=True,
-                                        showgrid=False,
-                                        showline=False,
-                                        tickfont=dict(size=9, color="rgba(255,255,255,0.25)"),
-                                        nticks=4,
-                                        tickformat=(
-                                            "%b %d" if _sel_label in ("1M", "3M") else
-                                            "%b '%y" if _sel_label in ("6M", "YTD", "1Y") else
-                                            "%Y" if _sel_label in ("2Y", "3Y", "5Y", "Max") else
-                                            "%b %d"
-                                        ),
-                                    )
-                                    _fig.update_yaxes(
-                                        visible=True,
-                                        fixedrange=True,
-                                        side="right",
-                                        showgrid=True,
-                                        gridcolor="rgba(255,255,255,0.04)",
-                                        showline=False,
-                                        tickfont=dict(size=9, color="rgba(255,255,255,0.25)"),
-                                        tickprefix="$",
-                                        nticks=4,
-                                    )
-                                    st.plotly_chart(
-                                        _fig, width="stretch",
-                                        config=PLOTLY_CONFIG_HOVER,
-                                        key=f"hc_{_tk}_{st.session_state['hc_period']}",
-                                    )
-                                except Exception:
-                                    st.caption(f"{_tk} — chart error")
+                                        # 50-day MA
+                                        if not _tk_df["MA50"].isna().all():
+                                            _fig.add_trace(go.Scatter(
+                                                x=_tk_df.index, y=_tk_df["MA50"],
+                                                mode="lines", name="50 MA",
+                                                line=dict(color="#C9A84C", width=1, dash="dot"),
+                                                hoverinfo="skip",
+                                            ))
 
-                    st.caption(f"{len(_chart_tickers)} holdings · {st.session_state['hc_period']} · yfinance · {datetime.now().strftime('%I:%M %p')}")
-                else:
-                    st.warning("Could not load chart data. Try refreshing.")
+                                        # 200-day MA
+                                        if not _tk_df["MA200"].isna().all():
+                                            _fig.add_trace(go.Scatter(
+                                                x=_tk_df.index, y=_tk_df["MA200"],
+                                                mode="lines", name="200 MA",
+                                                line=dict(color="rgba(255,255,255,0.25)", width=1, dash="dash"),
+                                                hoverinfo="skip",
+                                            ))
+
+                                        _fig_layout = {**PLOTLY_DARK}
+                                        _fig_layout["margin"] = dict(l=0, r=42, t=0, b=20)
+                                        _fig.update_layout(
+                                            **_fig_layout,
+                                            height=160,
+                                            showlegend=False,
+                                            hovermode="x unified",
+                                            dragmode=False,
+                                        )
+                                        _fig.update_xaxes(
+                                            visible=True,
+                                            fixedrange=True,
+                                            showgrid=False,
+                                            showline=False,
+                                            tickfont=dict(size=9, color="rgba(255,255,255,0.25)"),
+                                            nticks=4,
+                                            tickformat=(
+                                                "%b %d" if _sel_label in ("1M", "3M") else
+                                                "%b '%y" if _sel_label in ("6M", "YTD", "1Y") else
+                                                "%Y" if _sel_label in ("2Y", "3Y", "5Y", "Max") else
+                                                "%b %d"
+                                            ),
+                                        )
+                                        _fig.update_yaxes(
+                                            visible=True,
+                                            fixedrange=True,
+                                            side="right",
+                                            showgrid=True,
+                                            gridcolor="rgba(255,255,255,0.04)",
+                                            showline=False,
+                                            tickfont=dict(size=9, color="rgba(255,255,255,0.25)"),
+                                            tickprefix="$",
+                                            nticks=4,
+                                        )
+                                        st.plotly_chart(
+                                            _fig, width="stretch",
+                                            config=PLOTLY_CONFIG_HOVER,
+                                            key=f"hc_{_tk}_{st.session_state['hc_period']}",
+                                        )
+                                    except Exception:
+                                        st.caption(f"{_tk} — chart error")
+
+                        st.caption(f"{len(_chart_tickers)} holdings · {st.session_state['hc_period']} · yfinance · {datetime.now().strftime('%I:%M %p')}")
+                    else:
+                        st.warning("Could not load chart data. Try refreshing.")
             else:
                 st.info("No holdings in Tamarac file for this strategy.")
         else:
             st.info("Price charts require Tamarac holdings data.")
-    _dash_tick("EXIT tab_holdings")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # DIVIDENDS — Sprint 4: full dividend intelligence with sub-tabs
 # ══════════════════════════════════════════════════════════════════════════
 with tab_divs:
-    _dash_tick("ENTER tab_divs")
     _render_strategy_header("divs")
 
     if DIV_TAB_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
@@ -1290,26 +1311,22 @@ with tab_divs:
             render_dividend_calendar()
         else:
             st.info("Dividend calendar not yet available. Run `dividend_calendar.py` to generate data.")
-    _dash_tick("EXIT tab_divs")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # WATCHLIST
 # ══════════════════════════════════════════════════════════════════════════
 with tab_watchlist:
-    _dash_tick("ENTER tab_watchlist")
     if WATCHLIST_AVAILABLE:
         render_watchlist_tab()
     else:
         st.info("Watchlist module not found. Ensure `data/watchlist.py` and `data/watchlist_tab.py` are in the data folder.")
-    _dash_tick("EXIT tab_watchlist")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # MACRO
 # ══════════════════════════════════════════════════════════════════════════
 with tab_macro:
-    _dash_tick("ENTER tab_macro")
     if MACRO_AVAILABLE:
         # Pass QDVD yield so the context box can show it
         qdvd_yield = None
@@ -1323,33 +1340,28 @@ with tab_macro:
         render_macro_tab(qdvd_yield=qdvd_yield)
     else:
         st.info("Macro module not found. Ensure `data/macro_tab.py` is in the data folder.")
-    _dash_tick("EXIT tab_macro")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # MARKETS
 # ══════════════════════════════════════════════════════════════════════════
 with tab_markets:
-    _dash_tick("ENTER tab_markets")
     if MARKETS_AVAILABLE:
         render_markets_tab()
     else:
         st.info("Markets module not found. Ensure `data/markets_tab.py` is in the data folder.")
-    _dash_tick("EXIT tab_markets")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # ALERTS
 # ══════════════════════════════════════════════════════════════════════════
 with tab_alerts:
-    _dash_tick("ENTER tab_alerts")
     if ALERTS_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed:
         render_alerts_tab(tamarac_parsed, active)
     elif not ALERTS_AVAILABLE:
         st.info("Alerts module not found. Ensure `data/alerts_tab.py` is in the data folder.")
     else:
         st.info("Alerts require Tamarac holdings data. Upload a Tamarac export to enable alerts.")
-    _dash_tick("EXIT tab_alerts")
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -1363,13 +1375,11 @@ with tab_alerts:
 # means Dividends/Watchlist/Macro/Markets/Alerts all render before it.
 # ══════════════════════════════════════════════════════════════════════════
 with tab_perf:
-    _dash_tick("ENTER tab_perf")
     _render_strategy_header("perf")
     if COMPOSITE_AVAILABLE:
         render_performance_tab(active)
     else:
         st.info("Performance module not available. Ensure data/composite_returns.py and data/performance_tab.py are present.")
-    _dash_tick("EXIT tab_perf")
 
 
 # ── Footer ─────────────────────────────────────────────────────────────────
