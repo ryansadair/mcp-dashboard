@@ -379,9 +379,28 @@ with _sel_col:
         on_change=_on_strategy_change,
     )
 
+# ═══════════════════════════════════════════════════════════════════════════
+# DIAGNOSTIC TIMING [temp] — remove after identifying slow tabs
+# ═══════════════════════════════════════════════════════════════════════════
+# Times the execution of each tab body. Streamlit's st.tabs() runs every
+# tab body on every rerun, so this measures the total cost of a strategy
+# swap. Prefix [DASH] for easy grep/filter in Streamlit Cloud logs.
+import time as _time_mod_dash
+_DASH_STATE = {"start": _time_mod_dash.perf_counter(),
+               "last": _time_mod_dash.perf_counter()}
+def _dash_tick(label):
+    now = _time_mod_dash.perf_counter()
+    step_ms = (now - _DASH_STATE["last"]) * 1000
+    total_ms = (now - _DASH_STATE["start"]) * 1000
+    print(f"[DASH] {label}: {step_ms:.0f}ms  (total: {total_ms:.0f}ms)", flush=True)
+    _DASH_STATE["last"] = now
+
+_dash_tick("before st.tabs")
+
 tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
     "Overview", "Holdings", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "News & Alerts"
 ])
+_dash_tick("st.tabs() called")
 
 def _render_strategy_header(tab_key):
     """Render KPI cards inside a tab. The strategy selector itself lives
@@ -469,10 +488,13 @@ _XAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(
 _YAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10))
 
 
+_dash_tick("pre-tab setup done (KPIs + themes)")
+
 # ══════════════════════════════════════════════════════════════════════════
 # OVERVIEW
 # ══════════════════════════════════════════════════════════════════════════
 with tab_overview:
+    _dash_tick("ENTER tab_overview")
     _render_strategy_header("overview")
     left, right = st.columns([3, 2])
 
@@ -636,7 +658,7 @@ with tab_overview:
                         title=f"Today's Returns — {strat_label}",
                         height=max(550, len(hm_df) * 18 + 100),
                     )
-                    st.plotly_chart(fig_tm, use_container_width=True, config=PLOTLY_CONFIG)
+                    st.plotly_chart(fig_tm, width="stretch", config=PLOTLY_CONFIG)
                 else:
                     st.info("No holdings data available.")
             else:
@@ -666,7 +688,7 @@ with tab_overview:
                 hovermode="x unified",
                 dragmode=False,
             )
-            st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG_HOVER)
+            st.plotly_chart(fig, width="stretch", config=PLOTLY_CONFIG_HOVER)
 
     with right:
         st.markdown("<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:12px;'>Sector Allocation</div>", unsafe_allow_html=True)
@@ -773,12 +795,14 @@ with tab_overview:
                         f"</div>",
                         unsafe_allow_html=True,
                     )
+    _dash_tick("EXIT tab_overview")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # HOLDINGS — Sprint 2 upgrade: real Tamarac + live yfinance
 # ══════════════════════════════════════════════════════════════════════════
 with tab_holdings:
+    _dash_tick("ENTER tab_holdings")
     _render_strategy_header("holdings")
 
     # ── Sub-tabs: Holdings Detail | Price Charts ──────────────────────────
@@ -883,7 +907,7 @@ with tab_holdings:
                 # Height: generous calculation to prevent internal scrollbar on mobile
                 _df_height = min(80 + len(filtered) * 40, 2000)
                 event = st.dataframe(
-                    styled, use_container_width=True, hide_index=True,
+                    styled, width="stretch", hide_index=True,
                     height=_df_height,
                     selection_mode="single-row",
                     on_select="rerun",
@@ -926,7 +950,7 @@ with tab_holdings:
 
                     col_tbl, col_pie = st.columns([3, 2])
                     with col_tbl:
-                        st.dataframe(sect_agg, use_container_width=True, height=(80 + len(sect_agg) * 40), column_config={
+                        st.dataframe(sect_agg, width="stretch", height=(80 + len(sect_agg) * 40), column_config={
                             "Holdings": st.column_config.NumberColumn("#", width="small"),
                             "Total_Weight": st.column_config.NumberColumn("Wt %", format="%.2f%%", width="small"),
                             "Avg_Yield": st.column_config.NumberColumn("Avg Yld %", format="%.2f%%", width="small"),
@@ -968,7 +992,7 @@ with tab_holdings:
                             uniformtext_minsize=9,
                             uniformtext_mode="hide",
                         )
-                        st.plotly_chart(fig_pie, use_container_width=True, config=PLOTLY_CONFIG)
+                        st.plotly_chart(fig_pie, width="stretch", config=PLOTLY_CONFIG)
 
                 # ── Finviz Analyst Enrichment (Sprint 7) ─────────────────
                 if FINVIZ_AVAILABLE:
@@ -1010,7 +1034,7 @@ with tab_holdings:
                 if "price" in show_df.columns:
                     show_df["price"] = show_df["price"].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "—")
                 show_df.columns = [c.replace("_"," ").title() for c in show_df.columns]
-                st.dataframe(show_df, use_container_width=True, hide_index=True)
+                st.dataframe(show_df, width="stretch", hide_index=True)
 
     # ═══════════════════════════════════════════════════════════════════════
     # SUB-TAB 2: PRICE CHARTS GRID
@@ -1031,7 +1055,7 @@ with tab_holdings:
                 _pcols = st.columns(len(_period_map))
                 for _pi, (_plabel, _) in enumerate(_period_map.items()):
                     with _pcols[_pi]:
-                        if st.button(_plabel, key=f"hc_p_{_plabel}", use_container_width=True,
+                        if st.button(_plabel, key=f"hc_p_{_plabel}", width="stretch",
                                      type="primary" if st.session_state["hc_period"] == _plabel else "secondary"):
                             st.session_state["hc_period"] = _plabel
                             st.rerun()
@@ -1205,7 +1229,7 @@ with tab_holdings:
                                         nticks=4,
                                     )
                                     st.plotly_chart(
-                                        _fig, use_container_width=True,
+                                        _fig, width="stretch",
                                         config=PLOTLY_CONFIG_HOVER,
                                         key=f"hc_{_tk}_{st.session_state['hc_period']}",
                                     )
@@ -1219,12 +1243,14 @@ with tab_holdings:
                 st.info("No holdings in Tamarac file for this strategy.")
         else:
             st.info("Price charts require Tamarac holdings data.")
+    _dash_tick("EXIT tab_holdings")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # DIVIDENDS — Sprint 4: full dividend intelligence with sub-tabs
 # ══════════════════════════════════════════════════════════════════════════
 with tab_divs:
+    _dash_tick("ENTER tab_divs")
     _render_strategy_header("divs")
 
     if DIV_TAB_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
@@ -1264,22 +1290,26 @@ with tab_divs:
             render_dividend_calendar()
         else:
             st.info("Dividend calendar not yet available. Run `dividend_calendar.py` to generate data.")
+    _dash_tick("EXIT tab_divs")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # WATCHLIST
 # ══════════════════════════════════════════════════════════════════════════
 with tab_watchlist:
+    _dash_tick("ENTER tab_watchlist")
     if WATCHLIST_AVAILABLE:
         render_watchlist_tab()
     else:
         st.info("Watchlist module not found. Ensure `data/watchlist.py` and `data/watchlist_tab.py` are in the data folder.")
+    _dash_tick("EXIT tab_watchlist")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # MACRO
 # ══════════════════════════════════════════════════════════════════════════
 with tab_macro:
+    _dash_tick("ENTER tab_macro")
     if MACRO_AVAILABLE:
         # Pass QDVD yield so the context box can show it
         qdvd_yield = None
@@ -1293,28 +1323,33 @@ with tab_macro:
         render_macro_tab(qdvd_yield=qdvd_yield)
     else:
         st.info("Macro module not found. Ensure `data/macro_tab.py` is in the data folder.")
+    _dash_tick("EXIT tab_macro")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # MARKETS
 # ══════════════════════════════════════════════════════════════════════════
 with tab_markets:
+    _dash_tick("ENTER tab_markets")
     if MARKETS_AVAILABLE:
         render_markets_tab()
     else:
         st.info("Markets module not found. Ensure `data/markets_tab.py` is in the data folder.")
+    _dash_tick("EXIT tab_markets")
 
 
 # ══════════════════════════════════════════════════════════════════════════
 # ALERTS
 # ══════════════════════════════════════════════════════════════════════════
 with tab_alerts:
+    _dash_tick("ENTER tab_alerts")
     if ALERTS_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed:
         render_alerts_tab(tamarac_parsed, active)
     elif not ALERTS_AVAILABLE:
         st.info("Alerts module not found. Ensure `data/alerts_tab.py` is in the data folder.")
     else:
         st.info("Alerts require Tamarac holdings data. Upload a Tamarac export to enable alerts.")
+    _dash_tick("EXIT tab_alerts")
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -1328,11 +1363,13 @@ with tab_alerts:
 # means Dividends/Watchlist/Macro/Markets/Alerts all render before it.
 # ══════════════════════════════════════════════════════════════════════════
 with tab_perf:
+    _dash_tick("ENTER tab_perf")
     _render_strategy_header("perf")
     if COMPOSITE_AVAILABLE:
         render_performance_tab(active)
     else:
         st.info("Performance module not available. Ensure data/composite_returns.py and data/performance_tab.py are present.")
+    _dash_tick("EXIT tab_perf")
 
 
 # ── Footer ─────────────────────────────────────────────────────────────────
@@ -1349,5 +1386,5 @@ st.markdown(
 )
 # Documentation link — centered below footer
 st.markdown("<div style='margin-top:-16px'></div>", unsafe_allow_html=True)
-if st.button("Documentation", key="footer_docs_btn", use_container_width=True):
+if st.button("Documentation", key="footer_docs_btn", width="stretch"):
     st.switch_page("pages/3_Documentation.py")
