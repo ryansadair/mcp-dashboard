@@ -646,7 +646,9 @@ def _render_income_dashboard(edf, tam_df, div_data, active_strategy, strat_color
             yaxis={**_YAXIS, "tickfont": dict(size=10)},
             showlegend=True,
         )
-        st.plotly_chart(fig_yoc, use_container_width=True, config=PLOTLY_CONFIG)
+        # TEMP DIAGNOSTIC: chart disabled to test if Plotly is the bottleneck
+        st.caption("[temp] YoC chart disabled for speed test")
+        # st.plotly_chart(fig_yoc, use_container_width=True, config=PLOTLY_CONFIG)
 
     with col_right:
         st.markdown("**Consecutive Dividend Increase Streaks**")
@@ -686,7 +688,9 @@ def _render_income_dashboard(edf, tam_df, div_data, active_strategy, strat_color
                 yaxis=_YAXIS,
                 showlegend=False,
             )
-            st.plotly_chart(fig_streak, use_container_width=True, config=PLOTLY_CONFIG)
+            # TEMP DIAGNOSTIC
+            st.caption("[temp] Streak chart disabled for speed test")
+            # st.plotly_chart(fig_streak, use_container_width=True, config=PLOTLY_CONFIG)
         else:
             st.info("No consecutive-year data available for this strategy.")
 
@@ -718,7 +722,9 @@ def _render_income_dashboard(edf, tam_df, div_data, active_strategy, strat_color
             yaxis=_YAXIS,
             showlegend=False,
         )
-        st.plotly_chart(fig_inc, use_container_width=True, config=PLOTLY_CONFIG)
+        # TEMP DIAGNOSTIC
+        st.caption("[temp] Income-by-Holding chart disabled for speed test")
+        # st.plotly_chart(fig_inc, use_container_width=True, config=PLOTLY_CONFIG)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -951,7 +957,9 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
                 yaxis={**_YAXIS, "tickfont": dict(size=10)},
                 showlegend=True,
             )
-            st.plotly_chart(fig_yoc, use_container_width=True, config=PLOTLY_CONFIG)
+            # TEMP DIAGNOSTIC
+            st.caption("[temp] YoC chart disabled for speed test")
+            # st.plotly_chart(fig_yoc, use_container_width=True, config=PLOTLY_CONFIG)
     _tick("YoC chart rendered")
 
     # ── Consecutive Increases chart (moved from Income Dashboard) ──────────
@@ -993,7 +1001,9 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
                 yaxis=_YAXIS,
                 showlegend=False,
             )
-            st.plotly_chart(fig_streak, use_container_width=True, config=PLOTLY_CONFIG)
+            # TEMP DIAGNOSTIC
+            st.caption("[temp] Streak chart disabled for speed test")
+            # st.plotly_chart(fig_streak, use_container_width=True, config=PLOTLY_CONFIG)
         else:
             st.info("No consecutive-year data available for this strategy.")
     _tick("Streak chart rendered")
@@ -1021,7 +1031,9 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             height=max(300, len(yield_df) * 28 + 80),
             showlegend=False,
         )
-        st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
+        # TEMP DIAGNOSTIC
+        st.caption("[temp] Yield-by-Holding chart disabled for speed test")
+        # st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
     _tick("Yield-by-Holding chart rendered")
 
 
@@ -1222,7 +1234,9 @@ A+ = 14–15 &nbsp;·&nbsp; A = 12–13 &nbsp;·&nbsp; A- = 10–11 &nbsp;·&nbs
             yaxis=_YAXIS,
             showlegend=False,
         )
-        st.plotly_chart(fig_pay, use_container_width=True, config=PLOTLY_CONFIG)
+        # TEMP DIAGNOSTIC
+        st.caption("[temp] Payout chart disabled for speed test")
+        # st.plotly_chart(fig_pay, use_container_width=True, config=PLOTLY_CONFIG)
     _tick("payout chart rendered")
 
     # ── Risk Monitor ──────────────────────────────────────────────────────
