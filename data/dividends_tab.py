@@ -78,6 +78,31 @@ RED   = BRAND["red"]
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# DIAGNOSTIC TIMING  — TEMPORARY (remove after we identify the bottleneck)
+# ═══════════════════════════════════════════════════════════════════════════
+# Writes to Streamlit Cloud logs so we can see which step burns the cold-path
+# time on first-visit strategy switches. All prints are prefixed [DIV_TAB] so
+# they're easy to grep/filter. Remove this block + all _tick() calls once we
+# have the answer.
+
+import time as _time_mod
+
+def _make_ticker(label_prefix):
+    """Return a (_tick, _reset) pair that prints elapsed ms between calls."""
+    state = {"start": _time_mod.perf_counter(), "last": _time_mod.perf_counter()}
+    def _tick(label):
+        now = _time_mod.perf_counter()
+        step_ms = (now - state["last"]) * 1000
+        total_ms = (now - state["start"]) * 1000
+        print(f"[{label_prefix}] {label}: {step_ms:.0f}ms  (total: {total_ms:.0f}ms)", flush=True)
+        state["last"] = now
+    def _reset():
+        state["start"] = _time_mod.perf_counter()
+        state["last"] = state["start"]
+    return _tick, _reset
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # HELPER: yfinance dividend history fallback (for tickers not in Fish CCC)
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -469,6 +494,10 @@ def render_dividends_tab(tamarac_parsed, active_strategy, strat_config, kpis):
         strat_config: dict from STRATEGIES[active]
         kpis: dict with current KPI values
     """
+    # ── TIMING [temp] ──────────────────────────────────────────────────────
+    _tick, _ = _make_ticker(f"DIV_TAB:{active_strategy}")
+    _tick("enter render_dividends_tab")
+
     strat_color = strat_config["color"]
 
     # ── Load + enrich data (cached per-strategy) ───────────────────────────
@@ -477,6 +506,7 @@ def render_dividends_tab(tamarac_parsed, active_strategy, strat_config, kpis):
         edf, tam_df, price_data, div_data = _enrich_for_strategy(
             tamarac_parsed, active_strategy
         )
+    _tick("_enrich_for_strategy returned")
 
     if edf is None:
         st.info("No holdings for this strategy in Tamarac file.")
@@ -486,6 +516,7 @@ def render_dividends_tab(tamarac_parsed, active_strategy, strat_config, kpis):
     sub_announce, sub_detail, sub_safety = st.tabs([
         "Announcements", "Dividend Detail", "Safety & Growth"
     ])
+    _tick("st.tabs created")
 
     # ═══════════════════════════════════════════════════════════════════════
     # SUB-TAB 1: ANNOUNCEMENTS (existing calendar)
@@ -500,20 +531,24 @@ def render_dividends_tab(tamarac_parsed, active_strategy, strat_config, kpis):
                 "Dividend calendar not yet available. "
                 "Run `dividend_calendar.py` to generate `data/dividend_calendar.xlsx`."
             )
+    _tick("sub_announce rendered")
 
     # ═══════════════════════════════════════════════════════════════════════
     # SUB-TAB 2: DIVIDEND DETAIL TABLE
     # ═══════════════════════════════════════════════════════════════════════
     with sub_detail:
         _render_dividend_detail(edf, active_strategy, strat_color)
+    _tick("sub_detail rendered")
 
     # ═══════════════════════════════════════════════════════════════════════
     # SUB-TAB 3: SAFETY & GROWTH
     # ═══════════════════════════════════════════════════════════════════════
     with sub_safety:
         _render_safety_growth(edf, active_strategy, strat_color)
+    _tick("sub_safety rendered")
 
     st.caption(f"Dividend data via Tamarac + yfinance/Supabase • {datetime.now().strftime('%I:%M %p')}")
+    _tick("done")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -693,6 +728,10 @@ def _render_income_dashboard(edf, tam_df, div_data, active_strategy, strat_color
 def _render_dividend_detail(edf, active_strategy, strat_color):
     """Full sortable dividend metrics table with clickable rows for stock detail."""
 
+    # ── TIMING [temp] ──────────────────────────────────────────────────────
+    _tick, _ = _make_ticker(f"DIV_DETAIL:{active_strategy}")
+    _tick("enter _render_dividend_detail")
+
     # ── KPI summary row ────────────────────────────────────────────────────
     # Weighted avg yield (by portfolio weight, excluding zeros)
     valid_yield = edf[edf["current_yield"] > 0]
@@ -716,6 +755,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
     with d3: st.metric("Avg 3Y Div Growth", f"{avg_3y:+.2f}%")
     with d4: st.metric("Avg 5Y Div Growth", f"{avg_5y:+.2f}%")
     with d5: st.metric("Avg Consec. Years", f"{int(avg_consec)}")
+    _tick("KPI row rendered")
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
@@ -757,6 +797,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
     detail_df = pd.DataFrame(detail_rows)
     if not detail_df.empty and "Company" in detail_df.columns:
         detail_df = detail_df.sort_values("Company", ascending=True).reset_index(drop=True)
+    _tick("detail_df built")
 
     # Color formatting
     def _color_growth(val):
@@ -838,6 +879,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "Sector":        st.column_config.TextColumn("Sector", width="medium"),
         },
     )
+    _tick("styled dataframe rendered")
 
     # Navigate to stock detail when a row is selected
     if event and event.selection and event.selection.rows:
@@ -910,6 +952,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
                 showlegend=True,
             )
             st.plotly_chart(fig_yoc, use_container_width=True, config=PLOTLY_CONFIG)
+    _tick("YoC chart rendered")
 
     # ── Consecutive Increases chart (moved from Income Dashboard) ──────────
     with col_streak:
@@ -953,6 +996,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             st.plotly_chart(fig_streak, use_container_width=True, config=PLOTLY_CONFIG)
         else:
             st.info("No consecutive-year data available for this strategy.")
+    _tick("Streak chart rendered")
 
     # ── Dividend Yield by Holding ──────────────────────────────────────────
     st.divider()
@@ -978,6 +1022,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             showlegend=False,
         )
         st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
+    _tick("Yield-by-Holding chart rendered")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -986,6 +1031,10 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
 
 def _render_safety_growth(edf, active_strategy, strat_color):
     """Growth tier distribution, safety scores, payout trends, risk monitor."""
+
+    # ── TIMING [temp] ──────────────────────────────────────────────────────
+    _tick, _ = _make_ticker(f"SAFETY:{active_strategy}")
+    _tick("enter _render_safety_growth")
 
     col_left, col_right = st.columns(2)
 
@@ -1043,6 +1092,7 @@ def _render_safety_growth(edf, active_strategy, strat_color):
                 f"{len(no_data)} holdings with no 5Y growth data available</div>",
                 unsafe_allow_html=True,
             )
+    _tick("growth tier distribution rendered")
 
     # ── Safety Score Distribution ──────────────────────────────────────────
     with col_right:
@@ -1099,6 +1149,7 @@ def _render_safety_growth(edf, active_strategy, strat_color):
             f"</div>",
             unsafe_allow_html=True,
         )
+    _tick("safety scores rendered")
 
     # ── Methodology Reference ────────────────────────────────────────────
     with st.expander("How are safety grades calculated?"):
@@ -1172,6 +1223,7 @@ A+ = 14–15 &nbsp;·&nbsp; A = 12–13 &nbsp;·&nbsp; A- = 10–11 &nbsp;·&nbs
             showlegend=False,
         )
         st.plotly_chart(fig_pay, use_container_width=True, config=PLOTLY_CONFIG)
+    _tick("payout chart rendered")
 
     # ── Risk Monitor ──────────────────────────────────────────────────────
     st.divider()
@@ -1253,3 +1305,4 @@ A+ = 14–15 &nbsp;·&nbsp; A = 12–13 &nbsp;·&nbsp; A- = 10–11 &nbsp;·&nbs
         )
     else:
         st.success("✅ No holdings currently flagged for dividend risk.")
+    _tick("risk monitor rendered")
