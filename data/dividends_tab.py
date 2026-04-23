@@ -283,8 +283,8 @@ def _build_enriched_df(tam_df, price_data, div_data):
 # Tamarac file is updated, so the cache invalidates on its own.
 
 @st.cache_data(ttl=1800, show_spinner=False, max_entries=32)
-@disk_cached(namespace="div_enriched", ttl=1800, version=1)
-def _enriched_df_for_strategy(strategy, ticker_tuple, _tamarac_parsed, _v=1):
+@disk_cached(namespace="div_enriched", ttl=1800, version=2)
+def _enriched_df_for_strategy(strategy, ticker_tuple, _tamarac_parsed, _v=2):
     """Cached enrichment keyed on (strategy, ticker_tuple).
 
     Fetches price + dividend data from already-cached helpers, runs
