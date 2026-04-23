@@ -155,14 +155,17 @@ def _slice_period(df, period_label):
     return df.tail(days) if days else df
 
 
-def _render_ticker_pills(items, quotes, selected_ticker, section_key):
+def _render_ticker_pills(items, quotes, selected_ticker, section_key, per_row=4):
     """
-    Render a row of ticker pills showing TICKER +X.XX%. Clicking a pill
+    Render a row of ticker pills showing NAME +X.XX%. Clicking a pill
     sets it as the focus ticker and reruns.
     items: list of (name, ticker) pairs.
+    per_row: how many pills per row. Lower values = wider pills = better
+        legibility for long names (e.g. "Russell 1000 Growth"). Mobile
+        stacks all columns vertically regardless, so this only affects
+        desktop row count. Typical: 3 for long names, 4 default, 6 for
+        short names like COMMODITIES.
     """
-    # Compute a responsive number of pills per row — 6 on desktop
-    per_row = 6
     rows = [items[i:i + per_row] for i in range(0, len(items), per_row)]
 
     for row in rows:
@@ -422,11 +425,12 @@ def _render_focus_chart(ticker, name, batch_data, period_label, section_key):
     )
 
 
-def _render_focus_section(title, items, session_prefix, quotes):
+def _render_focus_section(title, items, session_prefix, quotes, per_row=4):
     """
     Render one Option B focus-chart section:
       header → ticker pills → stats card → period selector → focus chart.
     Uses a single cached batch download for all tickers in the section.
+    per_row: pills per row on desktop (see _render_ticker_pills).
     """
     section_key = f"mkt_focus_{session_prefix}"
 
@@ -443,7 +447,7 @@ def _render_focus_section(title, items, session_prefix, quotes):
         st.session_state[focus_key] = selected_ticker
 
     # ── Ticker pills row ───────────────────────────────────────────────────
-    _render_ticker_pills(items, quotes, selected_ticker, section_key)
+    _render_ticker_pills(items, quotes, selected_ticker, section_key, per_row=per_row)
 
     # ── Period selection (default = 1Y, matches Holdings) ─────────────────
     period_key = f"{section_key}_period"
@@ -913,14 +917,17 @@ def render_markets_tab():
             with st.spinner("Loading market data..."):
                 _quotes = _fetch_market_quotes()
 
-            # One focus section per market group
-            _render_focus_section("Indices", INDICES, "idx", _quotes)
-            _render_focus_section("Dividend Benchmarks", DIVIDEND_BENCHMARKS, "divbench", _quotes)
-            _render_focus_section("S&P Sector ETFs", SECTORS, "sectors", _quotes)
-            _render_focus_section("Commodities", COMMODITIES, "commod", _quotes)
-            _render_focus_section("Fixed Income ETFs", FIXED_INCOME, "fi", _quotes)
-            _render_focus_section("Global Markets — Developed", GLOBAL_DEVELOPED, "gldev", _quotes)
-            _render_focus_section("Global Markets — Emerging", GLOBAL_EMERGING, "glem", _quotes)
+            # One focus section per market group.
+            # per_row picked per section based on name length: lower for
+            # sections with long names (so pills stay legible on mobile and
+            # don't wrap awkwardly on desktop), higher for short names.
+            _render_focus_section("Indices", INDICES, "idx", _quotes, per_row=3)
+            _render_focus_section("Dividend Benchmarks", DIVIDEND_BENCHMARKS, "divbench", _quotes, per_row=3)
+            _render_focus_section("S&P Sector ETFs", SECTORS, "sectors", _quotes, per_row=4)
+            _render_focus_section("Commodities", COMMODITIES, "commod", _quotes, per_row=6)
+            _render_focus_section("Fixed Income ETFs", FIXED_INCOME, "fi", _quotes, per_row=4)
+            _render_focus_section("Global Markets — Developed", GLOBAL_DEVELOPED, "gldev", _quotes, per_row=4)
+            _render_focus_section("Global Markets — Emerging", GLOBAL_EMERGING, "glem", _quotes, per_row=4)
 
     # ── Footer ────────────────────────────────────────────────────────────
     st.caption(f"Data: yfinance (ETF proxies) · Cached 15 min · {datetime.now().strftime('%I:%M %p')}")
