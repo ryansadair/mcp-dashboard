@@ -1,0 +1,37 @@
+# Normalize line endings on commit — prevents autocrlf corruption.
+# All text files stored as LF in the repo; checked out as-is (no conversion).
+* text=auto eol=lf
+
+# Explicit types — ensures Python, Markdown, CSS, HTML, YAML, TOML are LF
+*.py     text eol=lf
+*.md     text eol=lf
+*.txt    text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.toml   text eol=lf
+*.html   text eol=lf
+*.css    text eol=lf
+*.js     text eol=lf
+*.json   text eol=lf
+*.csv    text eol=lf
+
+# Windows-only scripts keep CRLF (PowerShell, batch, VBScript)
+*.ps1    text eol=crlf
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+*.vbs    text eol=crlf
+
+# Binary files — explicitly marked so Git never tries text conversion
+*.xlsx   binary
+*.xls    binary
+*.xlsm   binary
+*.pdf    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.db     binary
+*.sqlite binary
+*.zip    binary
+*.7z     binary
