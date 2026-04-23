@@ -694,28 +694,25 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
     """Full sortable dividend metrics table with clickable rows for stock detail."""
 
     # ── KPI summary row ────────────────────────────────────────────────────
-    # Weighted avg yield (by portfolio weight, excluding zeros)
-    valid_yield = edf[edf["current_yield"] > 0]
-    wtd_yield = round((valid_yield["current_yield"] * valid_yield["weight"]).sum() / valid_yield["weight"].sum(), 2) if not valid_yield.empty and valid_yield["weight"].sum() > 0 else 0
-
     # Avg growth rates (exclude zeros and outliers)
     def _avg_col(col, lo=-50, hi=100):
         vals = edf[(edf[col] != 0) & (edf[col] > lo) & (edf[col] < hi)][col]
         return round(vals.mean(), 1) if not vals.empty else 0
 
-    avg_1y = _avg_col("growth_1y")
-    avg_3y = _avg_col("growth_3y")
-    avg_5y = _avg_col("growth_5y")
+    avg_1y  = _avg_col("growth_1y")
+    avg_3y  = _avg_col("growth_3y")
+    avg_5y  = _avg_col("growth_5y")
+    avg_10y = _avg_col("growth_10y")
 
     consec = edf[edf["consec_years"] > 0]["consec_years"].tolist()
     avg_consec = round(sum(consec) / len(consec), 0) if consec else 0
 
     d1, d2, d3, d4, d5 = st.columns(5)
-    with d1: st.metric("Wtd Avg Yield", f"{wtd_yield}%")
-    with d2: st.metric("Avg 1Y Div Growth", f"{avg_1y:+.2f}%")
-    with d3: st.metric("Avg 3Y Div Growth", f"{avg_3y:+.2f}%")
-    with d4: st.metric("Avg 5Y Div Growth", f"{avg_5y:+.2f}%")
-    with d5: st.metric("Avg Consec. Years", f"{int(avg_consec)}")
+    with d1: st.metric("Avg 1Y Div Growth",  f"{avg_1y:+.2f}%")
+    with d2: st.metric("Avg 3Y Div Growth",  f"{avg_3y:+.2f}%")
+    with d3: st.metric("Avg 5Y Div Growth",  f"{avg_5y:+.2f}%")
+    with d4: st.metric("Avg 10Y Div Growth", f"{avg_10y:+.2f}%")
+    with d5: st.metric("Avg Consec. Years",  f"{int(avg_consec)}")
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 

@@ -407,22 +407,22 @@ if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
 
         kpi_tickers = tuple(tam_kpi["symbol"].tolist())
         kpi_prices = fetch_batch_prices(kpi_tickers)
+        kpi_divs = get_batch_dividend_details(kpi_tickers)
 
         equity_weight = 0.0
-        weighted_yield = 0.0
         weighted_daily = 0.0
         for _, row in tam_kpi.iterrows():
             sym = row["symbol"]
             wt = row["weight"]
             mkt = kpi_prices.get(sym, {})
-            yld = mkt.get("dividend_yield", 0) or 0
             chg = mkt.get("change_1d_pct", 0) or 0
-            weighted_yield += wt * yld
             weighted_daily += wt * chg
             equity_weight += wt
 
-        if equity_weight > 0:
-            kpis["div_yield"] = round(weighted_yield / equity_weight, 2)
+        # Dividend yield: use same source as Dividend Detail table
+        # (Supabase dividends table → Fish CCC → yfinance). compute_weighted_yield
+        # applies a 0 < yld <= 15 sanity guard to ignore yfinance glitches.
+        kpis["div_yield"] = compute_weighted_yield(tam_kpi, kpi_divs)
 
         cash_decimal = cash_kpi / 100
         total_portfolio_weight = equity_weight + cash_decimal
