@@ -283,14 +283,20 @@ def _build_enriched_df(tam_df, price_data, div_data):
 # Tamarac file is updated, so the cache invalidates on its own.
 
 @st.cache_data(ttl=1800, show_spinner=False, max_entries=32)
-@disk_cached(namespace="div_enriched", ttl=1800, version=2)
-def _enriched_df_for_strategy(strategy, ticker_tuple, _tamarac_parsed, _v=2):
+@disk_cached(namespace="div_enriched_v2", ttl=1800, version=1)
+def _enriched_df_for_strategy_v2(strategy, ticker_tuple, _tamarac_parsed):
     """Cached enrichment keyed on (strategy, ticker_tuple).
 
     Fetches price + dividend data from already-cached helpers, runs
     _build_enriched_df, and appends the safety/growth_tier computed columns.
     The _tamarac_parsed arg is passed through so we can reconstruct tam_df
     on cache misses; leading underscore tells Streamlit not to hash it.
+
+    NOTE: Renamed from _enriched_df_for_strategy on 2026-04-23 to force cache
+    invalidation after YoC fallback logic changes. Version params on the
+    decorators weren't enough on Streamlit Cloud — function-level rename is
+    the bulletproof path because Python can't serve a cache entry keyed on
+    a function name that no longer exists.
     """
     tam_df = get_holdings_for_strategy(_tamarac_parsed, strategy)
     price_data = fetch_batch_prices(ticker_tuple)
@@ -325,7 +331,7 @@ def _enrich_for_strategy(tamarac_parsed, active_strategy):
 
     # The cached helper does the expensive work on cache misses. On hits,
     # this returns instantly.
-    edf = _enriched_df_for_strategy(active_strategy, ticker_tuple, tamarac_parsed)
+    edf = _enriched_df_for_strategy_v2(active_strategy, ticker_tuple, tamarac_parsed)
 
     # We still return price_data and div_data for callers that need them
     # (income dashboard uses them directly). These are cached, so cheap.
