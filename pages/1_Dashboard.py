@@ -407,22 +407,22 @@ if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
 
         kpi_tickers = tuple(tam_kpi["symbol"].tolist())
         kpi_prices = fetch_batch_prices(kpi_tickers)
-        kpi_divs = get_batch_dividend_details(kpi_tickers)
 
         equity_weight = 0.0
+        weighted_yield = 0.0
         weighted_daily = 0.0
         for _, row in tam_kpi.iterrows():
             sym = row["symbol"]
             wt = row["weight"]
             mkt = kpi_prices.get(sym, {})
+            yld = mkt.get("dividend_yield", 0) or 0
             chg = mkt.get("change_1d_pct", 0) or 0
+            weighted_yield += wt * yld
             weighted_daily += wt * chg
             equity_weight += wt
 
-        # Dividend yield: use same source as Dividend Detail table
-        # (Supabase dividends table → Fish CCC → yfinance). compute_weighted_yield
-        # applies a 0 < yld <= 15 sanity guard to ignore yfinance glitches.
-        kpis["div_yield"] = compute_weighted_yield(tam_kpi, kpi_divs)
+        if equity_weight > 0:
+            kpis["div_yield"] = round(weighted_yield / equity_weight, 2)
 
         cash_decimal = cash_kpi / 100
         total_portfolio_weight = equity_weight + cash_decimal
@@ -1049,7 +1049,7 @@ with tab_holdings:
                     _bcol1, _bcol2, _bcol3 = st.columns([1, 1, 1])
                     with _bcol2:
                         if st.button(
-                            f"Load {len(_charts_tam)} charts",
+                            "Load charts",
                             key=f"hc_load_{active}",
                             type="primary",
                             width="stretch",
@@ -1062,11 +1062,13 @@ with tab_holdings:
                     _chart_tickers = _charts_tam["symbol"].tolist()
                     _chart_names = dict(zip(_charts_tam["symbol"], _charts_tam["description"]))
 
-                    # Optional: small "unload" button so user can free up rerun speed
-                    _hdr_left, _hdr_right = st.columns([5, 1])
+                    # Optional: small "unload" button so user can free up rerun speed.
+                    # [3, 1] + no stretch keeps "Hide charts" on one line across
+                    # desktop and mobile widths.
+                    _hdr_left, _hdr_right = st.columns([3, 1])
                     with _hdr_right:
                         if st.button("Hide charts", key=f"hc_hide_{active}",
-                                     width="stretch", type="secondary"):
+                                     type="secondary"):
                             st.session_state.pop(_loaded_key, None)
                             st.rerun()
 

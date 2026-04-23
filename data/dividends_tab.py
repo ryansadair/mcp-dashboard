@@ -970,31 +970,6 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
         else:
             st.info("No consecutive-year data available for this strategy.")
 
-    # ── Dividend Yield by Holding ──────────────────────────────────────────
-    st.divider()
-    st.markdown("**Dividend Yield by Holding**")
-    yield_df = edf[edf["div_yield"] > 0][["symbol", "div_yield"]].sort_values("div_yield", ascending=True)
-    if not yield_df.empty:
-        fig3 = go.Figure()
-        fig3.add_trace(go.Bar(
-            x=yield_df["div_yield"], y=yield_df["symbol"], orientation="h",
-            marker=dict(
-                color=yield_df["div_yield"],
-                colorscale=[[0, BLUE], [0.5, GOLD], [1, GREEN]],
-            ),
-            text=[f"{y:.2f}%" for y in yield_df["div_yield"]],
-            textposition="outside",
-            textfont=dict(size=11, color="rgba(255,255,255,0.6)"),
-        ))
-        fig3.update_layout(
-            **PLOTLY_DARK,
-            xaxis={**_XAXIS, "title": "Yield %"},
-            yaxis=_YAXIS,
-            height=max(300, len(yield_df) * 28 + 80),
-            showlegend=False,
-        )
-        st.plotly_chart(fig3, use_container_width=True, config=PLOTLY_CONFIG)
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 # SUB-TAB 3: SAFETY & GROWTH ANALYTICS

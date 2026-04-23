@@ -173,8 +173,10 @@ def _render_ticker_pills(items, quotes, selected_ticker, section_key):
                 pct = q.get("change_pct", 0)
                 is_active = (ticker == selected_ticker)
 
-                # Label format: TICKER +X.XX%
-                label = f"{ticker}  {pct:+.2f}%"
+                # Label format: Friendly Name · +X.XX%
+                # The ticker is still shown in the stats card directly below
+                # the pills, so dropping it from the pill itself is safe.
+                label = f"{name}  {pct:+.2f}%"
 
                 if st.button(
                     label,
@@ -886,12 +888,15 @@ def render_markets_tab():
                     st.rerun()
         else:
             # ── Charts loaded — render all focus sections ────────────────────
-            _hdr_left, _hdr_right = st.columns([5, 1])
+            # [3, 1] gives the Hide button ~25% of desktop width (keeps it
+            # right-aligned and compact). Dropping width="stretch" lets the
+            # button size to its text content so "Hide charts" stays on a
+            # single line on narrow mobile columns.
+            _hdr_left, _hdr_right = st.columns([3, 1])
             with _hdr_right:
                 if st.button(
                     "Hide charts",
                     key="mkt_charts_hide",
-                    width="stretch",
                     type="secondary",
                 ):
                     st.session_state.pop(_loaded_key, None)
