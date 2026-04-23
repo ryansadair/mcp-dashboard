@@ -122,28 +122,8 @@ def _build_enriched_df(tam_df, price_data, div_data):
         mkt = price_data.get(sym, {})
         dd  = div_data.get(sym, {})
 
-        # Yield on Cost from Tamarac (decimal → percentage).
-        # Tamarac API template 41 no longer returns yield_at_cost — it's 0 until
-        # we move to a richer template. None signals "unavailable" so the UI
-        # can render em-dash instead of a misleading 0.00%.
-        yoc_raw = h.get("yield_at_cost", 0) or 0
-        yoc_pct = (float(yoc_raw) * 100 if 0 < float(yoc_raw) < 1
-                   else float(yoc_raw)) if yoc_raw else None
-
-        # Current yield: Tamarac first, then Supabase `dividends` table, then
-        # Supabase `prices` table. Different fields update at different rates
-        # and one can have zero while the other is populated.
-        # All three sources store dividend_yield as a percentage (e.g. 3.01).
-        cy_raw = h.get("current_yield", 0) or 0
-        if cy_raw:
-            cy_pct = float(cy_raw) * 100 if 0 < float(cy_raw) < 1 else float(cy_raw)
-        else:
-            _dd_yield = float(dd.get("dividend_yield", 0) or 0)
-            _mkt_yield = float(mkt.get("dividend_yield", 0) or 0)
-            # Pick whichever source has a non-zero value; prefer dividends table
-            cy_pct = _dd_yield if _dd_yield > 0 else _mkt_yield
-
-        # Quantity from Tamarac (pulled early because annual_income derives from it)
+        # Quantity from Tamarac (pulled early because annual_income derives from it,
+        # and annual_income + cost_basis are used in the YoC fallback below)
         qty = float(h.get("quantity", 0) or 0)
 
         # Annual income: Tamarac first, else compute from dividend_rate × quantity.
@@ -160,6 +140,39 @@ def _build_enriched_df(tam_df, price_data, div_data):
 
         # Cost basis from Tamarac (template 41 returns 0; UI should render em-dash)
         cost_basis = float(h.get("cost_basis", 0) or 0)
+
+        # Yield on Cost from Tamarac (decimal → percentage).
+        # Tamarac API template 41 no longer returns yield_at_cost — it's 0 for
+        # most holdings until we move to a richer template. Fallback chain:
+        #   1. annual_income / cost_basis (when both are populated)
+        #   2. annual_income / (qty × unit_cost) — unit_cost comes from
+        #      Tamarac_Holdings_Manual.xlsx and is present for legacy positions
+        #      (e.g. TTE) where cost_basis is zeroed out by template 41.
+        # None signals "unavailable" so the UI can render em-dash instead of
+        # a misleading 0.00%.
+        yoc_raw = h.get("yield_at_cost", 0) or 0
+        unit_cost = float(h.get("unit_cost", 0) or 0)
+        if yoc_raw:
+            yoc_pct = float(yoc_raw) * 100 if 0 < float(yoc_raw) < 1 else float(yoc_raw)
+        elif cost_basis > 0 and annual_inc > 0:
+            yoc_pct = (annual_inc / cost_basis) * 100
+        elif unit_cost > 0 and qty > 0 and annual_inc > 0:
+            yoc_pct = (annual_inc / (qty * unit_cost)) * 100
+        else:
+            yoc_pct = None
+
+        # Current yield: Tamarac first, then Supabase `dividends` table, then
+        # Supabase `prices` table. Different fields update at different rates
+        # and one can have zero while the other is populated.
+        # All three sources store dividend_yield as a percentage (e.g. 3.01).
+        cy_raw = h.get("current_yield", 0) or 0
+        if cy_raw:
+            cy_pct = float(cy_raw) * 100 if 0 < float(cy_raw) < 1 else float(cy_raw)
+        else:
+            _dd_yield = float(dd.get("dividend_yield", 0) or 0)
+            _mkt_yield = float(mkt.get("dividend_yield", 0) or 0)
+            # Pick whichever source has a non-zero value; prefer dividends table
+            cy_pct = _dd_yield if _dd_yield > 0 else _mkt_yield
 
         # Dividend data: prefer Fish CCC spreadsheet, fallback to Supabase/yfinance
         div_yield    = dd.get("dividend_yield", 0) or 0
