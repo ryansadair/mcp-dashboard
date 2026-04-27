@@ -566,14 +566,17 @@ with tab_overview:
                 height=280,
                 hovermode="x unified",
                 dragmode=False,
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom", y=1.02,
-                    xanchor="right",  x=1,
-                    bgcolor="rgba(0,0,0,0)",
-                    font=dict(size=11),
-                ),
             )
+            # Legend overrides PLOTLY_DARK's default legend dict — applied
+            # separately because passing legend= alongside **PLOTLY_DARK
+            # raises TypeError (PLOTLY_DARK already contains a 'legend' key).
+            fig_intra.update_layout(legend=dict(
+                orientation="h",
+                yanchor="bottom", y=1.02,
+                xanchor="right",  x=1,
+                bgcolor="rgba(0,0,0,0)",
+                font=dict(size=11),
+            ))
             st.plotly_chart(fig_intra, width="stretch", config=PLOTLY_CONFIG_HOVER)
         # If no data (pre-market, weekends, or first run), silently skip —
         # nothing useful to show, no need to spam an error message.
