@@ -160,20 +160,32 @@ def _intraday_pct_series(close_df, prev_close):
 
 def _prev_close_from_quote(quote):
     """
-    Derive previous close from a _fetch_market_quotes()-style quote dict.
-    Quote has {price, change_pct}; prev_close = price / (1 + change_pct/100).
-    Returns 0 if either value is missing.
+    Derive previous close from a quote dict. Handles two shapes:
+
+      1. _fetch_market_quotes() shape: {price, change_pct, ...}
+         (used for indices — same source as ticker bar)
+      2. fetch_batch_prices() shape: {price, previous_close, change_1d_pct, ...}
+         (used for holdings — Supabase-backed, includes every Tamarac ticker)
+
+    Returns 0 if no usable values are present.
     """
     if not quote:
         return 0
+
+    # Shape 2: previous_close stored directly (Supabase prices table)
+    pc = quote.get("previous_close", 0) or 0
+    if pc and pc > 0:
+        return float(pc)
+
+    # Shape 1: derive from price + change percentage
     price = quote.get("price", 0) or 0
-    chg_pct = quote.get("change_pct", 0) or 0
     if price <= 0:
         return 0
+
+    chg_pct = quote.get("change_pct", quote.get("change_1d_pct", 0)) or 0
     if chg_pct == 0:
-        # No change today — prev close == current price (still fine to use)
-        return price
-    return price / (1.0 + chg_pct / 100.0)
+        return float(price)
+    return float(price) / (1.0 + chg_pct / 100.0)
 
 
 def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
@@ -202,6 +214,7 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
     """
     # Lazy-import to keep this module light on import (matches Markets tab)
     from data.markets_tab import _fetch_market_quotes
+    from data.market_data import fetch_batch_prices
     from data.tamarac_parser import get_holdings_for_strategy, get_cash_weight
 
     open_pt, close_pt = _today_session_bounds_pt()
@@ -240,7 +253,11 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
 
             tickers = tuple(holdings["symbol"].tolist())
             holdings_intraday = _fetch_intraday_5m(tickers)
-            holdings_quotes = quotes  # already fetched above; same dict
+            # Holdings are not in _fetch_market_quotes (Markets-tab tickers only).
+            # Pull from Supabase via fetch_batch_prices, which already has
+            # previous_close stored for every Tamarac holding via the prefetch
+            # pipeline. Same source as the Daily Return KPI.
+            holdings_quotes = fetch_batch_prices(tickers)
 
             # Build per-ticker pct series, aligned to a common time index.
             # We pick the first non-empty series as the master timeline so
