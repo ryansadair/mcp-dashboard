@@ -482,294 +482,251 @@ _YAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(
 with tab_overview:
     _render_strategy_header("overview")
 
-    # ── Today's Intraday Performance Chart (Sprint 19) ────────────────────
-    # Strategy line + 3 index reference lines, normalized to % change from
-    # previous close. Strategy line uses the same cash-included weighting as
-    # the Daily Return KPI; index lines pull from the same yfinance cache as
-    # the ticker bar so endpoint values match exactly. ~1-2s on cold cache,
-    # instant on subsequent renders within the 15-min cache window.
-    if INTRADAY_CHART_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed:
-        with st.spinner("Loading intraday performance..."):
-            _intra = fetch_intraday_chart_data(active, tamarac_parsed)
+    # ── Shared data for both columns ──────────────────────────────────────
+    # Compute hm_df ONCE, before the columns split, so both the left column
+    # (heatmap) and the right column (Top Contributors / Detractors) can
+    # read it without duplicating work or fetching prices twice.
+    tam_ov_hm = None
+    hm_df = None
+    if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
+        tam_ov_hm = get_holdings_for_strategy(tamarac_parsed, active)
+        if not tam_ov_hm.empty:
+            ov_hm_tickers = tuple(tam_ov_hm["symbol"].tolist())
+            ov_hm_prices = fetch_batch_prices(ov_hm_tickers)
 
-        _strat_color = STRAT_COLORS.get(active, "#569542")
-        _open_pt, _close_pt = _intra["session"]
-        _strat_series = _intra["strategy"]
-        _idx_series = _intra["indices"]
-
-        _has_data = bool(_strat_series["x"]) or any(s["x"] for s in _idx_series)
-
-        if _has_data:
-            fig_intra = go.Figure()
-
-            # Helper: build legend label with the most recent % value appended.
-            # Matches the Koyfin convention "S&P 500  +0.10%" so users can read
-            # the current move without hovering.
-            def _last_y(y_list):
-                return y_list[-1] if y_list else None
-
-            # Index lines first (rendered behind the strategy line). Grays at
-            # decreasing opacity so they read as background reference, not peers.
-            _idx_styles = {
-                "^GSPC": {"color": "rgba(255,255,255,0.55)", "width": 1.5},
-                "^NDX":  {"color": "rgba(255,255,255,0.40)", "width": 1.5},
-                "^DJI":  {"color": "rgba(255,255,255,0.30)", "width": 1.5},
-            }
-            for s in _idx_series:
-                if not s["x"]:
-                    continue
-                style = _idx_styles.get(s["ticker"], {"color": "rgba(255,255,255,0.4)", "width": 1.5})
-                _last = _last_y(s["y"])
-                _legend_name = f"{s['label']}  {_last:+.2f}%" if _last is not None else s["label"]
-                fig_intra.add_trace(go.Scatter(
-                    x=s["x"], y=s["y"],
-                    name=_legend_name,
-                    mode="lines",
-                    line=dict(color=style["color"], width=style["width"]),
-                    hovertemplate=f"{s['label']}: %{{y:+.2f}}%<extra></extra>",
-                ))
-
-            # Strategy line on top (thicker, brand color)
-            if _strat_series["x"]:
-                _strat_label = STRATEGY_NAMES.get(active, active)
-                _last = _last_y(_strat_series["y"])
-                _strat_legend = f"{_strat_label}  {_last:+.2f}%" if _last is not None else _strat_label
-                fig_intra.add_trace(go.Scatter(
-                    x=_strat_series["x"], y=_strat_series["y"],
-                    name=_strat_legend,
-                    mode="lines",
-                    line=dict(color=_strat_color, width=2.5),
-                    hovertemplate=f"{_strat_label}: %{{y:+.2f}}%<extra></extra>",
-                ))
-
-            # Faint zero line so % moves above/below 0 read clearly
-            fig_intra.add_hline(
-                y=0, line_width=1,
-                line_color="rgba(255,255,255,0.15)",
-                line_dash="dot",
-            )
-
-            fig_intra.update_layout(
-                title=f"Today's Performance — {STRATEGY_NAMES.get(active, active)} vs Indices",
-                **PLOTLY_DARK,
-                xaxis={
-                    **_XAXIS,
-                    "range": [_open_pt, _close_pt],
-                    "fixedrange": True,
-                    "tickformat": "%-I:%M %p",
-                    "showspikes": True,
-                    "spikecolor": "rgba(255,255,255,0.15)",
-                    "spikethickness": 1,
-                    "spikemode": "across",
-                    "spikedash": "solid",
-                },
-                yaxis={
-                    **_YAXIS,
-                    "ticksuffix": "%",
-                    "fixedrange": True,
-                    "showspikes": True,
-                    "spikecolor": "rgba(255,255,255,0.15)",
-                    "spikethickness": 1,
-                    "spikemode": "across",
-                    "spikedash": "solid",
-                },
-                height=280,
-                hovermode="x unified",
-                dragmode=False,
-            )
-            # Legend overrides PLOTLY_DARK's default legend dict — applied
-            # separately because passing legend= alongside **PLOTLY_DARK
-            # raises TypeError (PLOTLY_DARK already contains a 'legend' key).
-            fig_intra.update_layout(legend=dict(
-                orientation="h",
-                yanchor="bottom", y=1.02,
-                xanchor="right",  x=1,
-                bgcolor="rgba(0,0,0,0)",
-                font=dict(size=11),
-            ))
-            st.plotly_chart(fig_intra, width="stretch", config=PLOTLY_CONFIG_HOVER)
-
-        # Debug: append ?debug=1 to the URL to see what _fetch_intraday_5m
-        # returned for indices vs holdings. Helpful when the strategy line
-        # is unexpectedly empty.
-        if st.query_params.get("debug") == "1" and "diag" in _intra:
-            with st.expander("🔧 Intraday chart diagnostics", expanded=False):
-                st.write("**Indices batch:**", _intra["diag"].get("indices_5m"))
-                st.write("**Holdings batch:**", _intra["diag"].get("holdings_5m"))
-                st.write("**Strategy series length:**", len(_strat_series.get("x", [])))
-                st.write("**Index series lengths:**", {s["ticker"]: len(s["x"]) for s in _idx_series})
-        # If no data (pre-market, weekends, or first run), silently skip —
-        # nothing useful to show, no need to spam an error message.
+            hm_rows = []
+            for _, row in tam_ov_hm.iterrows():
+                sym = row["symbol"]
+                mkt = ov_hm_prices.get(sym, {})
+                chg = mkt.get("change_1d_pct", 0) or 0
+                sector = mkt.get("sector", "") or "Other"
+                hm_rows.append({
+                    "symbol": sym,
+                    "description": row["description"],
+                    "weight": row["weight_pct"],
+                    "daily_return": round(chg, 2),
+                    "sector": sector,
+                })
+            hm_df = pd.DataFrame(hm_rows).sort_values("weight", ascending=False)
+            if len(hm_df) > 0:
+                hm_df["contrib"] = (hm_df["weight"] * hm_df["daily_return"] / 100).round(4)
 
     left, right = st.columns([3, 2])
 
     with left:
-        # Holdings Daily Return Treemap
-        if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
-            tam_ov_hm = get_holdings_for_strategy(tamarac_parsed, active)
+        # ── Today's Intraday Performance Chart (Sprint 19) ────────────────
+        # Strategy line + 3 index reference lines, normalized to % change
+        # from previous close. Strategy line uses the same cash-included
+        # weighting as the Daily Return KPI; index lines pull from the same
+        # yfinance cache as the ticker bar so endpoint values match exactly.
+        # Sized to fit the 3-wide left column: 220px tall, 2-hour x-ticks
+        # to prevent label crowding.
+        if INTRADAY_CHART_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed:
+            with st.spinner("Loading intraday performance..."):
+                _intra = fetch_intraday_chart_data(active, tamarac_parsed)
 
-            if not tam_ov_hm.empty:
-                ov_hm_tickers = tuple(tam_ov_hm["symbol"].tolist())
-                ov_hm_prices = fetch_batch_prices(ov_hm_tickers)
+            _strat_color = STRAT_COLORS.get(active, "#569542")
+            _open_pt, _close_pt = _intra["session"]
+            _strat_series = _intra["strategy"]
+            _idx_series = _intra["indices"]
 
-                hm_rows = []
-                for _, row in tam_ov_hm.iterrows():
-                    sym = row["symbol"]
-                    mkt = ov_hm_prices.get(sym, {})
-                    chg = mkt.get("change_1d_pct", 0) or 0
-                    sector = mkt.get("sector", "") or "Other"
-                    hm_rows.append({
-                        "symbol": sym,
-                        "description": row["description"],
-                        "weight": row["weight_pct"],
-                        "daily_return": round(chg, 2),
-                        "sector": sector,
-                    })
+            _has_data = bool(_strat_series["x"]) or any(s["x"] for s in _idx_series)
 
-                hm_df = pd.DataFrame(hm_rows).sort_values("weight", ascending=False)
+            if _has_data:
+                fig_intra = go.Figure()
 
-                # ── Today's Movers — top contributors & detractors ────
-                if len(hm_df) > 0:
-                    hm_df["contrib"] = (hm_df["weight"] * hm_df["daily_return"] / 100).round(4)
-                    movers_sorted = hm_df.sort_values("contrib", ascending=False)
-                    top3 = movers_sorted.head(3)
-                    bot3 = movers_sorted.tail(3).iloc[::-1]
+                # Helper: build legend label with the most recent % value appended.
+                # Matches the Koyfin convention "S&P 500  +0.10%" so users can read
+                # the current move without hovering.
+                def _last_y(y_list):
+                    return y_list[-1] if y_list else None
 
-                    col_top, col_bot = st.columns(2)
-                    with col_top:
-                        st.markdown(
-                            "<div style='font-size:10px;color:rgba(86,149,66,0.8);text-transform:uppercase;"
-                            "letter-spacing:0.06em;margin-bottom:6px;font-weight:700;'>▲ Top Contributors</div>",
-                            unsafe_allow_html=True,
-                        )
-                        for _, m in top3.iterrows():
-                            _c_color = "#569542" if m["daily_return"] >= 0 else "#c45454"
-                            _c_bp = m["contrib"] * 100
-                            st.markdown(
-                                f"<div style='display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);gap:8px;'>"
-                                f"<div style='flex:0 0 42px;font-size:12px;font-weight:600;color:#C9A84C;'>{m['symbol']}</div>"
-                                f"<div style='font-size:12px;color:{_c_color};font-weight:600;'>{m['daily_return']:+.2f}%</div>"
-                                f"<div style='font-size:11px;color:rgba(255,255,255,0.3);'>{_c_bp:+.1f}bp</div>"
-                                f"</div>",
-                                unsafe_allow_html=True,
-                            )
-
-                    with col_bot:
-                        st.markdown(
-                            "<div style='font-size:10px;color:rgba(196,84,84,0.8);text-transform:uppercase;"
-                            "letter-spacing:0.06em;margin-bottom:6px;font-weight:700;'>▼ Top Detractors</div>",
-                            unsafe_allow_html=True,
-                        )
-                        for _, m in bot3.iterrows():
-                            _d_color = "#569542" if m["daily_return"] >= 0 else "#c45454"
-                            _d_bp = m["contrib"] * 100
-                            st.markdown(
-                                f"<div style='display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);gap:8px;'>"
-                                f"<div style='flex:0 0 42px;font-size:12px;font-weight:600;color:#C9A84C;'>{m['symbol']}</div>"
-                                f"<div style='font-size:12px;color:{_d_color};font-weight:600;'>{m['daily_return']:+.2f}%</div>"
-                                f"<div style='font-size:11px;color:rgba(255,255,255,0.3);'>{_d_bp:+.1f}bp</div>"
-                                f"</div>",
-                                unsafe_allow_html=True,
-                            )
-
-                    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
-
-                if len(hm_df) > 0:
-                    # Build treemap: grouped by sector, sorted by return within each sector
-                    # Color scale: red (negative) → dark neutral → green (positive)
-                    _tm_max = max(abs(hm_df["daily_return"].min()), abs(hm_df["daily_return"].max()), 1.0)
-
-                    # Sort within each sector by daily return (best first)
-                    hm_df = hm_df.sort_values(["sector", "daily_return"], ascending=[True, False])
-
-                    strat_label = STRATEGY_NAMES.get(active, active)
-
-                    # Build hierarchical ids/labels/parents for sector grouping
-                    # Structure: root → sector → ticker
-                    # Use unique ids to avoid conflicts (e.g. ticker name = sector name)
-                    tm_ids = []
-                    tm_labels = []
-                    tm_parents = []
-                    tm_values = []
-                    tm_text = []
-                    tm_colors = []
-
-                    # Root node
-                    tm_ids.append("root")
-                    tm_labels.append(strat_label)
-                    tm_parents.append("")
-                    tm_values.append(0)
-                    tm_text.append("")
-                    tm_colors.append(0)
-
-                    # Sector parent nodes
-                    for sector in hm_df["sector"].unique():
-                        tm_ids.append(f"sector_{sector}")
-                        tm_labels.append(sector)
-                        tm_parents.append("root")
-                        tm_values.append(0)
-                        tm_text.append("")
-                        tm_colors.append(0)
-
-                    # Ticker leaf nodes under their sector
-                    for _, row in hm_df.iterrows():
-                        tm_ids.append(f"tick_{row['symbol']}")
-                        tm_labels.append(row["symbol"])
-                        tm_parents.append(f"sector_{row['sector']}")
-                        tm_values.append(row["weight"])
-                        tm_text.append(f"{row['daily_return']:+.2f}%")
-                        tm_colors.append(row["daily_return"])
-
-                    fig_tm = go.Figure(go.Treemap(
-                        ids=tm_ids,
-                        labels=tm_labels,
-                        parents=tm_parents,
-                        values=tm_values,
-                        text=tm_text,
-                        branchvalues="remainder",
-                        texttemplate="<b>%{label}</b><br>%{text}",
-                        textfont=dict(size=13, family="DM Sans"),
-                        hovertemplate=(
-                            "<b>%{label}</b><br>"
-                            "Weight: %{value:.2f}%<br>"
-                            "Return: %{text}<extra></extra>"
-                        ),
-                        marker=dict(
-                            colors=tm_colors,
-                            colorscale=[
-                                [0.0, "#c45454"],           # most negative → red
-                                [0.35, "#8a3a3a"],          # mild negative
-                                [0.5, "rgba(40,40,50,1)"],  # zero → dark neutral
-                                [0.65, "#3a6a30"],          # mild positive
-                                [1.0, "#569542"],           # most positive → green
-                            ],
-                            cmid=0,
-                            cmin=-_tm_max,
-                            cmax=_tm_max,
-                            line=dict(width=2, color="rgba(12,17,23,0.8)"),
-                            showscale=False,
-                        ),
-                        tiling=dict(pad=3),
-                        pathbar=dict(visible=False),
+                # Index lines first (rendered behind the strategy line). Grays at
+                # decreasing opacity so they read as background reference, not peers.
+                _idx_styles = {
+                    "^GSPC": {"color": "rgba(255,255,255,0.55)", "width": 1.5},
+                    "^NDX":  {"color": "rgba(255,255,255,0.40)", "width": 1.5},
+                    "^DJI":  {"color": "rgba(255,255,255,0.30)", "width": 1.5},
+                }
+                for s in _idx_series:
+                    if not s["x"]:
+                        continue
+                    style = _idx_styles.get(s["ticker"], {"color": "rgba(255,255,255,0.4)", "width": 1.5})
+                    _last = _last_y(s["y"])
+                    _legend_name = f"{s['label']}  {_last:+.2f}%" if _last is not None else s["label"]
+                    fig_intra.add_trace(go.Scatter(
+                        x=s["x"], y=s["y"],
+                        name=_legend_name,
+                        mode="lines",
+                        line=dict(color=style["color"], width=style["width"]),
+                        hovertemplate=f"{s['label']}: %{{y:+.2f}}%<extra></extra>",
                     ))
 
-                    # Start at root level so sectors show as groups
-                    fig_tm.update_traces(level="root")
+                # Strategy line on top (thicker, brand color)
+                if _strat_series["x"]:
+                    _strat_label = STRATEGY_NAMES.get(active, active)
+                    _last = _last_y(_strat_series["y"])
+                    _strat_legend = f"{_strat_label}  {_last:+.2f}%" if _last is not None else _strat_label
+                    fig_intra.add_trace(go.Scatter(
+                        x=_strat_series["x"], y=_strat_series["y"],
+                        name=_strat_legend,
+                        mode="lines",
+                        line=dict(color=_strat_color, width=2.5),
+                        hovertemplate=f"{_strat_label}: %{{y:+.2f}}%<extra></extra>",
+                    ))
 
-                    _tm_layout = {**PLOTLY_DARK}
-                    _tm_layout["margin"] = dict(l=0, r=0, t=36, b=0)
-                    fig_tm.update_layout(
-                        **_tm_layout,
-                        title=f"Today's Returns — {strat_label}",
-                        height=max(550, len(hm_df) * 18 + 100),
-                    )
-                    st.plotly_chart(fig_tm, width="stretch", config=PLOTLY_CONFIG)
-                else:
-                    st.info("No holdings data available.")
-            else:
-                st.info("No holdings for this strategy.")
+                # Faint zero line so % moves above/below 0 read clearly
+                fig_intra.add_hline(
+                    y=0, line_width=1,
+                    line_color="rgba(255,255,255,0.15)",
+                    line_dash="dot",
+                )
+
+                fig_intra.update_layout(
+                    title=f"Today's Performance — {STRATEGY_NAMES.get(active, active)} vs Indices",
+                    **PLOTLY_DARK,
+                    xaxis={
+                        **_XAXIS,
+                        "range": [_open_pt, _close_pt],
+                        "fixedrange": True,
+                        "tickformat": "%-I %p",
+                        "dtick": 7200000,  # 2 hours in milliseconds — prevents label crowding in narrower column
+                        "showspikes": True,
+                        "spikecolor": "rgba(255,255,255,0.15)",
+                        "spikethickness": 1,
+                        "spikemode": "across",
+                        "spikedash": "solid",
+                    },
+                    yaxis={
+                        **_YAXIS,
+                        "ticksuffix": "%",
+                        "fixedrange": True,
+                        "showspikes": True,
+                        "spikecolor": "rgba(255,255,255,0.15)",
+                        "spikethickness": 1,
+                        "spikemode": "across",
+                        "spikedash": "solid",
+                    },
+                    height=220,
+                    hovermode="x unified",
+                    dragmode=False,
+                )
+                # Legend overrides PLOTLY_DARK's default legend dict — applied
+                # separately because passing legend= alongside **PLOTLY_DARK
+                # raises TypeError (PLOTLY_DARK already contains a 'legend' key).
+                fig_intra.update_layout(legend=dict(
+                    orientation="h",
+                    yanchor="bottom", y=1.02,
+                    xanchor="right",  x=1,
+                    bgcolor="rgba(0,0,0,0)",
+                    font=dict(size=11),
+                ))
+                st.plotly_chart(fig_intra, width="stretch", config=PLOTLY_CONFIG_HOVER)
+
+            # Debug: append ?debug=1 to the URL to see what _fetch_intraday_5m
+            # returned for indices vs holdings. Helpful when the strategy line
+            # is unexpectedly empty.
+            if st.query_params.get("debug") == "1" and "diag" in _intra:
+                with st.expander("🔧 Intraday chart diagnostics", expanded=False):
+                    st.write("**Indices batch:**", _intra["diag"].get("indices_5m"))
+                    st.write("**Holdings batch:**", _intra["diag"].get("holdings_5m"))
+                    st.write("**Strategy series length:**", len(_strat_series.get("x", [])))
+                    st.write("**Index series lengths:**", {s["ticker"]: len(s["x"]) for s in _idx_series})
+
+        # ── Holdings Daily Return Treemap ────────────────────────────────
+        if hm_df is not None and len(hm_df) > 0:
+            # Build treemap: grouped by sector, sorted by return within each sector
+            # Color scale: red (negative) → dark neutral → green (positive)
+            _tm_max = max(abs(hm_df["daily_return"].min()), abs(hm_df["daily_return"].max()), 1.0)
+
+            # Sort within each sector by daily return (best first)
+            hm_df = hm_df.sort_values(["sector", "daily_return"], ascending=[True, False])
+
+            strat_label = STRATEGY_NAMES.get(active, active)
+
+            # Build hierarchical ids/labels/parents for sector grouping
+            # Structure: root → sector → ticker
+            # Use unique ids to avoid conflicts (e.g. ticker name = sector name)
+            tm_ids = []
+            tm_labels = []
+            tm_parents = []
+            tm_values = []
+            tm_text = []
+            tm_colors = []
+
+            # Root node
+            tm_ids.append("root")
+            tm_labels.append(strat_label)
+            tm_parents.append("")
+            tm_values.append(0)
+            tm_text.append("")
+            tm_colors.append(0)
+
+            # Sector parent nodes
+            for sector in hm_df["sector"].unique():
+                tm_ids.append(f"sector_{sector}")
+                tm_labels.append(sector)
+                tm_parents.append("root")
+                tm_values.append(0)
+                tm_text.append("")
+                tm_colors.append(0)
+
+            # Ticker leaf nodes under their sector
+            for _, row in hm_df.iterrows():
+                tm_ids.append(f"tick_{row['symbol']}")
+                tm_labels.append(row["symbol"])
+                tm_parents.append(f"sector_{row['sector']}")
+                tm_values.append(row["weight"])
+                tm_text.append(f"{row['daily_return']:+.2f}%")
+                tm_colors.append(row["daily_return"])
+
+            fig_tm = go.Figure(go.Treemap(
+                ids=tm_ids,
+                labels=tm_labels,
+                parents=tm_parents,
+                values=tm_values,
+                text=tm_text,
+                branchvalues="remainder",
+                texttemplate="<b>%{label}</b><br>%{text}",
+                textfont=dict(size=13, family="DM Sans"),
+                hovertemplate=(
+                    "<b>%{label}</b><br>"
+                    "Weight: %{value:.2f}%<br>"
+                    "Return: %{text}<extra></extra>"
+                ),
+                marker=dict(
+                    colors=tm_colors,
+                    colorscale=[
+                        [0.0, "#c45454"],           # most negative → red
+                        [0.35, "#8a3a3a"],          # mild negative
+                        [0.5, "rgba(40,40,50,1)"],  # zero → dark neutral
+                        [0.65, "#3a6a30"],          # mild positive
+                        [1.0, "#569542"],           # most positive → green
+                    ],
+                    cmid=0,
+                    cmin=-_tm_max,
+                    cmax=_tm_max,
+                    line=dict(width=2, color="rgba(12,17,23,0.8)"),
+                    showscale=False,
+                ),
+                tiling=dict(pad=3),
+                pathbar=dict(visible=False),
+            ))
+
+            # Start at root level so sectors show as groups
+            fig_tm.update_traces(level="root")
+
+            _tm_layout = {**PLOTLY_DARK}
+            _tm_layout["margin"] = dict(l=0, r=0, t=36, b=0)
+            fig_tm.update_layout(
+                **_tm_layout,
+                title=f"Today's Returns — {strat_label}",
+                height=max(550, len(hm_df) * 18 + 100),
+            )
+            st.plotly_chart(fig_tm, width="stretch", config=PLOTLY_CONFIG)
         else:
-            # Sprint 1 fallback
+            # Sprint 1 fallback — only triggers if hm_df is unavailable
+            # (SPRINT2 not loaded, no Tamarac data, or empty holdings).
             perf_df = get_perf_chart_data(active, strat["bench_ticker"])
             fig = go.Figure()
             fig.add_trace(go.Scatter(
@@ -796,6 +753,55 @@ with tab_overview:
             st.plotly_chart(fig, width="stretch", config=PLOTLY_CONFIG_HOVER)
 
     with right:
+        # ── Today's Movers — Top Contributors & Detractors ───────────────
+        # Reads hm_df (computed above the column split) so we don't refetch
+        # prices. Contributors and detractors stay side-by-side as the user
+        # had them — the right column is wide enough at 2/5 of page width
+        # for the compact ticker-percent-bp layout.
+        if hm_df is not None and len(hm_df) > 0:
+            movers_sorted = hm_df.sort_values("contrib", ascending=False)
+            top3 = movers_sorted.head(3)
+            bot3 = movers_sorted.tail(3).iloc[::-1]
+
+            col_top, col_bot = st.columns(2)
+            with col_top:
+                st.markdown(
+                    "<div style='font-size:10px;color:rgba(86,149,66,0.8);text-transform:uppercase;"
+                    "letter-spacing:0.06em;margin-bottom:6px;font-weight:700;'>▲ Top Contributors</div>",
+                    unsafe_allow_html=True,
+                )
+                for _, m in top3.iterrows():
+                    _c_color = "#569542" if m["daily_return"] >= 0 else "#c45454"
+                    _c_bp = m["contrib"] * 100
+                    st.markdown(
+                        f"<div style='display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);gap:8px;'>"
+                        f"<div style='flex:0 0 42px;font-size:12px;font-weight:600;color:#C9A84C;'>{m['symbol']}</div>"
+                        f"<div style='font-size:12px;color:{_c_color};font-weight:600;'>{m['daily_return']:+.2f}%</div>"
+                        f"<div style='font-size:11px;color:rgba(255,255,255,0.3);'>{_c_bp:+.1f}bp</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+
+            with col_bot:
+                st.markdown(
+                    "<div style='font-size:10px;color:rgba(196,84,84,0.8);text-transform:uppercase;"
+                    "letter-spacing:0.06em;margin-bottom:6px;font-weight:700;'>▼ Top Detractors</div>",
+                    unsafe_allow_html=True,
+                )
+                for _, m in bot3.iterrows():
+                    _d_color = "#569542" if m["daily_return"] >= 0 else "#c45454"
+                    _d_bp = m["contrib"] * 100
+                    st.markdown(
+                        f"<div style='display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);gap:8px;'>"
+                        f"<div style='flex:0 0 42px;font-size:12px;font-weight:600;color:#C9A84C;'>{m['symbol']}</div>"
+                        f"<div style='font-size:12px;color:{_d_color};font-weight:600;'>{m['daily_return']:+.2f}%</div>"
+                        f"<div style='font-size:11px;color:rgba(255,255,255,0.3);'>{_d_bp:+.1f}bp</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+
+            st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+
         st.markdown("<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:12px;'>Sector Allocation</div>", unsafe_allow_html=True)
 
         # Sprint 2: build sector data from Tamarac + yfinance
