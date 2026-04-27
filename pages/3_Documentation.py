@@ -172,7 +172,7 @@ Full sortable table of every position in the selected strategy. All columns can 
 <tr><td>1D Change</td><td><span class="doc-source">Supabase</span></td><td>Percentage change from previous close</td></tr>
 <tr><td>YTD Return</td><td><span class="doc-source">Supabase</span></td><td>Year-to-date percentage return</td></tr>
 <tr><td>Div Yield</td><td><span class="doc-source">yfinance</span></td><td>Trailing 12-month dividend yield</td></tr>
-<tr><td>Yield on Cost</td><td><span class="doc-source">Tamarac</span></td><td>Stored as a decimal in the export (e.g., 0.0558 = 5.58%). Multiplied by 100 for display.</td></tr>
+<tr><td>Yield on Cost</td><td><span class="doc-source">Tamarac</span></td><td>Stored as a decimal in the export (e.g., 0.0558 = 5.58%). When yield_at_cost is missing, falls back to annual_income / cost_basis, then annual_income / (qty × unit_cost) from the manual file. Multiplied by 100 for display.</td></tr>
 <tr><td>Div Safety</td><td><span class="doc-source">Fish CCC</span> <span class="doc-source">yfinance</span></td><td>Letter grade (A+ through C) based on payout ratio, 5Y growth rate, and consecutive years of increases. See Dividends tab for full methodology.</td></tr>
 <tr><td>MCP Target</td><td><span class="doc-source">Notion</span></td><td>Proprietary price target from the MCP Master Holdings database in Notion. Upside % = (target - price) / price × 100.</td></tr>
 <tr><td>Sector</td><td><span class="doc-source">yfinance</span></td><td>GICS sector classification</td></tr>
@@ -212,7 +212,7 @@ st.markdown('<div class="doc-section">Performance Tab</div>', unsafe_allow_html=
 
 st.markdown("""
 <div class="doc-body">
-Shows strategy performance vs benchmarks over time using authoritative composite return data from Composite Returns.xls (updated quarterly, covers QDVD since Jun 2010, SMID since Dec 2014, DAC since Dec 2015, OR since Sep 2017). All returns displayed gross of fees.
+Shows strategy performance vs benchmarks over time using authoritative composite return data from Composite Returns.xls (updated quarterly, covers QDVD since Jun 2010, SMID since Dec 2014, DAC since Dec 2015, OR since Sep 2017). All returns displayed gross of fees. The parser auto-detects strategy block rows by scanning for label text rather than using hard-coded row numbers, which keeps it resilient to row insertions when the quarterly file is updated. Both .xls (xlrd) and .xlsx (openpyxl) formats are supported.
 </div>
 
 <div class="doc-subsection">Strategy Benchmarks</div>
@@ -264,7 +264,17 @@ st.markdown('<div class="doc-section">Dividends Tab</div>', unsafe_allow_html=Tr
 
 st.markdown("""
 <div class="doc-body">
-Comprehensive dividend intelligence across multiple sub-tabs: Snapshot, Safety & Growth, Dividend History, and Dividend Calendar.
+Dividend intelligence across three sub-tabs: Announcements (upcoming ex-dividend calendar), Dividend Detail (full sortable metrics table with clickable rows for Stock Detail), and Safety & Growth (analytics — growth tier distribution, safety scores, payout chart, risk monitor).
+</div>
+
+<div class="doc-subsection">Top KPI Cards</div>
+<div class="doc-body">
+The four KPI cards above the sub-tabs are: Daily Return, Cash %, Dividend Yield, and Holdings count. Dividend Yield is computed as a portfolio-weighted average using the same data source as the Dividend Detail table (Supabase dividends → Fish CCC → yfinance), with a 0–15% sanity guard to filter out yfinance glitches.
+</div>
+
+<div class="doc-subsection">Dividend Detail Sub-tab KPI Row</div>
+<div class="doc-body">
+Five cards summarizing the strategy's growth profile: Avg 1Y Div Growth, Avg 3Y Div Growth, Avg 5Y Div Growth, Avg 10Y Div Growth, and Avg Consecutive Years. Each is a simple average across holdings with valid data, excluding zeros and outliers (range guard: -50% to +100%). The 10Y row primarily uses Fish CCC data; holdings without a CCC streak show 0 and are excluded from the average.
 </div>
 
 <div class="doc-subsection">Dividend Safety Grades</div>
@@ -298,7 +308,7 @@ Generated weekly by a Python script that runs every Monday via Windows Task Sche
 <tr><td>1Y dividend growth</td><td><span class="doc-source">Fish CCC</span></td><td>yfinance</td></tr>
 <tr><td>Payout ratio</td><td><span class="doc-source">Finviz</span></td><td>yfinance</td></tr>
 <tr><td>Ex-dividend dates</td><td><span class="doc-source">yfinance</span></td><td>—</td></tr>
-<tr><td>Yield on cost</td><td><span class="doc-source">Tamarac</span></td><td>— (computed by Tamarac from cost basis)</td></tr>
+<tr><td>Yield on cost</td><td><span class="doc-source">Tamarac</span></td><td>Fallback chain when yield_at_cost is missing (template 41 zeros it for most positions): annual_income / cost_basis, then annual_income / (qty × unit_cost) using the manual cost-basis file. Holdings missing all three render em-dash.</td></tr>
 </table>
 
 <div class="doc-subsection">ADR / Special Dividend Handling</div>
@@ -389,20 +399,25 @@ st.markdown('<div class="doc-section">Markets Tab</div>', unsafe_allow_html=True
 
 st.markdown("""
 <div class="doc-body">
-Broad market snapshot using ETF proxies and actual index tickers, sorted by daily performance (best to worst) within each section. All data from a single batched yfinance call (~50 tickers), cached 15 minutes. Row hover highlights on all tables.
+Broad market snapshot using ETF proxies and actual index tickers, organized into two sub-tabs (Tables and Charts). All data comes from a single batched yfinance call (~50 tickers), cached 15 minutes.
 </div>
 
-<div class="doc-subsection">Normalized Performance Chart</div>
+<div class="doc-subsection">Tables Sub-tab</div>
 <div class="doc-body">
-Koyfin-style multi-line chart comparing S&P 500, Nasdaq 100, Russell 2000, and Dow Jones, normalized to percentage change. Uses actual index tickers (^GSPC, ^NDX, ^RUT, ^DJI) — not ETF proxies — so the chart values match the tables exactly. For the 1D view, the previous close baseline is derived from the same data source as the tables. Intraday timestamps are converted to Pacific time. Period selector: 1D, 1M, 3M, 6M, YTD, 1Y, 3Y, 5Y, Max. Touch-to-zoom disabled for mobile usability.
+Compact tables grouped by section (Indices, Dividend Benchmarks, Sectors, Commodities, Fixed Income, Global Developed, Global Emerging), sorted by daily performance (best to worst) within each. Row hover highlights and a "% From High" column per row.
+</div>
+
+<div class="doc-subsection">Charts Sub-tab</div>
+<div class="doc-body">
+Lazy-loaded focus-chart layout. Click "Load charts" to fetch a year of daily history for all ~50 tickers in one batch. Within each section, click a ticker pill to make it the focus — its full history renders below alongside a stats card (LAST / 1D / YTD / 52W range). The pill density per section adapts to name length: 3 per row for INDICES and DIVIDEND_BENCHMARKS (long names like "Russell 1000 Growth"), 4 for most sections, 6 for COMMODITIES (short names). On mobile, all pills stack vertically. Period selector matches the Holdings tab (1M / 3M / 6M / YTD / 1Y / 2Y / 3Y / 5Y / Max).
 </div>
 
 <table class="doc-table">
 <tr><th>Section</th><th>Tickers</th><th>Notes</th></tr>
-<tr><td>Indices</td><td>Nasdaq 100, DJIA, Russell 2000, Russell 1000 Value/Growth, AGG, Bitcoin</td><td>Bitcoin uses BTC-USD</td></tr>
+<tr><td>Indices</td><td>Nasdaq 100, DJIA, Russell 2000, Russell 1000 Value/Growth, AGG</td><td>S&P 500 lives in Dividend Benchmarks since it's the primary benchmark for QDVD/DAC/OR</td></tr>
 <tr><td>Dividend Benchmarks</td><td>S&P 500, SPYD, SDY, REGL, S&P 400, Russell 3000, DWX, DVY</td><td>Key benchmarks for dividend strategies</td></tr>
 <tr><td>S&P Sector ETFs</td><td>XLK, XLV, XLF, XLY, XLP, XLI, XLE, XLU, XLRE, XLB, XLC</td><td>All 11 GICS sectors</td></tr>
-<tr><td>Commodities</td><td>GC=F, SI=F, CL=F, BZ=F, NG=F, HG=F</td><td>Actual futures contracts, not ETF proxies</td></tr>
+<tr><td>Commodities</td><td>GC=F, SI=F, CL=F, BZ=F, NG=F, HG=F, BTC-USD</td><td>Actual futures contracts plus Bitcoin (no ETF proxies)</td></tr>
 <tr><td>Fixed Income</td><td>^TNX, GOVT, TIP, LQD, HYG, MUB, CWB</td><td>10Y Treasury yield + Government, TIPS, IG, HY, Munis, Convertibles</td></tr>
 <tr><td>Global Developed</td><td>EFA, EWJ, EWU, EWG, EWA, EWQ</td><td>Broad + major countries</td></tr>
 <tr><td>Global Emerging</td><td>EEM, FXI, EPI, EWZ, EWW, EWY, EZA</td><td>Broad + major countries</td></tr>
@@ -464,7 +479,7 @@ Market data is refreshed automatically during trading hours. The pipeline runs a
 <table class="doc-table">
 <tr><th>Component</th><th>Frequency</th><th>Details</th></tr>
 <tr><td>Supabase price data</td><td>Every 15 min (market hours)</td><td>prefetch_cloud.py runs via GitHub Actions. Fetches prices, changes, yields, 52-week data from yfinance and writes to Supabase.</td></tr>
-<tr><td>Tamarac Holdings</td><td>Manual export, auto-pushed</td><td>Ryan exports from Tamarac, drops file in data/ folder. A background file watcher (watch_tamarac.py) detects the change and auto-commits/pushes to GitHub within 60 seconds.</td></tr>
+<tr><td>Tamarac Holdings</td><td>Manual export, auto-pushed</td><td>Ryan exports from Tamarac, drops file in data/ folder. A background file watcher (watch_tamarac.py) detects the change and auto-commits/pushes to GitHub within 60 seconds. The watcher also monitors Watchlists.xlsx, Composite Returns, and Fish CCC files. If Tamarac_Holdings_Manual.xlsx is present in the same folder, the parser merges in unit_cost / cost_basis / annual_income / yield_at_cost / current_yield by (strategy, ticker) — the API template 41 zeros these out, so the manual file fills the gap for legacy positions.</td></tr>
 <tr><td>Fish CCC data</td><td>Monthly</td><td>Monthly David Fish CCC spreadsheet placed in data/ folder. File pattern: Fish_*.xlsx (glob selects newest).</td></tr>
 <tr><td>Dividend Calendar</td><td>Weekly (Monday)</td><td>Generated by dividend_calendar.py via Windows Task Scheduler. Auto-commits and pushes to GitHub.</td></tr>
 <tr><td>Notion data</td><td>Live (cached 1hr)</td><td>Investment theses, dividend commentary, and MCP price targets fetched from Notion API on each page load.</td></tr>
@@ -475,6 +490,11 @@ Market data is refreshed automatically during trading hours. The pipeline runs a
 <div class="doc-subsection">Cron Job Maintenance</div>
 <div class="doc-body">
 The cron-job.org trigger uses a GitHub Personal Access Token (classic, repo scope) to dispatch the workflow. If the token expires, update the Authorization header in cron-job.org. Prefetch market hours detection automatically handles EDT/DST transitions — no manual seasonal adjustment is needed.
+</div>
+
+<div class="doc-subsection">Caching Architecture</div>
+<div class="doc-body">
+Expensive computations (Performance tab returns, dividend enrichment, batch yfinance fetches) use a three-tier cache: in-memory via @st.cache_data, then disk via @disk_cached (utils/disk_cache.py) with a per-namespace version param, then full rebuild on miss. Cache invalidation: bump the version param on the decorator AND ensure the function name actually changes — Streamlit Cloud has been observed serving stale rows even after a version bump. Renaming the function (e.g. _enriched_df_for_strategy → _enriched_df_for_strategy_v2) is the bulletproof bust because Python can't serve a cache entry under a name that no longer exists.
 </div>
 
 <div class="doc-subsection">Data Freshness Display</div>
