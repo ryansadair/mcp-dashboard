@@ -27,6 +27,13 @@ try:
 except ImportError:
     SPRINT2_AVAILABLE = False
 
+# Sprint 19: intraday performance chart (Overview tab)
+try:
+    from data.intraday_chart import fetch_intraday_chart_data
+    INTRADAY_CHART_AVAILABLE = True
+except ImportError:
+    INTRADAY_CHART_AVAILABLE = False
+
 # Tamarac auto-detector (Sprint 5)
 try:
     from data.tamarac_detector import (
@@ -474,6 +481,103 @@ _YAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(
 # ══════════════════════════════════════════════════════════════════════════
 with tab_overview:
     _render_strategy_header("overview")
+
+    # ── Today's Intraday Performance Chart (Sprint 19) ────────────────────
+    # Strategy line + 3 index reference lines, normalized to % change from
+    # previous close. Strategy line uses the same cash-included weighting as
+    # the Daily Return KPI; index lines pull from the same yfinance cache as
+    # the ticker bar so endpoint values match exactly. ~1-2s on cold cache,
+    # instant on subsequent renders within the 15-min cache window.
+    if INTRADAY_CHART_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed:
+        with st.spinner("Loading intraday performance..."):
+            _intra = fetch_intraday_chart_data(active, tamarac_parsed)
+
+        _strat_color = STRAT_COLORS.get(active, "#569542")
+        _open_pt, _close_pt = _intra["session"]
+        _strat_series = _intra["strategy"]
+        _idx_series = _intra["indices"]
+
+        _has_data = bool(_strat_series["x"]) or any(s["x"] for s in _idx_series)
+
+        if _has_data:
+            fig_intra = go.Figure()
+
+            # Index lines first (rendered behind the strategy line). Grays at
+            # decreasing opacity so they read as background reference, not peers.
+            _idx_styles = {
+                "^GSPC": {"color": "rgba(255,255,255,0.55)", "width": 1.5},
+                "^NDX":  {"color": "rgba(255,255,255,0.40)", "width": 1.5},
+                "^DJI":  {"color": "rgba(255,255,255,0.30)", "width": 1.5},
+            }
+            for s in _idx_series:
+                if not s["x"]:
+                    continue
+                style = _idx_styles.get(s["ticker"], {"color": "rgba(255,255,255,0.4)", "width": 1.5})
+                fig_intra.add_trace(go.Scatter(
+                    x=s["x"], y=s["y"],
+                    name=s["label"],
+                    mode="lines",
+                    line=dict(color=style["color"], width=style["width"]),
+                    hovertemplate=f"{s['label']}: %{{y:+.2f}}%<extra></extra>",
+                ))
+
+            # Strategy line on top (thicker, brand color)
+            if _strat_series["x"]:
+                _strat_label = STRATEGY_NAMES.get(active, active)
+                fig_intra.add_trace(go.Scatter(
+                    x=_strat_series["x"], y=_strat_series["y"],
+                    name=_strat_label,
+                    mode="lines",
+                    line=dict(color=_strat_color, width=2.5),
+                    hovertemplate=f"{_strat_label}: %{{y:+.2f}}%<extra></extra>",
+                ))
+
+            # Faint zero line so % moves above/below 0 read clearly
+            fig_intra.add_hline(
+                y=0, line_width=1,
+                line_color="rgba(255,255,255,0.15)",
+                line_dash="dot",
+            )
+
+            fig_intra.update_layout(
+                title=f"Today's Performance — {STRATEGY_NAMES.get(active, active)} vs Indices",
+                **PLOTLY_DARK,
+                xaxis={
+                    **_XAXIS,
+                    "range": [_open_pt, _close_pt],
+                    "fixedrange": True,
+                    "tickformat": "%-I:%M %p",
+                    "showspikes": True,
+                    "spikecolor": "rgba(255,255,255,0.15)",
+                    "spikethickness": 1,
+                    "spikemode": "across",
+                    "spikedash": "solid",
+                },
+                yaxis={
+                    **_YAXIS,
+                    "ticksuffix": "%",
+                    "fixedrange": True,
+                    "showspikes": True,
+                    "spikecolor": "rgba(255,255,255,0.15)",
+                    "spikethickness": 1,
+                    "spikemode": "across",
+                    "spikedash": "solid",
+                },
+                height=280,
+                hovermode="x unified",
+                dragmode=False,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom", y=1.02,
+                    xanchor="right",  x=1,
+                    bgcolor="rgba(0,0,0,0)",
+                    font=dict(size=11),
+                ),
+            )
+            st.plotly_chart(fig_intra, width="stretch", config=PLOTLY_CONFIG_HOVER)
+        # If no data (pre-market, weekends, or first run), silently skip —
+        # nothing useful to show, no need to spam an error message.
+
     left, right = st.columns([3, 2])
 
     with left:
@@ -737,9 +841,9 @@ with tab_overview:
         if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
             tam_top10 = get_holdings_for_strategy(tamarac_parsed, active)
             if not tam_top10.empty:
-                top10_tickers = tuple(tam_top10["symbol"].head(10).tolist())
+                top10_tickers = tuple(tam_top10["symbol"].head(6).tolist())
                 top10_prices = fetch_batch_prices(top10_tickers)
-                for _, h in tam_top10.head(10).iterrows():
+                for _, h in tam_top10.head(6).iterrows():
                     sym = h["symbol"]
                     mkt = top10_prices.get(sym, {})
                     price = mkt.get("price", 0)
@@ -761,7 +865,7 @@ with tab_overview:
         else:
             holdings_df = get_holdings(active)
             if not holdings_df.empty:
-                for _, h in holdings_df.head(10).iterrows():
+                for _, h in holdings_df.head(6).iterrows():
                     st.markdown(
                         f"<div style='display:flex;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);'>"
                         f"<div style='flex:0 0 50px;font-size:12px;font-weight:600;color:#C9A84C;'>{h.get('ticker','')}</div>"
