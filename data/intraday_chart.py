@@ -66,9 +66,16 @@ def _fetch_intraday_5m(tickers_tuple):
     Cached 15 min. Returns dict of {ticker: DataFrame[Close]} indexed by
     timezone-aware datetime in UTC. Empty DataFrames for tickers with no
     data (early morning, weekends, errors).
+
+    Also returns a sentinel under key "__diag__" with details about what
+    yfinance returned (shape, sample columns, exception). Useful for
+    debugging when a batch silently produces no data.
     """
+    diag = {"requested": list(tickers_tuple), "rows": 0, "shape": None,
+            "columns_sample": None, "error": None}
+
     if not tickers_tuple:
-        return {}
+        return {"__diag__": {**diag, "error": "empty input"}}
 
     try:
         import yfinance as yf
@@ -81,32 +88,52 @@ def _fetch_intraday_5m(tickers_tuple):
             threads=True,
             auto_adjust=False,
         )
-    except Exception:
-        return {t: pd.DataFrame() for t in tickers_tuple}
+    except Exception as e:
+        diag["error"] = f"yf.download raised: {type(e).__name__}: {e}"
+        return {**{t: pd.DataFrame() for t in tickers_tuple}, "__diag__": diag}
+
+    if data is None or (hasattr(data, "empty") and data.empty):
+        diag["error"] = "yf.download returned empty"
+        return {**{t: pd.DataFrame() for t in tickers_tuple}, "__diag__": diag}
+
+    diag["shape"] = str(getattr(data, "shape", "?"))
+    diag["rows"] = len(data) if hasattr(data, "__len__") else 0
+    if hasattr(data, "columns"):
+        try:
+            if isinstance(data.columns, pd.MultiIndex):
+                diag["columns_sample"] = list(data.columns.get_level_values(0).unique())[:8]
+            else:
+                diag["columns_sample"] = list(data.columns)[:8]
+        except Exception:
+            pass
 
     result = {}
     multi = len(tickers_tuple) > 1 and hasattr(data, "columns") and isinstance(data.columns, pd.MultiIndex)
 
     for ticker in tickers_tuple:
         try:
-            if multi and ticker in data.columns.get_level_values(0):
-                df = data[ticker]
-            elif not multi:
-                df = data
+            if multi:
+                # Try direct lookup first; fall back to checking the level-0 names
+                level0 = data.columns.get_level_values(0)
+                if ticker in level0:
+                    df = data[ticker]
+                else:
+                    result[ticker] = pd.DataFrame()
+                    continue
             else:
-                result[ticker] = pd.DataFrame()
-                continue
+                df = data
 
             if df is None or df.empty or "Close" not in df.columns:
                 result[ticker] = pd.DataFrame()
                 continue
 
-            # Keep just Close, drop NaN. Index is already tz-aware (yfinance)
             close = df[["Close"]].dropna()
             result[ticker] = close
-        except Exception:
+        except Exception as e:
+            diag.setdefault("ticker_errors", []).append(f"{ticker}: {type(e).__name__}: {e}")
             result[ticker] = pd.DataFrame()
 
+    result["__diag__"] = diag
     return result
 
 
@@ -192,6 +219,7 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
 
     # ── Strategy line ───────────────────────────────────────────────────
     strategy_x, strategy_y = [], []
+    holdings_intraday = {}  # always defined so the diag block below is safe
 
     if tamarac_parsed and active_strategy in tamarac_parsed:
         holdings = get_holdings_for_strategy(tamarac_parsed, active_strategy)
@@ -257,4 +285,8 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
         "strategy": {"name": active_strategy, "x": strategy_x, "y": strategy_y},
         "indices":  index_series,
         "session":  (open_pt, close_pt),
+        "diag": {
+            "indices_5m":  idx_intraday.get("__diag__", {}) if isinstance(idx_intraday, dict) else {},
+            "holdings_5m": holdings_intraday.get("__diag__", {}) if isinstance(holdings_intraday, dict) else {},
+        },
     }

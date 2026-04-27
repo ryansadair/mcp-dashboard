@@ -502,6 +502,12 @@ with tab_overview:
         if _has_data:
             fig_intra = go.Figure()
 
+            # Helper: build legend label with the most recent % value appended.
+            # Matches the Koyfin convention "S&P 500  +0.10%" so users can read
+            # the current move without hovering.
+            def _last_y(y_list):
+                return y_list[-1] if y_list else None
+
             # Index lines first (rendered behind the strategy line). Grays at
             # decreasing opacity so they read as background reference, not peers.
             _idx_styles = {
@@ -513,9 +519,11 @@ with tab_overview:
                 if not s["x"]:
                     continue
                 style = _idx_styles.get(s["ticker"], {"color": "rgba(255,255,255,0.4)", "width": 1.5})
+                _last = _last_y(s["y"])
+                _legend_name = f"{s['label']}  {_last:+.2f}%" if _last is not None else s["label"]
                 fig_intra.add_trace(go.Scatter(
                     x=s["x"], y=s["y"],
-                    name=s["label"],
+                    name=_legend_name,
                     mode="lines",
                     line=dict(color=style["color"], width=style["width"]),
                     hovertemplate=f"{s['label']}: %{{y:+.2f}}%<extra></extra>",
@@ -524,9 +532,11 @@ with tab_overview:
             # Strategy line on top (thicker, brand color)
             if _strat_series["x"]:
                 _strat_label = STRATEGY_NAMES.get(active, active)
+                _last = _last_y(_strat_series["y"])
+                _strat_legend = f"{_strat_label}  {_last:+.2f}%" if _last is not None else _strat_label
                 fig_intra.add_trace(go.Scatter(
                     x=_strat_series["x"], y=_strat_series["y"],
-                    name=_strat_label,
+                    name=_strat_legend,
                     mode="lines",
                     line=dict(color=_strat_color, width=2.5),
                     hovertemplate=f"{_strat_label}: %{{y:+.2f}}%<extra></extra>",
@@ -578,6 +588,16 @@ with tab_overview:
                 font=dict(size=11),
             ))
             st.plotly_chart(fig_intra, width="stretch", config=PLOTLY_CONFIG_HOVER)
+
+        # Debug: append ?debug=1 to the URL to see what _fetch_intraday_5m
+        # returned for indices vs holdings. Helpful when the strategy line
+        # is unexpectedly empty.
+        if st.query_params.get("debug") == "1" and "diag" in _intra:
+            with st.expander("🔧 Intraday chart diagnostics", expanded=False):
+                st.write("**Indices batch:**", _intra["diag"].get("indices_5m"))
+                st.write("**Holdings batch:**", _intra["diag"].get("holdings_5m"))
+                st.write("**Strategy series length:**", len(_strat_series.get("x", [])))
+                st.write("**Index series lengths:**", {s["ticker"]: len(s["x"]) for s in _idx_series})
         # If no data (pre-market, weekends, or first run), silently skip —
         # nothing useful to show, no need to spam an error message.
 
