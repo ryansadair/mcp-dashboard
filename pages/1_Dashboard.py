@@ -583,7 +583,6 @@ with tab_overview:
                 )
 
                 fig_intra.update_layout(
-                    title=f"Today's Performance — {STRATEGY_NAMES.get(active, active)} vs Indices",
                     **PLOTLY_DARK,
                     xaxis={
                         **_XAXIS,
