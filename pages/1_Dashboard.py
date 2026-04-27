@@ -10,8 +10,7 @@ from utils.config import STRATEGIES, SECTOR_COLORS, BRAND
 from components.header import render_header
 from components.market_ticker import render_market_ticker
 from components.kpi_cards import render_kpi_cards
-from data.holdings import get_holdings
-from data.performance import get_strategy_kpis, get_benchmark_ytd, get_perf_chart_data
+from data.performance import get_strategy_kpis, get_benchmark_ytd
 
 # ── Sprint 2 imports (graceful if not yet available) ──────────────────────
 try:
@@ -723,33 +722,9 @@ with tab_overview:
                 height=max(550, len(hm_df) * 18 + 100),
             )
             st.plotly_chart(fig_tm, width="stretch", config=PLOTLY_CONFIG)
-        else:
-            # Sprint 1 fallback — only triggers if hm_df is unavailable
-            # (SPRINT2 not loaded, no Tamarac data, or empty holdings).
-            perf_df = get_perf_chart_data(active, strat["bench_ticker"])
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=perf_df["month"], y=perf_df["strategy"],
-                name=active,
-                line=dict(color=strat["color"], width=2.5),
-                mode="lines+markers", marker=dict(size=4),
-            ))
-            fig.add_trace(go.Scatter(
-                x=perf_df["month"], y=perf_df["benchmark"],
-                name=strat["bench"],
-                line=dict(color="rgba(255,255,255,0.3)", width=1.5, dash="dot"),
-                mode="lines",
-            ))
-            fig.update_layout(
-                title="YTD Cumulative Performance",
-                **PLOTLY_DARK,
-                xaxis={**_XAXIS, "fixedrange": True, "showspikes": True, "spikecolor": "rgba(255,255,255,0.15)", "spikethickness": 1, "spikemode": "across", "spikedash": "solid"},
-                yaxis={**_YAXIS, "ticksuffix": "%", "fixedrange": True, "showspikes": True, "spikecolor": "rgba(255,255,255,0.15)", "spikethickness": 1, "spikemode": "across", "spikedash": "solid"},
-                height=280,
-                hovermode="x unified",
-                dragmode=False,
-            )
-            st.plotly_chart(fig, width="stretch", config=PLOTLY_CONFIG_HOVER)
+        # If hm_df is unavailable (Tamarac data missing), the left column
+        # simply ends with the intraday chart — no fallback chart rendered.
+        # Better to show nothing than to render placeholder data.
 
     with right:
         # ── Today's Movers — Top Contributors & Detractors ───────────────
@@ -803,7 +778,10 @@ with tab_overview:
 
         st.markdown("<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:12px;'>Sector Allocation</div>", unsafe_allow_html=True)
 
-        # Sprint 2: build sector data from Tamarac + yfinance
+        # Sprint 2: build sector data from Tamarac + yfinance. If Sprint 2
+        # data is unavailable, sector_df stays None and we skip the render
+        # block below — better than hard-coded sector weights.
+        sector_df = None
         if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
             tam_ov = get_holdings_for_strategy(tamarac_parsed, active)
             cash_ov = get_cash_weight(tamarac_parsed, active)
@@ -818,36 +796,20 @@ with tab_overview:
                 if cash_ov > 0:
                     sector_rows.append({"sector": "Cash", "weight": cash_ov})
                 sector_df = pd.DataFrame(sector_rows).groupby("sector")["weight"].sum().reset_index().sort_values("weight", ascending=False)
-            else:
-                sector_df = pd.DataFrame([{"sector": "No data", "weight": 100}])
-        else:
-            # Sprint 1 fallback
-            holdings_df = get_holdings(active)
-            if not holdings_df.empty and "sector" in holdings_df.columns:
-                sector_df = holdings_df.groupby("sector")["weight"].sum().reset_index().sort_values("weight", ascending=False)
-            else:
-                sector_df = pd.DataFrame([
-                    {"sector": "Healthcare",       "weight": 24.5},
-                    {"sector": "Consumer Staples", "weight": 22.8},
-                    {"sector": "Technology",       "weight": 18.2},
-                    {"sector": "Industrials",      "weight": 16.4},
-                    {"sector": "Financials",       "weight": 10.1},
-                    {"sector": "Energy",           "weight": 5.2},
-                    {"sector": "Cash",             "weight": 2.8},
-                ])
 
-        for _, row in sector_df.iterrows():
-            color = SECTOR_COLORS.get(row["sector"], "#888")
-            st.markdown(
-                f"<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'>"
-                f"<div style='width:10px;height:10px;border-radius:2px;background:{color};flex-shrink:0;'></div>"
-                f"<div style='flex:1;font-size:13px;color:rgba(255,255,255,0.7);'>{row['sector']}</div>"
-                f"<div style='width:120px;background:rgba(255,255,255,0.06);border-radius:3px;height:6px;overflow:hidden;'>"
-                f"<div style='width:{min(float(row['weight'])*2.5,100):.1f}%;height:6px;border-radius:3px;background:{color};'></div></div>"
-                f"<div style='font-size:13px;color:rgba(255,255,255,0.5);width:54px;text-align:right;white-space:nowrap;'>{float(row['weight']):.2f}%</div>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
+        if sector_df is not None:
+            for _, row in sector_df.iterrows():
+                color = SECTOR_COLORS.get(row["sector"], "#888")
+                st.markdown(
+                    f"<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'>"
+                    f"<div style='width:10px;height:10px;border-radius:2px;background:{color};flex-shrink:0;'></div>"
+                    f"<div style='flex:1;font-size:13px;color:rgba(255,255,255,0.7);'>{row['sector']}</div>"
+                    f"<div style='width:120px;background:rgba(255,255,255,0.06);border-radius:3px;height:6px;overflow:hidden;'>"
+                    f"<div style='width:{min(float(row['weight'])*2.5,100):.1f}%;height:6px;border-radius:3px;background:{color};'></div></div>"
+                    f"<div style='font-size:13px;color:rgba(255,255,255,0.5);width:54px;text-align:right;white-space:nowrap;'>{float(row['weight']):.2f}%</div>"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
 
         # Top 10 Holdings — compact display with headers
         st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
@@ -890,21 +852,8 @@ with tab_overview:
                         f"</div>",
                         unsafe_allow_html=True,
                     )
-        else:
-            holdings_df = get_holdings(active)
-            if not holdings_df.empty:
-                for _, h in holdings_df.head(6).iterrows():
-                    st.markdown(
-                        f"<div style='display:flex;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);'>"
-                        f"<div style='flex:0 0 50px;font-size:12px;font-weight:600;color:#C9A84C;'>{h.get('ticker','')}</div>"
-                        f"<div style='flex:1;font-size:11px;color:rgba(255,255,255,0.45);'>{h.get('name','')}</div>"
-                        f"<div style='flex:0 0 46px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h.get('weight',0):.2f}%</div>"
-                        f"<div style='flex:0 0 65px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>${h.get('price',0):.2f}</div>"
-                        f"<div style='flex:0 0 52px;font-size:12px;color:rgba(255,255,255,0.7);text-align:right;'>{h.get('chg1d',0):+.2f}%</div>"
-                        f"<div style='flex:0 0 52px;font-size:12px;color:#C9A84C;text-align:right;'>—</div>"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
+        # If Tamarac data unavailable, the Top Holdings table renders with
+        # only the header row — better than placeholder data.
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -1112,37 +1061,10 @@ with tab_holdings:
             else:
                 st.info("No holdings in Tamarac file for this strategy.")
 
-        # ── Sprint 1 fallback ─────────────────────────────────────────────
+        # If Tamarac data is unavailable, show a clean empty state. Better
+        # than rendering placeholder holdings.
         else:
-            search = st.text_input("🔍 Search ticker or company", placeholder="JNJ, Coca-Cola...", key="holdings_search")
-            holdings_df = get_holdings(active)
-
-            if holdings_df.empty:
-                st.info("No holdings data. Upload a Tamarac export below.")
-            else:
-                if search:
-                    mask = (
-                        holdings_df["ticker"].str.lower().str.contains(search.lower(), na=False) |
-                        holdings_df["name"].str.lower().str.contains(search.lower(), na=False)
-                    )
-                    holdings_df = holdings_df[mask]
-
-                sort_opts = [c for c in ["weight","ytd","div_yield","quality","chg1d"] if c in holdings_df.columns]
-                c1, c2 = st.columns([2,1])
-                with c1: sort_by = st.selectbox("Sort by", sort_opts)
-                with c2: sort_asc = st.checkbox("Ascending", value=False)
-                holdings_df = holdings_df.sort_values(sort_by, ascending=sort_asc)
-
-                display_cols = ["ticker","name","weight","price","chg1d","ytd","div_yield","div_growth_5y","sector","div_culture","quality"]
-                available = [c for c in display_cols if c in holdings_df.columns]
-                show_df = holdings_df[available].copy()
-                for col in ["weight","chg1d","ytd","div_yield","div_growth_5y"]:
-                    if col in show_df.columns:
-                        show_df[col] = show_df[col].apply(lambda x: f"+{x:.2f}%" if pd.notna(x) and float(x) >= 0 else f"{x:.2f}%" if pd.notna(x) else "—")
-                if "price" in show_df.columns:
-                    show_df["price"] = show_df["price"].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "—")
-                show_df.columns = [c.replace("_"," ").title() for c in show_df.columns]
-                st.dataframe(show_df, width="stretch", hide_index=True)
+            st.info("Tamarac data unavailable. Drop the latest Tamarac Holdings export in the data/ folder.")
 
     # ═══════════════════════════════════════════════════════════════════════
     # SUB-TAB 2: PRICE CHARTS GRID — lazy-loaded (Sprint 17)
@@ -1433,18 +1355,14 @@ with tab_divs:
             st.info("No holdings for this strategy in Tamarac file.")
 
     else:
-        # Sprint 1 fallback
-        d1, d2, d3, d4 = st.columns(4)
-        with d1: st.metric("Wtd Avg Yield", f"{float(kpis.get('div_yield', 0)):.2f}%")
-        with d2: st.metric("Yield on Cost", "—")
-        with d3: st.metric("5Y Div CAGR", "—")
-        with d4: st.metric("Annual Income Est.", "—")
+        # Tamarac data unavailable. Show empty state for KPIs but keep the
+        # dividend calendar — that's sourced independently from a real Excel
+        # file, not Sprint 1 placeholder data.
+        st.info("Tamarac data unavailable. Drop the latest Tamarac Holdings export in the data/ folder.")
 
-        st.markdown("**Estimated Dividend Increase Announcements**")
         if DIV_CALENDAR_AVAILABLE:
+            st.markdown("**Estimated Dividend Increase Announcements**")
             render_dividend_calendar()
-        else:
-            st.info("Dividend calendar not yet available. Run `dividend_calendar.py` to generate data.")
 
 
 # ══════════════════════════════════════════════════════════════════════════
