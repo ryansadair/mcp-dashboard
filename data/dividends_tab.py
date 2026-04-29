@@ -36,6 +36,17 @@ from data.tamarac_parser import (
     get_all_unique_tickers,
     STRATEGY_NAMES,
 )
+from data.scorecard_loader import (
+    load_scorecard,
+    days_since,
+    is_stale,
+    format_as_of,
+    get_mcp_detail_map,
+    _normalize_ticker as _norm_sc_ticker,
+    BUCKET_ORDER,
+    BUCKET_COLORS,
+    STALE_DAYS,
+)
 
 # Attempt to import the existing announcement calendar
 try:
@@ -975,272 +986,400 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
 # SUB-TAB 3: SAFETY & GROWTH ANALYTICS
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def _render_safety_growth(edf, active_strategy, strat_color):
-    """Growth tier distribution, safety scores, payout trends, risk monitor."""
+    """
+    Sprint 21 rewrite — Dividend Distress Scorecard view.
 
-    col_left, col_right = st.columns(2)
+    Reads data/dividend_scorecard_latest.json (written by run_scorecard.py
+    in the Dividend Monitoring System project) and renders the 6-pillar
+    framework: bucket distribution, full MCP scorecard table, per-ticker
+    pillar breakdowns for flagged names, and broader-universe Red/Critical.
 
-    # ── Growth Tier Distribution ───────────────────────────────────────────
-    with col_left:
-        st.markdown("**Dividend Growth Tier Distribution**")
-        st.markdown(
-            "<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
-            "Based on 5-year CAGR of dividend per share"
-            "</div>",
-            unsafe_allow_html=True,
+    Per Sprint 21 design: shows ALL MCP holdings regardless of active
+    strategy (universe view) — `edf` and `active_strategy` parameters are
+    retained for caller compatibility but no longer drive the data path.
+    `strat_color` is unused; kept in signature so the caller doesn't break.
+    """
+    # Reduce noise — these are not used by the scorecard view
+    _ = edf
+    _ = active_strategy
+    _ = strat_color
+
+    scorecard = load_scorecard()
+
+    # ── No file available → empty state with run instructions ────────────
+    if scorecard is None:
+        st.warning(
+            "**Dividend Distress Scorecard not yet available.**\n\n"
+            "The scorecard hasn't been generated, or the JSON copy in "
+            "`data/dividend_scorecard_latest.json` is missing or unreadable.\n\n"
+            "To populate this tab, run the scorecard pipeline:\n\n"
+            "```\npython run_scorecard.py\n```\n\n"
+            "(from the Dividend Monitoring System project). The script writes "
+            "a copy into the dashboard repo automatically; commit and push "
+            "to update Streamlit Cloud."
+        )
+        return
+
+    as_of = scorecard.get("as_of_date", "")
+    days_old = days_since(as_of)
+    summary = scorecard.get("summary", {})
+    mcp_rows = scorecard.get("mcp_rows", []) or []
+    universe_flagged = scorecard.get("universe_flagged", []) or []
+    detail_map = get_mcp_detail_map(scorecard)
+
+    # ── Header strip: as-of date, scope, optional staleness warning ──────
+    header_bits = [
+        f"As of <strong>{format_as_of(as_of)}</strong>",
+        f"<strong>{summary.get('mcp_count', len(mcp_rows))}</strong> MCP holdings",
+        f"<strong>{summary.get('total_scored', 0)}</strong> total scored",
+    ]
+    if days_old is not None:
+        header_bits.append(f"{days_old} day{'s' if days_old != 1 else ''} ago")
+
+    st.markdown(
+        f"<div style='font-size:13px;color:rgba(255,255,255,0.55);margin-bottom:8px;'>"
+        f"{' &nbsp;·&nbsp; '.join(header_bits)}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    if is_stale(as_of):
+        st.warning(
+            f"⚠️ Scorecard is **{days_old} days old** (threshold: {STALE_DAYS} days). "
+            f"Re-run `python run_scorecard.py` to refresh."
         )
 
-        tier_order = ["Elite (10%+)", "Strong (5–10%)", "Steady (2–5%)", "Slow (<2%)", "Uncertain (non-CCC)", "Cut / Frozen"]
-        tier_colors = {
-            "Elite (10%+)":       GREEN,
-            "Strong (5–10%)":     "#6aad56",
-            "Steady (2–5%)":      GOLD,
-            "Slow (<2%)":         "#e8a838",
-            "Uncertain (non-CCC)": "rgba(255,255,255,0.35)",
-            "Cut / Frozen":       RED,
-        }
-
-        # Only include holdings with non-zero growth data
-        has_growth = edf[edf["growth_5y"] != 0].copy()
-        no_data = edf[edf["growth_5y"] == 0]
-
-        for tier in tier_order:
-            tier_holdings = has_growth[has_growth["growth_tier"] == tier]
-            count = len(tier_holdings)
-            if count == 0:
-                continue
-            pct = round(count / len(edf) * 100, 0)
-            tickers = ", ".join(tier_holdings["symbol"].tolist()[:8])
-            color = tier_colors.get(tier, "rgba(255,255,255,0.3)")
-
-            st.markdown(
-                f"<div style='margin-bottom:12px;'>"
-                f"<div style='display:flex;justify-content:space-between;margin-bottom:4px;'>"
-                f"<span style='font-size:12px;color:{color};font-weight:600;'>{tier}</span>"
-                f"<span style='font-size:12px;color:rgba(255,255,255,0.6);'>{count} holdings ({pct:.0f}%)</span>"
-                f"</div>"
-                f"<div style='height:16px;border-radius:4px;background:rgba(255,255,255,0.03);overflow:hidden;'>"
-                f"<div style='width:{pct}%;height:100%;border-radius:4px;"
-                f"background:linear-gradient(90deg,{color}66,{color}cc);'></div>"
-                f"</div>"
-                f"<div style='font-size:10px;color:rgba(255,255,255,0.3);margin-top:3px;'>{tickers}</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-        if len(no_data) > 0:
-            st.markdown(
-                f"<div style='font-size:11px;color:rgba(255,255,255,0.25);margin-top:4px;'>"
-                f"{len(no_data)} holdings with no 5Y growth data available</div>",
-                unsafe_allow_html=True,
-            )
-
-    # ── Safety Score Distribution ──────────────────────────────────────────
-    with col_right:
-        st.markdown("**Dividend Safety Scores**")
-        st.markdown(
-            "<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
-            "Composite of payout ratio, 5Y growth rate, and consecutive-year streak"
-            "</div>",
-            unsafe_allow_html=True,
-        )
-
-        grade_order = ["A+", "A", "A-", "B+", "B", "B-", "C"]
-        grade_colors = {
-            "A+": GREEN, "A": "#6aad56", "A-": "#8cc47a",
-            "B+": GOLD, "B": "#e8a838", "B-": RED, "C": "#8a3030",
-        }
-
-        for grade in grade_order:
-            grade_holdings = edf[edf["safety"] == grade]
-            count = len(grade_holdings)
-            if count == 0:
-                continue
-            pct = round(count / len(edf) * 100, 0)
-            color = grade_colors.get(grade, "rgba(255,255,255,0.3)")
-            tickers = ", ".join(grade_holdings["symbol"].tolist()[:6])
-
-            st.markdown(
-                f"<div style='margin-bottom:10px;'>"
-                f"<div style='display:flex;justify-content:space-between;margin-bottom:3px;'>"
-                f"<span style='font-size:12px;font-weight:700;color:{color};'>{grade}</span>"
-                f"<span style='font-size:12px;color:rgba(255,255,255,0.6);'>{count} ({pct:.0f}%)</span>"
-                f"</div>"
-                f"<div style='height:14px;border-radius:4px;background:rgba(255,255,255,0.03);overflow:hidden;'>"
-                f"<div style='width:{pct}%;height:100%;border-radius:4px;"
-                f"background:linear-gradient(180deg,{color}cc,{color}55);'></div>"
-                f"</div>"
-                f"<div style='font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px;'>{tickers}</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-        # Portfolio weighted safety
-        a_plus_count = len(edf[edf["safety"].str.startswith("A")])
-        a_pct = round(a_plus_count / len(edf) * 100, 0)
-        st.markdown(
-            f"<div style='padding:14px;background:rgba(86,149,66,0.04);border-radius:8px;"
-            f"border:1px solid rgba(86,149,66,0.1);margin-top:12px;'>"
-            f"<div style='display:flex;justify-content:space-between;'>"
-            f"<span style='font-size:12px;font-weight:600;color:rgba(255,255,255,0.6);'>A-rated or better</span>"
-            f"<span style='font-size:16px;font-weight:700;color:{GREEN};'>{a_pct:.0f}%</span>"
-            f"</div>"
-            f"<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-top:4px;'>"
-            f"{a_plus_count} of {len(edf)} holdings rated A- or better</div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-
-    # ── Methodology Reference ────────────────────────────────────────────
-    with st.expander("How are safety grades calculated?"):
+    # Methodology expander — lifted from the scorecard's docx methodology
+    # section so users can see how to interpret the buckets without
+    # opening the full PDF report.
+    with st.expander("Methodology — six-pillar framework"):
         st.markdown("""
-<div style="font-size:12px; color:rgba(255,255,255,0.65); line-height:1.7;">
+The **MCP Dividend Distress Scorecard** scores each dividend-paying
+holding on six pillars derived from analysis of historical dividend
+cuts. The framework was backtested against nine fundamentals-driven
+cut events (INTC 2023, WBA 2024, GE 2017, T 2022, KHC 2019, MMM 2023,
+COP 2016, MAT 2017, MAC 2018) and correctly flagged 9 of 9 at 12 months
+pre-cut.
 
-Each holding receives a composite score (0–15 pts) from three equally weighted inputs, then mapped to a letter grade.
+**Six Pillars**
 
-**Payout Ratio** — lower is safer (source: Fish CCC, fallback Supabase/yfinance)
+1. **Yield Signal** — Is the yield elevated because the price is falling? Compares current yield to 5-year average and measures distance from 52-week high.
+2. **Cash Flow Coverage** — Can FCF pay the dividend? FCF payout ratio, earnings payout, Morningstar Dividend Safety as fallbacks.
+3. **Balance Sheet** — Does leverage threaten the dividend? Interest coverage 40%, Morningstar Financial Health (Distance-to-Default proxy) 60%.
+4. **Business Quality** — Does the business earn excess returns? Morningstar Economic Moat, Capital Allocation rating, ROIC.
+5. **Market Signal** — Is the market pricing in distress? Short interest, proximity to 52-week low, Morningstar star rating.
+6. **Dividend Trajectory** — What has the dividend done historically? Detects freezes, recent cuts, decelerating growth, and variable-dividend policies using 10+ years of payout history.
 
-<div style="margin-left:12px; color:rgba(255,255,255,0.5);">
-&lt;40% → 5 pts &nbsp;·&nbsp; 40–55% → 4 pts &nbsp;·&nbsp; 55–70% → 3 pts &nbsp;·&nbsp; 70–85% → 2 pts &nbsp;·&nbsp; 85%+ → 1 pt &nbsp;·&nbsp; No data → 2 pts
-</div>
+**Composite & Risk Buckets**
 
-**5-Year Dividend Growth Rate** — higher is safer (source: Fish CCC, fallback yfinance)
+Each pillar scores from −2 (severe stress) to +2 (healthy). Composite scales to a −10 to +10 range. A severity override ensures a single −2 pillar triggers at least Yellow, and two or more −2 pillars force at least Red.
 
-<div style="margin-left:12px; color:rgba(255,255,255,0.5);">
-10%+ → 5 pts &nbsp;·&nbsp; 5–10% → 4 pts &nbsp;·&nbsp; 2–5% → 3 pts &nbsp;·&nbsp; 0–2% → 2 pts &nbsp;·&nbsp; Negative → 0 pts
-<br>Non-Fish tickers (ADRs, foreign): mild negatives score 2 pts (FX/special div noise)
-</div>
+| Bucket | Composite | Interpretation |
+|---|---|---|
+| **Critical** | ≤ −6 | Multiple severe pillars. Cut likely within 12 months if pressure persists. |
+| **Red** | −3 to −5 | Significant stress across pillars. Cut risk elevated. Monitor closely. |
+| **Yellow** | −1 to −2 | Emerging stress. Watch list candidate. |
+| **Green** | 0 to +2 | Neutral to mildly healthy dividend. |
+| **Strong** | ≥ +3 | Very healthy dividend with ample coverage and quality fundamentals. |
+""")
 
-**Consecutive Years of Increases** — longer streak is safer (source: Fish CCC)
+    # ── Bucket distribution counter cards ────────────────────────────────
+    st.markdown(
+        "<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);"
+        "margin-top:24px;margin-bottom:10px;'>MCP Holdings — Risk Bucket Distribution</div>",
+        unsafe_allow_html=True,
+    )
 
-<div style="margin-left:12px; color:rgba(255,255,255,0.5);">
-25+ yrs → 5 pts &nbsp;·&nbsp; 15–24 → 4 pts &nbsp;·&nbsp; 10–14 → 3 pts &nbsp;·&nbsp; 5–9 → 2 pts &nbsp;·&nbsp; &lt;5 → 1 pt &nbsp;·&nbsp; No data → 3 pts
-</div>
+    by_bucket = summary.get("mcp_by_bucket", {}) or {}
+    cols = st.columns(len(BUCKET_ORDER))
+    for i, bucket in enumerate(BUCKET_ORDER):
+        count = int(by_bucket.get(bucket, 0))
+        color = BUCKET_COLORS.get(bucket, "rgba(255,255,255,0.3)")
+        with cols[i]:
+            st.markdown(
+                f"<div style='background:rgba(255,255,255,0.02);"
+                f"border:1px solid {color}33;border-left:3px solid {color};"
+                f"border-radius:8px;padding:14px 14px;'>"
+                f"<div style='font-size:10px;text-transform:uppercase;letter-spacing:0.08em;"
+                f"color:{color};font-weight:700;'>{bucket}</div>"
+                f"<div style='font-size:28px;font-weight:700;color:rgba(255,255,255,0.9);"
+                f"font-family:\"DM Serif Display\",serif;line-height:1.2;margin-top:4px;'>{count}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
 
-**Grade Scale** (sum of three scores)
-
-<div style="margin-left:12px; color:rgba(255,255,255,0.5);">
-A+ = 14–15 &nbsp;·&nbsp; A = 12–13 &nbsp;·&nbsp; A- = 10–11 &nbsp;·&nbsp; B+ = 8–9 &nbsp;·&nbsp; B = 6–7 &nbsp;·&nbsp; B- = 4–5 &nbsp;·&nbsp; C = 0–3
-</div>
-
-</div>
-""", unsafe_allow_html=True)
-
-    # ── Payout Ratio Heatmap ──────────────────────────────────────────────
-    st.divider()
-    st.markdown("**Payout Ratio — Traffic Light System**")
+    # ── MCP Holdings — Full Scorecard table ───────────────────────────────
+    st.markdown(
+        "<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);"
+        "margin-top:24px;margin-bottom:10px;'>MCP Holdings — Full Scorecard</div>",
+        unsafe_allow_html=True,
+    )
     st.markdown(
         "<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
-        "Green (&lt;50%) · Gold (50–70%) · Amber (70–85%) · Red (&gt;85%)"
+        "All MCP holdings sorted by composite score (most distressed first). "
+        "Sectors normalized to MCP convention. Yellow/Red/Critical names "
+        "have an expandable per-pillar breakdown below the table."
         "</div>",
         unsafe_allow_html=True,
     )
 
-    payout_df = edf[edf["payout_ratio"] > 0][["symbol", "payout_ratio", "safety", "consec_years", "sector"]].copy()
-    payout_df = payout_df.sort_values("payout_ratio", ascending=True)
+    # Build display dataframe with normalized sectors and bucket sort key
+    bucket_sort_key = {b: i for i, b in enumerate(BUCKET_ORDER)}
+    rows = []
+    for r in mcp_rows:
+        bucket = r.get("bucket", "")
+        rows.append({
+            "Ticker":      _norm_sc_ticker(r.get("ticker", "")),
+            "Company":     r.get("company", "") or "",
+            "Sector":      normalize_sector(r.get("sector", "")),
+            "Yield":       r.get("yield"),
+            "Composite":   r.get("composite"),
+            "Bucket":      bucket,
+            "Trajectory":  r.get("trajectory_pattern", "") or "",
+            "Key Signal":  r.get("key_signal", "") or "",
+            "_bucket_sort": bucket_sort_key.get(bucket, 99),
+            "_composite_sort": r.get("composite") if r.get("composite") is not None else 99,
+        })
+    sc_df = pd.DataFrame(rows)
+    if not sc_df.empty:
+        sc_df = sc_df.sort_values(["_bucket_sort", "_composite_sort"]).reset_index(drop=True)
 
-    if not payout_df.empty:
-        colors = [_payout_color(v) for v in payout_df["payout_ratio"]]
-        fig_pay = go.Figure()
-        fig_pay.add_trace(go.Bar(
-            y=payout_df["symbol"], x=payout_df["payout_ratio"], orientation="h",
-            marker=dict(color=colors, opacity=0.8),
-            text=[f"{v:.0f}%" for v in payout_df["payout_ratio"]],
-            textposition="outside",
-            textfont=dict(size=10, color="rgba(255,255,255,0.6)"),
-        ))
-        # Add reference lines
-        fig_pay.add_vline(x=50, line_dash="dot", line_color="rgba(201,168,76,0.3)", annotation_text="50%", annotation_position="top")
-        fig_pay.add_vline(x=70, line_dash="dot", line_color="rgba(232,168,56,0.3)", annotation_text="70%", annotation_position="top")
+    # Styled bucket badges via cell-level Styler.map
+    def _bucket_badge(val):
+        color = BUCKET_COLORS.get(val, "rgba(255,255,255,0.3)")
+        # Use a CSS background tint + matching text color
+        return f"background-color: {color}22; color: {color}; font-weight: 600;"
 
-        _pay_layout = {**PLOTLY_DARK}
-        _pay_layout["margin"] = dict(l=10, r=50, t=30, b=10)
-        fig_pay.update_layout(
-            **_pay_layout,
-            height=max(280, len(payout_df) * 24 + 80),
-            xaxis={**_XAXIS, "title": "Payout Ratio %", "ticksuffix": "%"},
-            yaxis=_YAXIS,
-            showlegend=False,
-        )
-        st.plotly_chart(fig_pay, use_container_width=True, config=PLOTLY_CONFIG)
+    def _yield_color(val):
+        return f"color: {BRAND['gold']};"
 
-    # ── Risk Monitor ──────────────────────────────────────────────────────
-    st.divider()
-    st.markdown("**Dividend Risk Monitor**")
-    st.markdown(
-        "<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
-        "Holdings with elevated payout ratios, declining growth, or broken streaks"
-        "</div>",
-        unsafe_allow_html=True,
-    )
+    def _composite_color(val):
+        try:
+            v = float(val)
+        except (ValueError, TypeError):
+            return ""
+        if v >= 3:
+            return f"color: {BRAND['green']}; font-weight: 600;"
+        if v >= 0:
+            return "color: rgba(255,255,255,0.75);"
+        if v >= -2:
+            return f"color: {BRAND['gold']}; font-weight: 600;"
+        return f"color: {BRAND['red']}; font-weight: 600;"
 
-    # Flag holdings that meet any risk criteria
-    # Note: for holdings without Fish CCC data (ADRs, foreign stocks), yfinance
-    # growth rates can be misleading (FX effects, special dividends counted then
-    # dropped). We use stricter thresholds for non-Fish tickers to avoid false alarms.
-    risk_rows = []
-    for _, r in edf.iterrows():
-        concerns = []
-        is_fish = r.get("fish_sourced", False)
-
-        if r["payout_ratio"] >= 75:
-            concerns.append(f"Elevated payout ratio ({r['payout_ratio']:.0f}%)")
-
-        if is_fish:
-            # Fish data is reliable — flag any negative growth
-            if r["growth_5y"] < 0:
-                concerns.append(f"Negative 5Y dividend growth ({r['growth_5y']:+.2f}%)")
-            if r["growth_1y"] < -10:
-                concerns.append(f"Significant 1Y decline ({r['growth_1y']:+.2f}%)")
-        else:
-            # yfinance fallback — use stricter thresholds to filter ADR/special noise
-            if r["growth_5y"] < -10:
-                concerns.append(f"Possible 5Y decline ({r['growth_5y']:+.2f}%) — verify (non-CCC)")
-            if r["growth_1y"] < -20:
-                concerns.append(f"Possible 1Y decline ({r['growth_1y']:+.2f}%) — verify (non-CCC)")
-
-        if 0 < r["consec_years"] < 5:
-            concerns.append(f"Short streak ({r['consec_years']}y) — possible reset")
-
-        if concerns:
-            risk_rows.append({
-                "Symbol":    r["symbol"],
-                "Company":   r["description"],
-                "Safety":    r["safety"],
-                "Payout":    r["payout_ratio"],
-                "5Y Growth": r["growth_5y"],
-                "Streak":    r["consec_years"] if r["consec_years"] > 0 else "N/A",
-                "Concern":   " · ".join(concerns),
-            })
-
-    if risk_rows:
-        risk_df = pd.DataFrame(risk_rows)
-
-        def _risk_color(val):
-            return f"color: #e8a838; font-style: italic"
-
-        styled_risk = (
-            risk_df.style
-            .map(_color_safety, subset=["Safety"])
-            .map(_risk_color, subset=["Concern"])
+    if not sc_df.empty:
+        display_df = sc_df.drop(columns=["_bucket_sort", "_composite_sort"])
+        styled = (
+            display_df.style
+            .map(_bucket_badge, subset=["Bucket"])
+            .map(_yield_color, subset=["Yield"])
+            .map(_composite_color, subset=["Composite"])
             .format({
-                "Payout": "{:.0f}%",
-                "5Y Growth": "{:+.2f}%",
-                "Streak": lambda v: f"{v:.0f}y" if isinstance(v, (int, float)) else str(v),
+                "Yield":     lambda v: f"{v:.1f}%" if isinstance(v, (int, float)) else "—",
+                "Composite": lambda v: f"{v:+.1f}" if isinstance(v, (int, float)) else "—",
             })
         )
         st.dataframe(
-            styled_risk, use_container_width=True, hide_index=True,
-            height=(42 + len(risk_df) * 36),
+            styled, width="stretch", hide_index=True,
+            height=min(80 + len(display_df) * 36, 1200),
             column_config={
-                "Symbol":    st.column_config.TextColumn("Symbol", width="small"),
-                "Company":   st.column_config.TextColumn("Company", width="medium"),
-                "Safety":    st.column_config.TextColumn("Safety", width="small"),
-                "Payout":    st.column_config.NumberColumn("Payout", format="%.0f%%"),
-                "5Y Growth": st.column_config.NumberColumn("5Y Gr", format="%+.2f%%"),
-                "Streak":    st.column_config.TextColumn("Streak", width="small"),
-                "Concern":   st.column_config.TextColumn("Concern", width="large"),
+                "Ticker":     st.column_config.TextColumn("Ticker", width="small"),
+                "Company":    st.column_config.TextColumn("Company", width="medium"),
+                "Sector":     st.column_config.TextColumn("Sector", width="medium"),
+                "Yield":      st.column_config.TextColumn("Yield", width="small"),
+                "Composite":  st.column_config.TextColumn("Score", width="small"),
+                "Bucket":     st.column_config.TextColumn("Risk", width="small"),
+                "Trajectory": st.column_config.TextColumn("Trajectory", width="small"),
+                "Key Signal": st.column_config.TextColumn("Key Signal", width="large"),
             },
         )
     else:
-        st.success("✅ No holdings currently flagged for dividend risk.")
+        st.info("No MCP holdings in the latest scorecard run.")
+
+    # ── Per-ticker pillar breakdown (Yellow/Red/Critical only) ────────────
+    flagged_buckets = {"Yellow", "Red", "Critical"}
+    flagged_rows = [r for r in mcp_rows if r.get("bucket") in flagged_buckets]
+
+    st.markdown(
+        "<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);"
+        "margin-top:28px;margin-bottom:10px;'>MCP Holdings Requiring Attention — Pillar Detail</div>",
+        unsafe_allow_html=True,
+    )
+
+    if not flagged_rows:
+        st.success(
+            "✅ All MCP holdings currently rated **Green** or **Strong**. "
+            "No Yellow / Red / Critical names in the latest scorecard run."
+        )
+    else:
+        st.markdown(
+            "<div style='font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:12px;'>"
+            f"{len(flagged_rows)} holding(s) flagged. Click any row to expand the six-pillar breakdown."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        # Sort flagged rows by composite ascending (worst first) — matches docx
+        flagged_rows = sorted(
+            flagged_rows,
+            key=lambda r: (r.get("composite") if r.get("composite") is not None else 99),
+        )
+
+        pillar_names = [
+            "Yield Signal",
+            "Cash Flow Coverage",
+            "Balance Sheet",
+            "Business Quality",
+            "Market Signal",
+            "Dividend Trajectory",
+        ]
+
+        for r in flagged_rows:
+            sym_norm = _norm_sc_ticker(r.get("ticker", ""))
+            company = r.get("company", "") or ""
+            bucket = r.get("bucket", "")
+            composite = r.get("composite")
+            sector_norm = normalize_sector(r.get("sector", ""))
+            color = BUCKET_COLORS.get(bucket, "rgba(255,255,255,0.3)")
+
+            # Expander header — ticker, company, bucket badge, composite
+            comp_str = f"{composite:+.1f}" if isinstance(composite, (int, float)) else "—"
+            expander_label = f"{sym_norm} · {company} · {bucket} · {comp_str}"
+
+            with st.expander(expander_label):
+                # Top-line meta
+                st.markdown(
+                    f"<div style='display:flex;gap:18px;flex-wrap:wrap;font-size:12px;"
+                    f"color:rgba(255,255,255,0.55);margin-bottom:14px;'>"
+                    f"<div><span style='color:rgba(255,255,255,0.35);'>Composite:</span> "
+                    f"<strong style='color:{color};'>{comp_str}</strong></div>"
+                    f"<div><span style='color:rgba(255,255,255,0.35);'>Bucket:</span> "
+                    f"<strong style='color:{color};'>{bucket}</strong></div>"
+                    f"<div><span style='color:rgba(255,255,255,0.35);'>Sector:</span> "
+                    f"<strong>{sector_norm}</strong></div>"
+                    f"<div><span style='color:rgba(255,255,255,0.35);'>Trajectory:</span> "
+                    f"<strong>{r.get('trajectory_pattern') or '—'}</strong></div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+
+                # Pull the matching detail record (six pillar scores +
+                # narratives). detail_map is keyed by normalized ticker so
+                # NYS:KOF and KOF both resolve.
+                detail = detail_map.get(sym_norm)
+                if not detail:
+                    st.caption("Per-pillar detail unavailable in this scorecard run.")
+                    continue
+
+                # Build the pillar table
+                pillar_rows = []
+                for p in pillar_names:
+                    score = detail.get(f"{p} Score")
+                    narrative = detail.get(f"{p} Narrative") or ""
+                    pillar_rows.append({
+                        "Pillar":    p,
+                        "Score":     score,
+                        "Signal":    narrative,
+                    })
+
+                pillar_df = pd.DataFrame(pillar_rows)
+
+                def _pillar_score_color(val):
+                    if val is None:
+                        return "color: rgba(255,255,255,0.3); font-style: italic;"
+                    try:
+                        v = int(val)
+                    except (ValueError, TypeError):
+                        return ""
+                    if v >= 1:
+                        return f"color: {BRAND['green']}; font-weight: 600;"
+                    if v == 0:
+                        return "color: rgba(255,255,255,0.65);"
+                    if v == -1:
+                        return f"color: {BRAND['gold']}; font-weight: 600;"
+                    return f"color: {BRAND['red']}; font-weight: 700;"
+
+                styled_p = (
+                    pillar_df.style
+                    .map(_pillar_score_color, subset=["Score"])
+                    .format({
+                        "Score": lambda v: f"{v:+d}" if isinstance(v, (int, float)) and v is not None else "—",
+                    })
+                )
+                st.dataframe(
+                    styled_p, width="stretch", hide_index=True,
+                    height=42 + len(pillar_df) * 36,
+                    column_config={
+                        "Pillar": st.column_config.TextColumn("Pillar", width="small"),
+                        "Score":  st.column_config.TextColumn("Score", width="small"),
+                        "Signal": st.column_config.TextColumn("Signal", width="large"),
+                    },
+                )
+
+    # ── Broader Universe — Red & Critical (collapsible) ──────────────────
+    st.markdown(
+        "<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);"
+        "margin-top:28px;margin-bottom:10px;'>Broader Universe — Red &amp; Critical</div>",
+        unsafe_allow_html=True,
+    )
+
+    if not universe_flagged:
+        st.caption("No Red or Critical names flagged in the broader universe.")
+    else:
+        with st.expander(
+            f"Show {len(universe_flagged)} flagged universe name(s)",
+            expanded=False,
+        ):
+            uni_rows = []
+            for r in universe_flagged:
+                bucket = r.get("bucket", "")
+                uni_rows.append({
+                    "Ticker":     _norm_sc_ticker(r.get("ticker", "")),
+                    "Company":    r.get("company", "") or "",
+                    "Sector":     normalize_sector(r.get("sector", "")),
+                    "Yield":      r.get("yield"),
+                    "Composite":  r.get("composite"),
+                    "Bucket":     bucket,
+                    "Trajectory": r.get("trajectory_pattern", "") or "",
+                    "Key Signal": r.get("key_signal", "") or "",
+                    "_bucket_sort": bucket_sort_key.get(bucket, 99),
+                    "_composite_sort": r.get("composite") if r.get("composite") is not None else 99,
+                })
+            uni_df = pd.DataFrame(uni_rows).sort_values(
+                ["_bucket_sort", "_composite_sort"]
+            ).reset_index(drop=True).drop(columns=["_bucket_sort", "_composite_sort"])
+
+            uni_styled = (
+                uni_df.style
+                .map(_bucket_badge, subset=["Bucket"])
+                .map(_yield_color, subset=["Yield"])
+                .map(_composite_color, subset=["Composite"])
+                .format({
+                    "Yield":     lambda v: f"{v:.1f}%" if isinstance(v, (int, float)) else "—",
+                    "Composite": lambda v: f"{v:+.1f}" if isinstance(v, (int, float)) else "—",
+                })
+            )
+            st.dataframe(
+                uni_styled, width="stretch", hide_index=True,
+                height=min(80 + len(uni_df) * 36, 1200),
+                column_config={
+                    "Ticker":     st.column_config.TextColumn("Ticker", width="small"),
+                    "Company":    st.column_config.TextColumn("Company", width="medium"),
+                    "Sector":     st.column_config.TextColumn("Sector", width="medium"),
+                    "Yield":      st.column_config.TextColumn("Yield", width="small"),
+                    "Composite":  st.column_config.TextColumn("Score", width="small"),
+                    "Bucket":     st.column_config.TextColumn("Risk", width="small"),
+                    "Trajectory": st.column_config.TextColumn("Trajectory", width="small"),
+                    "Key Signal": st.column_config.TextColumn("Key Signal", width="large"),
+                },
+            )
+
+    # ── Footer attribution ───────────────────────────────────────────────
+    st.markdown(
+        f"<div style='font-size:10px;color:rgba(255,255,255,0.3);margin-top:24px;text-align:right;'>"
+        f"Source: MCP Dividend Distress Scorecard · PitchBook + Morningstar + Fish CCC · "
+        f"Generated {format_as_of(as_of)}"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
