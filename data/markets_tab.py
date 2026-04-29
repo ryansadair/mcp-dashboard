@@ -555,6 +555,25 @@ def _fetch_market_quotes():
                     result[ticker] = dict(_empty)
                     continue
 
+                # Sanity guard: yfinance occasionally returns a corrupted last
+                # bar (split-adjustment artifact, bad early-session tick, feed
+                # glitch). Real ETF/index single-day moves don't cross ±35%
+                # outside trading halts. When the last bar fails this check,
+                # drop it from the dataframe so change_pct, 52w high/low, and
+                # YTD all compute from clean prior data. Confirmed example:
+                # IWF on 2026-04-29 showed $118.80 vs $476.29 prior close,
+                # producing a fake -75% move on the Markets factor heatmap.
+                if len(df) >= 2:
+                    _last_close = float(df["Close"].iloc[-1])
+                    _prev_close = float(df["Close"].iloc[-2])
+                    if _prev_close > 0:
+                        _move = abs((_last_close - _prev_close) / _prev_close * 100)
+                        if _move > 35.0:
+                            df = df.iloc[:-1]
+                            if len(df) < 1:
+                                result[ticker] = dict(_empty)
+                                continue
+
                 close = float(df["Close"].iloc[-1])
                 prev = float(df["Close"].iloc[-2]) if len(df) >= 2 else close
                 chg = close - prev
