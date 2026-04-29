@@ -112,12 +112,12 @@ _STYLE_BOX_TICKERS = [t for _, cols in STYLE_BOX for _, t in cols]
 SECTION_CHART_PERIODS = {
     "1M":  21,
     "3M":  63,
-    "6M":  126,
     "YTD": None,
     "1Y":  252,
     "2Y":  504,
     "3Y":  756,
     "5Y":  1260,
+    "10Y": 2520,
     "Max": 0,
 }
 
@@ -398,7 +398,7 @@ def _render_focus_chart(ticker, name, batch_data, period_label, section_key):
         fixedrange=True,
         tickformat=(
             "%b %d" if period_label in ("1M", "3M") else
-            "%b '%y" if period_label in ("6M", "YTD", "1Y") else
+            "%b '%y" if period_label in ("YTD", "1Y") else
             "%Y"
         ),
         **spike,

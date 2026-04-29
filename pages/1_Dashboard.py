@@ -1200,7 +1200,7 @@ with tab_holdings:
                             st.rerun()
 
                     # Period selector — matches Stock Detail page
-                    _period_map = {"1M": 21, "3M": 63, "6M": 126, "YTD": None, "1Y": 252, "2Y": 504, "3Y": 756, "5Y": 1260, "Max": 0}
+                    _period_map = {"1M": 21, "3M": 63, "YTD": None, "1Y": 252, "2Y": 504, "3Y": 756, "5Y": 1260, "10Y": 2520, "Max": 0}
                     if "hc_period" not in st.session_state:
                         st.session_state["hc_period"] = "1Y"
 
@@ -1364,8 +1364,8 @@ with tab_holdings:
                                             nticks=4,
                                             tickformat=(
                                                 "%b %d" if _sel_label in ("1M", "3M") else
-                                                "%b '%y" if _sel_label in ("6M", "YTD", "1Y") else
-                                                "%Y" if _sel_label in ("2Y", "3Y", "5Y", "Max") else
+                                                "%b '%y" if _sel_label in ("YTD", "1Y") else
+                                                "%Y" if _sel_label in ("2Y", "3Y", "5Y", "10Y", "Max") else
                                                 "%b %d"
                                             ),
                                         )
