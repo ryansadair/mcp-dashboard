@@ -72,19 +72,39 @@ COMPOSITE_BENCHMARKS = {
 }
 
 # ── Sector Colors ─────────────────────────────────────────────────────────
+# Keys match normalized labels from normalize_sector() below.
 SECTOR_COLORS = {
-    "Healthcare":        "#569542",
-    "Consumer Staples":  "#07415A",
-    "Technology":        "#C9A84C",
-    "Industrials":       "#3a7a5c",
-    "Financials":        "#0a5a7a",
-    "Energy":            "#8a6a2c",
-    "Utilities":         "#5a4a8a",
-    "Real Estate":       "#8a3a5c",
-    "Materials":         "#4a7a4a",
-    "Communication":     "#2a5a8a",
-    "Cash":              "#444",
+    "Healthcare":               "#569542",
+    "Consumer Staples":         "#07415A",
+    "Technology":               "#C9A84C",
+    "Industrials":              "#3a7a5c",
+    "Financials":               "#0a5a7a",
+    "Energy":                   "#8a6a2c",
+    "Utilities":                "#5a4a8a",
+    "Real Estate":              "#8a3a5c",
+    "Materials":                "#4a7a4a",
+    "Communication Services":   "#2a5a8a",
+    "Consumer Discretionary":   "#b87333",
+    "Cash":                     "#444",
 }
+
+# ── Sector Name Normalization (Sprint 20) ─────────────────────────────────
+# Map yfinance's GICS-ish labels to MCP's preferred labels. Single source
+# of truth — apply via normalize_sector() wherever a sector string enters
+# our dataframes (Overview heatmap, sector allocation, Holdings tab filter
+# and pie chart).
+SECTOR_RENAME = {
+    "Consumer Defensive":  "Consumer Staples",
+    "Consumer Cyclical":   "Consumer Discretionary",
+    "Financial Services":  "Financials",
+    # Communication Services kept as-is per Sprint 20 spec.
+}
+
+def normalize_sector(sector: str) -> str:
+    """Return MCP's preferred sector label, falling back to the input."""
+    if not sector:
+        return "Other"
+    return SECTOR_RENAME.get(sector, sector)
 
 # ── Data Refresh ──────────────────────────────────────────────────────────
 REFRESH_INTERVAL_MINUTES = 15

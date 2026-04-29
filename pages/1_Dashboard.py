@@ -6,7 +6,7 @@ import numpy as np
 from datetime import datetime
 from utils.auth import check_password
 from utils.styles import inject_global_css
-from utils.config import STRATEGIES, SECTOR_COLORS, BRAND
+from utils.config import STRATEGIES, SECTOR_COLORS, BRAND, normalize_sector
 from components.header import render_header
 from components.market_ticker import render_market_ticker
 from components.kpi_cards import render_kpi_cards
@@ -498,7 +498,7 @@ with tab_overview:
                 sym = row["symbol"]
                 mkt = ov_hm_prices.get(sym, {})
                 chg = mkt.get("change_1d_pct", 0) or 0
-                sector = mkt.get("sector", "") or "Other"
+                sector = normalize_sector(mkt.get("sector", ""))
                 hm_rows.append({
                     "symbol": sym,
                     "description": row["description"],
@@ -509,6 +509,16 @@ with tab_overview:
             hm_df = pd.DataFrame(hm_rows).sort_values("weight", ascending=False)
             if len(hm_df) > 0:
                 hm_df["contrib"] = (hm_df["weight"] * hm_df["daily_return"] / 100).round(4)
+
+    # Sector-level rollup (Sprint 20): weight totals for heatmap parent
+    # labels and contribution totals (sum of weight × daily_return) for the
+    # right-column Top Contributing / Detracting Sectors panel. Computed
+    # here so both columns can read the same series.
+    sector_weights = None
+    sector_contribs = None
+    if hm_df is not None and len(hm_df) > 0:
+        sector_weights = hm_df.groupby("sector")["weight"].sum()
+        sector_contribs = hm_df.groupby("sector")["contrib"].sum().sort_values(ascending=False)
 
     left, right = st.columns([3, 2])
 
@@ -660,10 +670,14 @@ with tab_overview:
             tm_text.append("")
             tm_colors.append(0)
 
-            # Sector parent nodes
+            # Sector parent nodes — label includes weight % so the heatmap
+            # banner reads "Financials (14.00%)" etc. Weight is the sum of
+            # holding weights within that sector (cash excluded, since cash
+            # isn't in hm_df).
             for sector in hm_df["sector"].unique():
+                _sw = sector_weights.get(sector, 0) if sector_weights is not None else 0
                 tm_ids.append(f"sector_{sector}")
-                tm_labels.append(sector)
+                tm_labels.append(f"{sector} ({_sw:.2f}%)")
                 tm_parents.append("root")
                 tm_values.append(0)
                 tm_text.append("")
@@ -776,40 +790,61 @@ with tab_overview:
 
             st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
 
-        st.markdown("<div style='font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:12px;'>Sector Allocation</div>", unsafe_allow_html=True)
+        # ── Sector Contributors & Detractors (Sprint 20) ──────────────────
+        # Mirrors the ticker-level Top Contributors / Top Detractors layout
+        # above, but rolled up to the sector level. Reuses sector_contribs
+        # (sum of weight × daily_return per sector) computed above the
+        # column split. Sector weights now live in the heatmap parent labels
+        # so we no longer render the standalone weight bars here.
+        if sector_contribs is not None and len(sector_contribs) > 0:
+            # Cap counts so top3 and bot3 don't overlap when fewer than 6
+            # sectors exist (e.g. concentrated strategies). With 5 sectors
+            # we'd otherwise show the middle one as both contributor and
+            # detractor.
+            _n_sect = len(sector_contribs)
+            _n_top = min(3, (_n_sect + 1) // 2)
+            _n_bot = min(3, _n_sect - _n_top)
+            top3_sect = sector_contribs.head(_n_top)
+            bot3_sect = sector_contribs.tail(_n_bot).iloc[::-1] if _n_bot > 0 else sector_contribs.iloc[0:0]
 
-        # Sprint 2: build sector data from Tamarac + yfinance. If Sprint 2
-        # data is unavailable, sector_df stays None and we skip the render
-        # block below — better than hard-coded sector weights.
-        sector_df = None
-        if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
-            tam_ov = get_holdings_for_strategy(tamarac_parsed, active)
-            cash_ov = get_cash_weight(tamarac_parsed, active)
-            if not tam_ov.empty:
-                ov_tickers = tuple(tam_ov["symbol"].tolist())
-                ov_prices = fetch_batch_prices(ov_tickers)
-                sector_rows = []
-                for _, h in tam_ov.iterrows():
-                    sym = h["symbol"]
-                    sect = ov_prices.get(sym, {}).get("sector", "Other")
-                    sector_rows.append({"sector": sect or "Other", "weight": h["weight_pct"]})
-                if cash_ov > 0:
-                    sector_rows.append({"sector": "Cash", "weight": cash_ov})
-                sector_df = pd.DataFrame(sector_rows).groupby("sector")["weight"].sum().reset_index().sort_values("weight", ascending=False)
-
-        if sector_df is not None:
-            for _, row in sector_df.iterrows():
-                color = SECTOR_COLORS.get(row["sector"], "#888")
+            col_st, col_sb = st.columns(2)
+            with col_st:
                 st.markdown(
-                    f"<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'>"
-                    f"<div style='width:10px;height:10px;border-radius:2px;background:{color};flex-shrink:0;'></div>"
-                    f"<div style='flex:1;font-size:13px;color:rgba(255,255,255,0.7);'>{row['sector']}</div>"
-                    f"<div style='width:120px;background:rgba(255,255,255,0.06);border-radius:3px;height:6px;overflow:hidden;'>"
-                    f"<div style='width:{min(float(row['weight'])*2.5,100):.1f}%;height:6px;border-radius:3px;background:{color};'></div></div>"
-                    f"<div style='font-size:13px;color:rgba(255,255,255,0.5);width:54px;text-align:right;white-space:nowrap;'>{float(row['weight']):.2f}%</div>"
-                    f"</div>",
-                    unsafe_allow_html=True
+                    "<div style='font-size:10px;color:rgba(86,149,66,0.8);text-transform:uppercase;"
+                    "letter-spacing:0.06em;margin-bottom:6px;font-weight:700;'>▲ Top Contributing Sectors</div>",
+                    unsafe_allow_html=True,
                 )
+                for sect_name, sect_contrib in top3_sect.items():
+                    _sc_color = "#569542" if sect_contrib >= 0 else "#c45454"
+                    _sc_bp = sect_contrib * 100
+                    _sc_dot = SECTOR_COLORS.get(sect_name, "#888")
+                    st.markdown(
+                        f"<div style='display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);gap:8px;'>"
+                        f"<div style='width:8px;height:8px;border-radius:2px;background:{_sc_dot};flex-shrink:0;'></div>"
+                        f"<div style='flex:1;font-size:12px;font-weight:600;color:rgba(255,255,255,0.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{sect_name}</div>"
+                        f"<div style='font-size:11px;color:{_sc_color};font-weight:600;white-space:nowrap;'>{_sc_bp:+.1f}bp</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+
+            with col_sb:
+                st.markdown(
+                    "<div style='font-size:10px;color:rgba(196,84,84,0.8);text-transform:uppercase;"
+                    "letter-spacing:0.06em;margin-bottom:6px;font-weight:700;'>▼ Top Detracting Sectors</div>",
+                    unsafe_allow_html=True,
+                )
+                for sect_name, sect_contrib in bot3_sect.items():
+                    _sd_color = "#569542" if sect_contrib >= 0 else "#c45454"
+                    _sd_bp = sect_contrib * 100
+                    _sd_dot = SECTOR_COLORS.get(sect_name, "#888")
+                    st.markdown(
+                        f"<div style='display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.03);gap:8px;'>"
+                        f"<div style='width:8px;height:8px;border-radius:2px;background:{_sd_dot};flex-shrink:0;'></div>"
+                        f"<div style='flex:1;font-size:12px;font-weight:600;color:rgba(255,255,255,0.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{sect_name}</div>"
+                        f"<div style='font-size:11px;color:{_sd_color};font-weight:600;white-space:nowrap;'>{_sd_bp:+.1f}bp</div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
 
         # Top 10 Holdings — compact display with headers
         st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
@@ -908,7 +943,7 @@ with tab_holdings:
                     rows.append({
                         "Company": h["description"],
                         "Symbol": sym,
-                        "Sector": mkt.get("sector", ""),
+                        "Sector": normalize_sector(mkt.get("sector", "")),
                         "Weight %": round(h["weight_pct"], 2),
                         "1D Chg %": chg_val,
                         "Price": mkt.get("price", 0),
