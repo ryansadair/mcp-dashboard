@@ -797,15 +797,12 @@ with tab_overview:
         # column split. Sector weights now live in the heatmap parent labels
         # so we no longer render the standalone weight bars here.
         if sector_contribs is not None and len(sector_contribs) > 0:
-            # Cap counts so top3 and bot3 don't overlap when fewer than 6
-            # sectors exist (e.g. concentrated strategies). With 5 sectors
-            # we'd otherwise show the middle one as both contributor and
-            # detractor.
-            _n_sect = len(sector_contribs)
-            _n_top = min(3, (_n_sect + 1) // 2)
-            _n_bot = min(3, _n_sect - _n_top)
-            top3_sect = sector_contribs.head(_n_top)
-            bot3_sect = sector_contribs.tail(_n_bot).iloc[::-1] if _n_bot > 0 else sector_contribs.iloc[0:0]
+            # Show all sectors on both sides — even if the day is lopsided.
+            # Contributors list reads top-down (best → worst); detractors
+            # reads worst → toward zero. The two columns will mirror each
+            # other but that's by design: the user sees the full picture.
+            top_sect = sector_contribs
+            bot_sect = sector_contribs.iloc[::-1]
 
             col_st, col_sb = st.columns(2)
             with col_st:
@@ -814,7 +811,7 @@ with tab_overview:
                     "letter-spacing:0.06em;margin-bottom:6px;font-weight:700;'>▲ Top Contributing Sectors</div>",
                     unsafe_allow_html=True,
                 )
-                for sect_name, sect_contrib in top3_sect.items():
+                for sect_name, sect_contrib in top_sect.items():
                     _sc_color = "#569542" if sect_contrib >= 0 else "#c45454"
                     _sc_bp = sect_contrib * 100
                     _sc_dot = SECTOR_COLORS.get(sect_name, "#888")
@@ -833,7 +830,7 @@ with tab_overview:
                     "letter-spacing:0.06em;margin-bottom:6px;font-weight:700;'>▼ Top Detracting Sectors</div>",
                     unsafe_allow_html=True,
                 )
-                for sect_name, sect_contrib in bot3_sect.items():
+                for sect_name, sect_contrib in bot_sect.items():
                     _sd_color = "#569542" if sect_contrib >= 0 else "#c45454"
                     _sd_bp = sect_contrib * 100
                     _sd_dot = SECTOR_COLORS.get(sect_name, "#888")
@@ -866,9 +863,9 @@ with tab_overview:
         if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
             tam_top10 = get_holdings_for_strategy(tamarac_parsed, active)
             if not tam_top10.empty:
-                top10_tickers = tuple(tam_top10["symbol"].head(6).tolist())
+                top10_tickers = tuple(tam_top10["symbol"].head(10).tolist())
                 top10_prices = fetch_batch_prices(top10_tickers)
-                for _, h in tam_top10.head(6).iterrows():
+                for _, h in tam_top10.head(10).iterrows():
                     sym = h["symbol"]
                     mkt = top10_prices.get(sym, {})
                     price = mkt.get("price", 0)
