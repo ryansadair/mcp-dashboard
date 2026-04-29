@@ -22,7 +22,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 
-from utils.config import BRAND, STRATEGIES
+from utils.config import BRAND, STRATEGIES, normalize_sector
 from utils.disk_cache import disk_cached
 from data.dividends import (
     get_batch_dividend_details,
@@ -233,7 +233,7 @@ def _build_enriched_df(tam_df, price_data, div_data):
 
         # Market data
         price  = mkt.get("price", 0) or 0
-        sector = mkt.get("sector", "") or ""
+        sector = normalize_sector(mkt.get("sector", ""))
         chg_1d = mkt.get("change_1d_pct", 0) or 0
 
         rows.append({
