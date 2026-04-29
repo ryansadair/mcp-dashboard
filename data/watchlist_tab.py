@@ -11,10 +11,13 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
+from utils.config import normalize_sector
+
 # Brand colors
 GREEN = "#569542"
 BLUE = "#07415A"
 GOLD = "#C9A84C"
+RED  = "#c45454"
 
 
 def render_watchlist_tab():
@@ -100,17 +103,19 @@ def render_watchlist_tab():
         hi = live.get("52w_high", 0)
         lo = live.get("52w_low", 0)
 
-        # 52-week range position
-        if hi > lo > 0 and price > 0:
-            range_pct = ((price - lo) / (hi - lo)) * 100
-            range_str = f"{range_pct:.0f}%"
+        # % From 52W Hi — Holdings-tab convention. Negative = below the high
+        # (typical case). None when we lack price/hi data so the formatter
+        # can render an em dash. Sprint 20: replaced the prior "52W Range"
+        # column (position-within-range %) with this MCP-standard metric.
+        if hi > 0 and price > 0:
+            from_hi = round((price - hi) / hi * 100, 2)
         else:
-            range_str = "—"
+            from_hi = None
 
         rows.append({
             "Ticker": tk,
             "Company": live.get("company_name", ""),
-            "Sector": live.get("sector", ""),
+            "Sector": normalize_sector(live.get("sector", "")),
             "Price": price,
             "Div Yield": min(live.get("dividend_yield", 0), 15),  # cap at 15% — no legit equity yield is higher
             "P/E": live.get("pe_ratio", 0),
@@ -118,10 +123,9 @@ def render_watchlist_tab():
             "P/B": live.get("price_to_book", 0),
             "Beta": live.get("beta", 0),
             "Mkt Cap": live.get("market_cap", ""),
-            "52W Range": range_str,
+            "% From 52W Hi": from_hi,
             "52W High": hi,
             "52W Low": lo,
-            "Payout %": live.get("payout_ratio", 0),
         })
 
     display_df = pd.DataFrame(rows)
@@ -132,28 +136,28 @@ def render_watchlist_tab():
     avg_pe = pe_valid["P/E"].mean() if len(pe_valid) > 0 else 0
     fwd_valid = display_df[display_df["Fwd P/E"] > 0]
     avg_fwd_pe = fwd_valid["Fwd P/E"].mean() if len(fwd_valid) > 0 else 0
-    avg_payout = display_df[display_df["Payout %"] > 0]["Payout %"].mean() if len(display_df[display_df["Payout %"] > 0]) > 0 else 0
 
-    kc1, kc2, kc3, kc4, kc5 = st.columns(5)
+    kc1, kc2, kc3, kc4 = st.columns(4)
     kc1.metric("Tickers", len(display_df))
     kc2.metric("Avg Div Yield", f"{avg_yield:.2f}%")
     kc3.metric("Avg P/E", f"{avg_pe:.1f}")
     kc4.metric("Avg Fwd P/E", f"{avg_fwd_pe:.1f}")
-    kc5.metric("Avg Payout", f"{avg_payout:.0f}%")
 
     # ── Main Table ─────────────────────────────────────────────────────────
     table_cols = ["Ticker", "Company", "Sector", "Price", "Div Yield",
-                  "P/E", "Fwd P/E", "P/B", "Beta", "Mkt Cap", "52W Range", "Payout %"]
+                  "P/E", "Fwd P/E", "P/B", "Beta", "Mkt Cap", "% From 52W Hi"]
     table_df = display_df[table_cols].copy()
 
     # Format for display
     table_df["Price"] = table_df["Price"].apply(lambda x: f"${x:.2f}" if x > 0 else "—")
     table_df["Div Yield"] = table_df["Div Yield"].apply(lambda x: f"{x:.2f}%" if x > 0 else "—")
-    table_df["P/E"] = table_df["P/E"].apply(lambda x: f"{x:.1f}" if x > 0 else "—")
-    table_df["Fwd P/E"] = table_df["Fwd P/E"].apply(lambda x: f"{x:.1f}" if x > 0 else "—")
+    table_df["P/E"] = table_df["P/E"].apply(lambda x: f"{x:.2f}" if x > 0 else "—")
+    table_df["Fwd P/E"] = table_df["Fwd P/E"].apply(lambda x: f"{x:.2f}" if x > 0 else "—")
     table_df["P/B"] = table_df["P/B"].apply(lambda x: f"{x:.2f}" if x > 0 else "—")
     table_df["Beta"] = table_df["Beta"].apply(lambda x: f"{x:.2f}" if x > 0 else "—")
-    table_df["Payout %"] = table_df["Payout %"].apply(lambda x: f"{x:.0f}%" if x > 0 else "—")
+    table_df["% From 52W Hi"] = table_df["% From 52W Hi"].apply(
+        lambda x: f"{x:+.2f}%" if isinstance(x, (int, float)) else "—"
+    )
 
     html = _build_watchlist_html(table_df)
     st.markdown(html, unsafe_allow_html=True)
@@ -238,6 +242,22 @@ def _build_watchlist_html(df):
                 style = f'{cell_style}{align}color:{GOLD};'
             elif col == "Sector":
                 style = f'{cell_style}{align}color:rgba(255,255,255,0.45); font-size:12px;'
+            elif col == "% From 52W Hi" and val != "—":
+                # Parse the leading sign+number for color tiers. At-or-near
+                # the high reads green; -10 to -20% gold; beyond -20% red.
+                try:
+                    _v = float(str(val).rstrip("%"))
+                    if _v >= -2:
+                        _c = GREEN
+                    elif _v >= -10:
+                        _c = "rgba(255,255,255,0.75)"
+                    elif _v >= -20:
+                        _c = GOLD
+                    else:
+                        _c = RED
+                except (ValueError, TypeError):
+                    _c = "rgba(255,255,255,0.65)"
+                style = f'{cell_style}{align}color:{_c};'
             else:
                 style = f'{cell_style}{align}'
 

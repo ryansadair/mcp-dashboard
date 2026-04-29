@@ -806,7 +806,7 @@ st.markdown("---")
 st.markdown('<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">Price Chart</div>', unsafe_allow_html=True)
 
 if not hist.empty:
-    period_options = {"1M": 21, "3M": 63, "6M": 126, "YTD": None, "1Y": 252, "2Y": 504, "3Y": 756, "5Y": 1260, "Max": 0}
+    period_options = {"1M": 21, "3M": 63, "YTD": None, "1Y": 252, "2Y": 504, "3Y": 756, "5Y": 1260, "10Y": 2520, "Max": 0}
     if "chart_period" not in st.session_state:
         st.session_state["chart_period"] = "1Y"
 
