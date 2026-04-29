@@ -3,8 +3,8 @@ Martin Capital Partners — Intraday Performance Chart
 data/intraday_chart.py
 
 Builds today's intraday performance chart for the Overview tab: a single
-strategy line plus three index reference lines (^NDX / ^GSPC / ^DJI),
-all normalized to % change from previous close.
+strategy line plus two reference lines (^GSPC / SPYD), all normalized to
+% change from previous close.
 
 Data path:
   - Index intraday paths: yf.download(period="1d", interval="5m") for the
@@ -29,12 +29,15 @@ import pandas as pd
 import streamlit as st
 
 
-# ── Index tickers used on the chart (matches ticker bar labels) ──────────
-# Ticker → display label. ^NDX is "Nasdaq 100" everywhere on the dashboard.
+# ── Index/ETF tickers used on the chart ──────────────────────────────────
+# Sprint 20: dropped ^NDX (Nasdaq 100) and ^DJI (Dow Jones) in favor of
+# SPYD (SPDR Portfolio S&P 500 High Dividend ETF), which lines up with
+# QDVD's secondary benchmark in COMPOSITE_BENCHMARKS. ^GSPC stays as the
+# primary broad-market reference. Tuple shape preserved so downstream
+# render code in pages/1_Dashboard.py keeps working unchanged.
 CHART_INDICES = [
     ("^GSPC", "S&P 500"),
-    ("^NDX",  "Nasdaq 100"),
-    ("^DJI",  "Dow Jones"),
+    ("SPYD",  "SPYD"),
 ]
 
 # Trading session bounds in US/Eastern, displayed in US/Pacific
@@ -190,10 +193,10 @@ def _prev_close_from_quote(quote):
 
 def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
     """
-    Build the four series for the Overview intraday chart:
+    Build the three series for the Overview intraday chart:
         - Active strategy (weighted average of holdings' intraday paths,
           cash-included denominator to match the Daily Return KPI)
-        - ^NDX / ^GSPC / ^DJI
+        - ^GSPC (S&P 500) and SPYD (SPDR S&P 500 High Dividend ETF)
 
     Returns a dict:
         {
@@ -219,14 +222,25 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
 
     open_pt, close_pt = _today_session_bounds_pt()
 
-    # ── Index lines ─────────────────────────────────────────────────────
+    # ── Index/ETF lines ─────────────────────────────────────────────────
+    # _fetch_market_quotes() carries Markets-tab tickers (^GSPC plus the
+    # other Markets-tab indices). If a ticker isn't there — e.g. SPYD,
+    # added in Sprint 20 — we fall back to fetch_batch_prices() from
+    # Supabase, which carries any ticker the prefetch pipeline has touched.
+    # If neither has it, _intraday_pct_series returns empty and the trace
+    # is skipped cleanly.
     quotes = _fetch_market_quotes() or {}
     idx_tickers = tuple(t for t, _ in CHART_INDICES)
     idx_intraday = _fetch_intraday_5m(idx_tickers)
 
+    # Pull Supabase prices once for any ticker not in the Markets quote dict.
+    _missing = tuple(t for t in idx_tickers if t not in quotes)
+    idx_supabase_quotes = fetch_batch_prices(_missing) if _missing else {}
+
     index_series = []
     for ticker, label in CHART_INDICES:
-        prev = _prev_close_from_quote(quotes.get(ticker, {}))
+        quote = quotes.get(ticker) or idx_supabase_quotes.get(ticker, {})
+        prev = _prev_close_from_quote(quote)
         x, y = _intraday_pct_series(idx_intraday.get(ticker), prev)
         index_series.append({"ticker": ticker, "label": label, "x": x, "y": y})
 

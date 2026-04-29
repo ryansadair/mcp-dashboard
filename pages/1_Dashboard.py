@@ -550,38 +550,66 @@ with tab_overview:
                 def _last_y(y_list):
                     return y_list[-1] if y_list else None
 
-                # Index lines first (rendered behind the strategy line). Grays at
-                # decreasing opacity so they read as background reference, not peers.
+                # Sprint 20: dropped ^NDX / ^DJI; chart now shows S&P 500
+                # and SPYD against the active strategy. SPYD reads as a
+                # peer (high-dividend ETF) so it gets a slightly stronger
+                # opacity than the broad-market reference.
                 _idx_styles = {
                     "^GSPC": {"color": "rgba(255,255,255,0.55)", "width": 1.5},
-                    "^NDX":  {"color": "rgba(255,255,255,0.40)", "width": 1.5},
-                    "^DJI":  {"color": "rgba(255,255,255,0.30)", "width": 1.5},
+                    "SPYD":  {"color": "rgba(201,168,76,0.65)", "width": 1.5},
                 }
+
+                # Build a list of all traces (indices + strategy) and sort
+                # by latest value descending. Plotly's "x unified" hovermode
+                # lists traces in the order they were added to the figure,
+                # so adding them in highest→lowest order makes the tooltip
+                # rows match the visual stacking on screen at the right
+                # edge of the chart. Intraday rank flips are rare within a
+                # session, so this stays accurate across most hover points.
+                _traces_to_add = []
                 for s in _idx_series:
                     if not s["x"]:
                         continue
-                    style = _idx_styles.get(s["ticker"], {"color": "rgba(255,255,255,0.4)", "width": 1.5})
                     _last = _last_y(s["y"])
-                    _legend_name = f"{s['label']}  {_last:+.2f}%" if _last is not None else s["label"]
-                    fig_intra.add_trace(go.Scatter(
-                        x=s["x"], y=s["y"],
-                        name=_legend_name,
-                        mode="lines",
-                        line=dict(color=style["color"], width=style["width"]),
-                        hovertemplate=f"{s['label']}: %{{y:+.2f}}%<extra></extra>",
-                    ))
+                    if _last is None:
+                        continue
+                    style = _idx_styles.get(s["ticker"], {"color": "rgba(255,255,255,0.4)", "width": 1.5})
+                    _traces_to_add.append({
+                        "sort_key": _last,
+                        "label": s["label"],
+                        "x": s["x"], "y": s["y"],
+                        "color": style["color"], "width": style["width"],
+                        "is_strategy": False,
+                    })
 
-                # Strategy line on top (thicker, brand color)
                 if _strat_series["x"]:
                     _strat_label = STRATEGY_NAMES.get(active, active)
                     _last = _last_y(_strat_series["y"])
-                    _strat_legend = f"{_strat_label}  {_last:+.2f}%" if _last is not None else _strat_label
+                    if _last is not None:
+                        _traces_to_add.append({
+                            "sort_key": _last,
+                            "label": _strat_label,
+                            "x": _strat_series["x"], "y": _strat_series["y"],
+                            "color": _strat_color, "width": 2.5,
+                            "is_strategy": True,
+                        })
+
+                # Sort highest-to-lowest by latest %. Then add traces in
+                # that order. Visually, the strategy line still draws on
+                # top of the indices because its line width is greater and
+                # its color is more saturated — Plotly's painter order is
+                # by trace index, so we accept the trade-off in exchange
+                # for a sorted hover tooltip.
+                _traces_to_add.sort(key=lambda t: t["sort_key"], reverse=True)
+
+                for t in _traces_to_add:
+                    _legend_name = f"{t['label']}  {t['sort_key']:+.2f}%"
                     fig_intra.add_trace(go.Scatter(
-                        x=_strat_series["x"], y=_strat_series["y"],
-                        name=_strat_legend,
+                        x=t["x"], y=t["y"],
+                        name=_legend_name,
                         mode="lines",
-                        line=dict(color=_strat_color, width=2.5),
-                        hovertemplate=f"{_strat_label}: %{{y:+.2f}}%<extra></extra>",
+                        line=dict(color=t["color"], width=t["width"]),
+                        hovertemplate=f"{t['label']}: %{{y:+.2f}}%<extra></extra>",
                     ))
 
                 # Faint zero line so % moves above/below 0 read clearly
