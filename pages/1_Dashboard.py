@@ -797,12 +797,12 @@ with tab_overview:
         # column split. Sector weights now live in the heatmap parent labels
         # so we no longer render the standalone weight bars here.
         if sector_contribs is not None and len(sector_contribs) > 0:
-            # Show all sectors on both sides — even if the day is lopsided.
-            # Contributors list reads top-down (best → worst); detractors
-            # reads worst → toward zero. The two columns will mirror each
-            # other but that's by design: the user sees the full picture.
-            top_sect = sector_contribs
-            bot_sect = sector_contribs.iloc[::-1]
+            # Split by sign: positive contributions on the left, negative on
+            # the right. Sectors with exactly zero contribution are dropped
+            # (they neither contributed nor detracted). Each list is sorted
+            # by magnitude — best first on the left, worst first on the right.
+            top_sect = sector_contribs[sector_contribs > 0]
+            bot_sect = sector_contribs[sector_contribs < 0].sort_values(ascending=True)
 
             col_st, col_sb = st.columns(2)
             with col_st:
@@ -823,6 +823,11 @@ with tab_overview:
                         f"</div>",
                         unsafe_allow_html=True,
                     )
+                if len(top_sect) == 0:
+                    st.markdown(
+                        "<div style='padding:5px 0;font-size:12px;color:rgba(255,255,255,0.3);font-style:italic;'>No contributing sectors today.</div>",
+                        unsafe_allow_html=True,
+                    )
 
             with col_sb:
                 st.markdown(
@@ -840,6 +845,11 @@ with tab_overview:
                         f"<div style='flex:1;font-size:12px;font-weight:600;color:rgba(255,255,255,0.8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{sect_name}</div>"
                         f"<div style='font-size:11px;color:{_sd_color};font-weight:600;white-space:nowrap;'>{_sd_bp:+.1f}bp</div>"
                         f"</div>",
+                        unsafe_allow_html=True,
+                    )
+                if len(bot_sect) == 0:
+                    st.markdown(
+                        "<div style='padding:5px 0;font-size:12px;color:rgba(255,255,255,0.3);font-style:italic;'>No detracting sectors today.</div>",
                         unsafe_allow_html=True,
                     )
 
