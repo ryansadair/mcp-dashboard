@@ -5,6 +5,9 @@ data/notion_metrics.py
 Pulls MCP-proprietary fields from the "MCP Master Holdings" Notion database:
   - MCP Dividend Baseline  (number, e.g. 4, 6, 8, 10, 12)
   - MCP Style Bucket       (select: DG, HG, TC, HY)
+  - CLD                    (number — MCP's proprietary culture/quality grade)
+  - CLD Source             (select)
+  - MCP Target             (number — price target)
 
 Designed to merge into the holdings table by ticker symbol.
 
@@ -123,6 +126,7 @@ def fetch_notion_metrics():
             "MSFT": {
                 "div_baseline": 10,
                 "style_bucket": "HG",
+                "cld": 8,
                 "cld_source": "Switch",
                 "mcp_target": 563,
                 "strategies": ["QDVD", "DAC", "OR"],
@@ -153,6 +157,7 @@ def fetch_notion_metrics():
         result[sym] = {
             "div_baseline":  _extract_number(props.get("MCP Dividend Baseline", {})),
             "style_bucket":  _extract_select(props.get("MCP Style Bucket", {})),
+            "cld":           _extract_number(props.get("CLD", {})),
             "cld_source":    _extract_select(props.get("CLD Source", {})),
             "mcp_target":    _extract_number(props.get("MCP Target", {})),
             "strategies":    _extract_multi_select(props.get("Strategies", {})),
@@ -164,7 +169,7 @@ def fetch_notion_metrics():
 def get_metrics_for_ticker(ticker):
     """
     Get Notion metrics for a single ticker.
-    Returns dict with keys: div_baseline, style_bucket, cld_source, mcp_target, strategies
+    Returns dict with keys: div_baseline, style_bucket, cld, cld_source, mcp_target, strategies
     Returns empty dict if not found.
     """
     data = fetch_notion_metrics()
@@ -174,7 +179,7 @@ def get_metrics_for_ticker(ticker):
 def get_metrics_for_tickers(tickers):
     """
     Get Notion metrics for a list of tickers.
-    Returns: {ticker: {div_baseline, style_bucket, ...}}
+    Returns: {ticker: {div_baseline, style_bucket, cld, ...}}
     Missing tickers will have empty dicts.
     """
     data = fetch_notion_metrics()

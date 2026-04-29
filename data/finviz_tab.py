@@ -16,7 +16,6 @@ from datetime import datetime
 from utils.config import BRAND
 from data.finviz_data import (
     fetch_finviz_batch,
-    recommendation_badge,
     upside_badge,
     rsi_indicator,
 )
@@ -53,12 +52,12 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
         st.caption("Finviz data unavailable — check network or try again later.")
         return
 
-    # ── Analyst Consensus Summary ─────────────────────────────────────────
+    # ── MCP Targets & Technicals ──────────────────────────────────────────
     st.markdown(
         '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
         'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
         'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
-        'Analyst Ratings &amp; MCP Price Targets</div>',
+        'MCP Targets &amp; Technicals</div>',
         unsafe_allow_html=True,
     )
 
@@ -72,8 +71,6 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
         if not fv:
             continue
 
-        rec_val = fv.get("recommendation")
-        rec_label = fv.get("rec_label", "—")
         rsi = fv.get("rsi_14")
         price = mkt.get("price", 0) or fv.get("price", 0)
 
@@ -90,8 +87,6 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
             "description": h["description"],
             "weight_pct": h["weight_pct"],
             "price": price,
-            "rec_val": rec_val,
-            "rec_label": rec_label,
             "target": mcp_target,
             "upside": upside,
             "rsi": rsi,
@@ -111,41 +106,7 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
 
     df = pd.DataFrame(rows).sort_values("weight_pct", ascending=False)
 
-    # ── Summary KPIs ──────────────────────────────────────────────────────
-    valid_recs = [r for r in df["rec_val"].dropna()]
-    valid_upsides = [r for r in df["upside"].dropna()]
-
-    avg_rec = sum(valid_recs) / len(valid_recs) if valid_recs else None
-    avg_upside = sum(valid_upsides) / len(valid_upsides) if valid_upsides else None
-    buys = len([r for r in valid_recs if r <= 2.0])
-    holds = len([r for r in valid_recs if 2.0 < r <= 3.0])
-    sells = len([r for r in valid_recs if r > 3.0])
-
-    k1, k2, k3, k4 = st.columns(4)
-    with k1:
-        if avg_rec is not None:
-            _, lbl = None, "—"
-            if avg_rec <= 2.0:
-                lbl = "Buy"
-            elif avg_rec <= 3.0:
-                lbl = "Hold"
-            else:
-                lbl = "Sell"
-            st.metric("Avg Rating", f"{avg_rec:.1f} ({lbl})")
-        else:
-            st.metric("Avg Rating", "—")
-    with k2:
-        if avg_upside is not None:
-            st.metric("Avg Upside to MCP Target", f"{avg_upside:+.1f}%")
-        else:
-            st.metric("Avg Upside to MCP Target", "—")
-    with k3:
-        st.metric("Buy / Hold / Sell", f"{buys} / {holds} / {sells}")
-    with k4:
-        above_200 = len([1 for _, r in df.iterrows() if r.get("sma200") and r["sma200"] > 0])
-        st.metric("Above 200-SMA", f"{above_200} / {len(df)}")
-
-    # ── Main Analyst Table ────────────────────────────────────────────────
+    # ── Main Table ────────────────────────────────────────────────────────
     # Render as custom HTML for badge formatting
     header_style = (
         "padding:6px 8px;font-size:10px;font-weight:600;"
@@ -156,17 +117,16 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
     html = (
         '<table style="width:100%;border-collapse:collapse;table-layout:fixed">'
         '<colgroup>'
-        '<col style="width:7%"><col style="width:18%"><col style="width:6%">'
-        '<col style="width:8%"><col style="width:15%"><col style="width:8%">'
-        '<col style="width:8%"><col style="width:7%"><col style="width:7%">'
-        '<col style="width:8%"><col style="width:8%">'
+        '<col style="width:7%"><col style="width:23%"><col style="width:7%">'
+        '<col style="width:9%"><col style="width:12%"><col style="width:10%">'
+        '<col style="width:8%"><col style="width:8%"><col style="width:8%">'
+        '<col style="width:8%">'
         '</colgroup>'
         f'<thead><tr>'
         f'<th style="text-align:left;{header_style}">Sym</th>'
         f'<th style="text-align:left;{header_style}">Company</th>'
         f'<th style="text-align:right;{header_style}">Wt%</th>'
         f'<th style="text-align:right;{header_style}">Price</th>'
-        f'<th style="text-align:center;{header_style}">Analyst</th>'
         f'<th style="text-align:right;{header_style}">MCP Target</th>'
         f'<th style="text-align:right;{header_style}">Upside</th>'
         f'<th style="text-align:right;{header_style}">RSI</th>'
@@ -177,7 +137,6 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
     )
 
     for _, r in df.iterrows():
-        rec_html = recommendation_badge(r["rec_val"], r["rec_label"])
         up_html = upside_badge(r["upside"])
         rsi_html = rsi_indicator(r["rsi"])
 
@@ -189,11 +148,10 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
         ytd_str = f"{r['perf_ytd']:+.1f}%" if r["perf_ytd"] is not None else "—"
         ytd_color = GREEN if r.get("perf_ytd") and r["perf_ytd"] >= 0 else RED
 
-        # Highlight row if analyst says sell or big upside
+        # Highlight row when MCP target shows big upside (analyst-driven highlight removed
+        # along with the Analyst column).
         bg = ""
-        if r.get("rec_val") and r["rec_val"] > 3.0:
-            bg = "background:rgba(196,84,84,0.04);"
-        elif r.get("upside") and r["upside"] >= 20:
+        if r.get("upside") and r["upside"] >= 20:
             bg = "background:rgba(86,149,66,0.04);"
 
         html += (
@@ -202,7 +160,6 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
             f'<td style="text-align:left;padding:8px;font-size:11px;color:rgba(255,255,255,0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{r["description"]}</td>'
             f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.6);">{r["weight_pct"]:.1f}%</td>'
             f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.8);">${r["price"]:.2f}</td>'
-            f'<td style="text-align:center;padding:8px;">{rec_html}</td>'
             f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.7);">{target_str}</td>'
             f'<td style="text-align:right;padding:8px;">{up_html}</td>'
             f'<td style="text-align:right;padding:8px;">{rsi_html}</td>'
@@ -312,7 +269,6 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
             )
 
     st.caption(
-        f"Source: Finviz (analyst ratings, technicals) · Notion (MCP targets) · Cached 1 hour · "
-        f"{datetime.now().strftime('%I:%M %p')} · "
-        f"Analyst ratings are consensus of Wall Street coverage"
+        f"Source: Finviz (technicals) · Notion (MCP targets) · Cached 1 hour · "
+        f"{datetime.now().strftime('%I:%M %p')}"
     )
