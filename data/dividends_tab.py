@@ -1029,6 +1029,21 @@ def _render_safety_growth(edf, active_strategy, strat_color):
     universe_flagged = scorecard.get("universe_flagged", []) or []
     detail_map = get_mcp_detail_map(scorecard)
 
+    # Yield in the scorecard JSON is stored as a decimal fraction
+    # (PitchBook convention: 0.043 = 4.3%). Multiply by 100 for display.
+    # Helper is reused by both the MCP scorecard table and the universe
+    # table so the conversion lives in one place. The bounds check
+    # safely passes through anything that's already in percent form
+    # (e.g. >1) so future format changes don't silently corrupt output.
+    def _fmt_yield_pct(v):
+        if not isinstance(v, (int, float)):
+            return "—"
+        # Decimal fraction (typical case): scale to percent
+        if 0 <= v <= 1:
+            return f"{v * 100:.1f}%"
+        # Already in percent form (defensive)
+        return f"{v:.1f}%"
+
     # ── Header strip: as-of date, scope, optional staleness warning ──────
     header_bits = [
         f"As of <strong>{format_as_of(as_of)}</strong>",
@@ -1176,7 +1191,7 @@ Each pillar scores from −2 (severe stress) to +2 (healthy). Composite scales t
             .map(_yield_color, subset=["Yield"])
             .map(_composite_color, subset=["Composite"])
             .format({
-                "Yield":     lambda v: f"{v:.1f}%" if isinstance(v, (int, float)) else "—",
+                "Yield":     _fmt_yield_pct,
                 "Composite": lambda v: f"{v:+.1f}" if isinstance(v, (int, float)) else "—",
             })
         )
@@ -1356,7 +1371,7 @@ Each pillar scores from −2 (severe stress) to +2 (healthy). Composite scales t
                 .map(_yield_color, subset=["Yield"])
                 .map(_composite_color, subset=["Composite"])
                 .format({
-                    "Yield":     lambda v: f"{v:.1f}%" if isinstance(v, (int, float)) else "—",
+                    "Yield":     _fmt_yield_pct,
                     "Composite": lambda v: f"{v:+.1f}" if isinstance(v, (int, float)) else "—",
                 })
             )
