@@ -399,6 +399,87 @@ def _compute_5yr_roe_avg(tk):
         return None
 
 
+def _compute_dividend_metadata(tk):
+    """
+    Compute Tab 2 (QDG Characteristics) dividend metadata:
+      timing_of_raise   — modal calendar month string (e.g. "Dec") of historical
+                          dividend increases. Returns None if no clear pattern.
+      dividend_frequency — "Q" (quarterly), "M" (monthly), "SA" (semi-annual),
+                          "A" (annual), or None if can't determine.
+
+    Uses yfinance's tk.dividends series. Goes through tk.history's actions
+    machinery which is reliable on Streamlit Cloud (unlike tk.info).
+
+    Both use a 5-year lookback so recent corporate actions dominate the signal.
+    """
+    out = {"timing_of_raise": None, "dividend_frequency": None}
+    try:
+        divs = tk.dividends
+        if divs is None or len(divs) == 0:
+            return out
+
+        # Restrict to last 5 calendar years to avoid ancient policy changes
+        # skewing the modal month / frequency.
+        from datetime import datetime, timedelta
+        cutoff = datetime.now().replace(tzinfo=None) - timedelta(days=365 * 5)
+        recent = divs.copy()
+        try:
+            # yfinance returns a tz-aware DatetimeIndex; convert to naive for
+            # comparison with our cutoff.
+            recent.index = recent.index.tz_localize(None) if recent.index.tz is not None else recent.index
+        except Exception:
+            pass
+        recent = recent[recent.index >= cutoff] if len(recent) > 0 else recent
+
+        if len(recent) == 0:
+            return out
+
+        # ── Dividend frequency ───────────────────────────────────────────
+        # Count payments per calendar year; take median across years for a
+        # stable signal even if the most recent year is partial.
+        from collections import Counter
+        years = recent.index.year
+        per_year = Counter(years)
+        if per_year:
+            counts = sorted(per_year.values())
+            median_count = counts[len(counts) // 2]
+            if median_count >= 11:
+                out["dividend_frequency"] = "M"   # Monthly
+            elif median_count >= 3:
+                out["dividend_frequency"] = "Q"   # Quarterly
+            elif median_count == 2:
+                out["dividend_frequency"] = "SA"  # Semi-annual
+            elif median_count == 1:
+                out["dividend_frequency"] = "A"   # Annual
+
+        # ── Timing of raise ──────────────────────────────────────────────
+        # Identify months where dividend increased vs prior payment, then
+        # take the modal month.
+        months_with_increase = []
+        prior = None
+        for ts, amt in recent.items():
+            try:
+                amt_f = float(amt)
+            except (TypeError, ValueError):
+                continue
+            if prior is not None and amt_f > prior * 1.001:  # >0.1% increase
+                months_with_increase.append(ts.month)
+            prior = amt_f
+
+        if months_with_increase:
+            month_counts = Counter(months_with_increase)
+            # Modal month: highest count
+            modal_month = month_counts.most_common(1)[0][0]
+            month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            out["timing_of_raise"] = month_names[modal_month - 1]
+
+    except Exception:
+        pass
+
+    return out
+
+
 # ── Per-ticker compute ────────────────────────────────────────────────────
 
 def _compute_ticker(ticker, spx_hist):
@@ -425,6 +506,10 @@ def _compute_ticker(ticker, spx_hist):
         # Industry / geo
         "super_sector": None, "sub_industry": None, "country": None,
         "forward_pe": None,
+        # Sprint 23C — dividend metadata for QDG Characteristics tab.
+        # Both come from tk.dividends (the actions stream from tk.history),
+        # which is reliable on Streamlit Cloud unlike tk.info.
+        "timing_of_raise": None, "dividend_frequency": None,
     }
 
     try:
@@ -480,6 +565,10 @@ def _compute_ticker(ticker, spx_hist):
         cf_metrics = _compute_cash_flow_metrics(tk, info)
         out.update(cf_metrics)
 
+        # Dividend metadata (Sprint 23C) — uses tk.dividends, reliable on Cloud
+        div_meta = _compute_dividend_metadata(tk)
+        out.update(div_meta)
+
         # Sector / sub-industry / country / forward P/E
         sector_raw = info.get("sector", "") or ""
         out["super_sector"] = _SUPER_SECTOR_MAP.get(sector_raw)
@@ -500,7 +589,7 @@ def _compute_ticker(ticker, spx_hist):
 # ── Public API ────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=3600, show_spinner=False)
-@disk_cached(namespace="warbook", ttl=86400, version=1)
+@disk_cached(namespace="warbook", ttl=86400, version=2)
 def fetch_warbook_metrics_batch(tickers_tuple):
     """
     Fetch warbook-specific metrics for a batch of tickers.

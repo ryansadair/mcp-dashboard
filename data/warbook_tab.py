@@ -42,6 +42,13 @@ from data.notion_metrics import fetch_notion_metrics
 from data.warbook_metrics import fetch_warbook_metrics_batch
 from data.dividends import get_batch_dividend_details
 
+# Fish CCC data is optional — gracefully degrade if not available
+try:
+    from data.dividend_streaks import get_fish_metrics, get_dividend_history
+    FISH_AVAILABLE = True
+except ImportError:
+    FISH_AVAILABLE = False
+
 
 # ── Strategies that get a warbook (DCP excluded per MCP workflow) ─────────
 WARBOOK_STRATEGIES = {"DAC", "OR", "QDVD", "SMID"}
@@ -128,15 +135,18 @@ def render_warbook_tab(tamarac_parsed, active_strategy, strat_config):
         unsafe_allow_html=True,
     )
 
-    # Sub-tabs: Strategy Overview | Attribution (23C will add QDG + Risk)
-    sub_overview, sub_attribution = st.tabs([
+    # Sub-tabs: 4 warbook views matching the printed spreadsheet layout.
+    # All four share the same pre-fetched data underneath.
+    sub_overview, sub_qdg, sub_risk, sub_attribution = st.tabs([
         "Strategy Overview",
+        "QDG Characteristics",
+        "Risk Correlation",
         "Attribution",
     ])
 
-    # Pre-fetch all data once — both sub-tabs share the same underlying calls.
-    # Streamlit's st.tabs() runs every body on every interaction, so any
-    # heavy fetches need to be cached. Each of these has its own caching
+    # Pre-fetch all data once — all four sub-tabs share the same underlying
+    # calls. Streamlit's st.tabs() runs every body on every interaction, so
+    # any heavy fetches need to be cached. Each of these has its own caching
     # layer (st.cache_data + disk_cached) so this call is cheap on warm
     # cache.
     tickers = tuple(tam_df["symbol"].astype(str).str.upper().tolist())
@@ -159,11 +169,44 @@ def render_warbook_tab(tamarac_parsed, active_strategy, strat_config):
         except Exception:
             pass
 
+        # Fish CCC data — for QDG Characteristics tab. Fish has authoritative
+        # streak_began (Raised Since), payout_ratio, and DGR series. Each
+        # ticker lookup goes through @st.cache_data on _load_fish_data so
+        # this batch call is cheap.
+        fish_data = {}
+        fish_history = {}
+        if FISH_AVAILABLE:
+            for t in tickers:
+                try:
+                    m = get_fish_metrics(t)
+                    if m:
+                        fish_data[t] = m
+                    h = get_dividend_history(t)
+                    if h:
+                        fish_history[t] = h
+                except Exception:
+                    pass
+
     # ── Strategy Overview (Tab 1) ────────────────────────────────────────
     with sub_overview:
         _render_strategy_overview(
             tam_df, active_strategy,
             price_data, notion_data, div_data,
+        )
+
+    # ── QDG Characteristics (Tab 2) ──────────────────────────────────────
+    with sub_qdg:
+        _render_qdg_characteristics(
+            tam_df, active_strategy,
+            price_data, notion_data, warbook_data,
+            fish_data, fish_history,
+        )
+
+    # ── Risk Correlation (Tab 3) ─────────────────────────────────────────
+    with sub_risk:
+        _render_risk_correlation(
+            tam_df, active_strategy,
+            price_data, notion_data, warbook_data,
         )
 
     # ── Attribution (Tab 4) ──────────────────────────────────────────────
@@ -390,6 +433,321 @@ def _render_strategy_overview(tam_df, active_strategy, price_data, notion_data, 
         "margin-top:14px;text-align:right;'>"
         "Source: Tamarac (positions, cost basis) · yfinance (price, yield) · "
         "Fish CCC (5yr DG) · Notion (CLD, MCP Target, Baseline, Style, Date Eval)"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# TAB 2 — QDG CHARACTERISTICS
+# ══════════════════════════════════════════════════════════════════════════
+
+def _render_qdg_characteristics(
+    tam_df, active_strategy,
+    price_data, notion_data, warbook_data,
+    fish_data, fish_history,
+):
+    """
+    Replicates the warbook spreadsheet's "QDG Characteristics" tab.
+
+    Columns (sorted by weight desc):
+      Symbol · Shares · Value · Company · Yield · Mkt Cap $Bln · Sector ·
+      ROE % · LT Debt/Cap % · Quality (S&P) · Paid Since · Raised Since ·
+      Timing of Raise · Frequency · Payout Ratio % · Last Bump % ·
+      1Y/3Y/5Y DG % · FCF Yield · Weight
+
+    Sources:
+      - Yield, Mkt Cap, Sector, ROE, LT Debt/Cap, FCF Yield: yfinance / warbook_metrics
+      - Quality (S&P): Notion
+      - Raised Since, Payout, 1Y/3Y/5Y DG: Fish CCC (preferred — authoritative)
+      - Paid Since: Fish Historical (earliest year with non-zero dividend)
+      - Last Bump: Fish Historical (most recent ÷ prior annual)
+      - Timing of Raise, Frequency: yfinance via warbook_metrics
+    """
+    rows = []
+    for _, h in tam_df.iterrows():
+        sym = str(h["symbol"]).strip().upper()
+        mkt = price_data.get(sym, {})
+        nm = notion_data.get(sym, {})
+        wm = warbook_data.get(sym, {})
+        fm = fish_data.get(sym, {})
+        fh = fish_history.get(sym, {})
+
+        price = mkt.get("price") or 0
+        qty = h.get("quantity") or 0
+        tam_value = h.get("value") or 0
+        value = tam_value if tam_value else (qty * price if qty and price else 0)
+
+        # Market cap in billions for compactness (warbook column is "$Bln")
+        mkt_cap_raw = mkt.get("market_cap") or 0
+        mkt_cap_bln = round(mkt_cap_raw / 1e9, 1) if mkt_cap_raw else None
+
+        # Paid Since — earliest year in Fish Historical with non-zero dividend
+        paid_since = None
+        if fh:
+            years_with_div = sorted(y for y, v in fh.items() if v and v > 0)
+            if years_with_div:
+                paid_since = years_with_div[0]
+
+        # Raised Since — directly from Fish streak_began (more reliable than
+        # back-computing from the Historical sheet)
+        raised_since_raw = fm.get("streak_began")
+        raised_since = None
+        if raised_since_raw is not None:
+            try:
+                raised_since = int(float(str(raised_since_raw)))
+            except (ValueError, TypeError):
+                pass
+
+        # Last Bump % — most recent annual ÷ prior annual, expressed as %.
+        # Use Fish Historical because Fish is curated and consistent.
+        # Skip current calendar year if it's likely incomplete.
+        last_bump = None
+        if fh:
+            from datetime import date as _date
+            current_year = _date.today().year
+            sorted_years = sorted([y for y in fh.keys() if y < current_year])
+            if len(sorted_years) >= 2:
+                latest_y = sorted_years[-1]
+                prior_y = sorted_years[-2]
+                latest_v = fh.get(latest_y)
+                prior_v = fh.get(prior_y)
+                if latest_v and prior_v and prior_v > 0:
+                    last_bump = round((latest_v / prior_v - 1) * 100, 1)
+
+        # Dividend growth — prefer Fish (Supabase) over yfinance fallback.
+        dgr_1y = fm.get("dgr_1y")
+        dgr_3y = fm.get("dgr_3y")
+        dgr_5y = fm.get("dgr_5y")
+        # Fish stores 0.0 when data is missing; treat 0 as missing for display
+        # unless we have evidence of an actual zero (very rare for grow names)
+        if dgr_1y == 0:
+            dgr_1y = None
+        if dgr_3y == 0:
+            dgr_3y = None
+        if dgr_5y == 0:
+            dgr_5y = None
+
+        # Payout ratio — prefer Fish (curated). Stored as percentage (e.g. 45.0)
+        payout = fm.get("payout_ratio")
+        if payout == 0:
+            payout = None
+
+        rows.append({
+            "Symbol":            sym,
+            "Shares":             qty,
+            "Value":              value,
+            "Company":            h["description"],
+            "Yield":              mkt.get("dividend_yield") or 0,
+            "Mkt Cap $Bln":       mkt_cap_bln,
+            "Sector":             normalize_sector(mkt.get("sector", "")),
+            "ROE %":              wm.get("roe_ttm"),
+            "LT D/Cap %":         wm.get("lt_debt_to_capital"),
+            "Qual (S&P)":         nm.get("sp_quality") or "",
+            "Paid Since":         paid_since,
+            "Raised Since":       raised_since,
+            "Timing":             wm.get("timing_of_raise") or "",
+            "Freq":               wm.get("dividend_frequency") or "",
+            "Payout %":           payout,
+            "Last Bump %":        last_bump,
+            "1Y DG %":            dgr_1y,
+            "3Y DG %":            dgr_3y,
+            "5Y DG %":            dgr_5y,
+            "FCF Yld %":          wm.get("fcf_yield"),
+            "Weight":             round(h["weight_pct"], 2),
+        })
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        st.info("No data available for QDG Characteristics view.")
+        return
+
+    # Coerce numeric columns to float dtype for proper sort + na_rep handling.
+    numeric_cols = [
+        "Shares", "Value", "Yield", "Mkt Cap $Bln", "ROE %", "LT D/Cap %",
+        "Paid Since", "Raised Since", "Payout %", "Last Bump %",
+        "1Y DG %", "3Y DG %", "5Y DG %", "FCF Yld %", "Weight",
+    ]
+    for c in numeric_cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    # Sort by weight descending — same as Strategy Overview.
+    df = df.sort_values("Weight", ascending=False).reset_index(drop=True)
+
+    styler = (
+        df.style
+        .format({
+            "Shares":        lambda v: f"{v:,.0f}" if _is_num(v) else "—",
+            "Value":         lambda v: f"${v:,.0f}" if _is_num(v) else "—",
+            "Yield":         lambda v: f"{v:.2f}%" if _is_num(v) else "—",
+            "Mkt Cap $Bln":  lambda v: f"${v:,.1f}" if _is_num(v) else "—",
+            "ROE %":         lambda v: f"{v:.1f}%" if _is_num(v) else "—",
+            "LT D/Cap %":    lambda v: f"{v:.1f}%" if _is_num(v) else "—",
+            "Paid Since":    lambda v: f"{int(v)}" if _is_num(v) else "—",
+            "Raised Since":  lambda v: f"{int(v)}" if _is_num(v) else "—",
+            "Payout %":      lambda v: f"{v:.1f}%" if _is_num(v) else "—",
+            "Last Bump %":   lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "1Y DG %":       lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "3Y DG %":       lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "5Y DG %":       lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "FCF Yld %":     lambda v: f"{v:.2f}%" if _is_num(v) else "—",
+            "Weight":        lambda v: f"{v:.2f}%" if _is_num(v) else "—",
+        }, na_rep="—")
+    )
+
+    height = min(80 + len(df) * 36, 1400)
+    st.dataframe(
+        styler, width="stretch", hide_index=True, height=height,
+        column_config={
+            "Symbol":        st.column_config.TextColumn("Symbol", width="small"),
+            "Shares":        st.column_config.TextColumn("Shares", width="small"),
+            "Value":         st.column_config.TextColumn("Value", width="small"),
+            "Company":       st.column_config.TextColumn("Company", width="medium"),
+            "Yield":         st.column_config.TextColumn("Yield", width="small"),
+            "Mkt Cap $Bln":  st.column_config.TextColumn("Mkt Cap", width="small"),
+            "Sector":        st.column_config.TextColumn("Sector", width="medium"),
+            "ROE %":         st.column_config.TextColumn("ROE", width="small"),
+            "LT D/Cap %":    st.column_config.TextColumn("LT D/Cap", width="small"),
+            "Qual (S&P)":    st.column_config.TextColumn("S&P Q", width="small"),
+            "Paid Since":    st.column_config.TextColumn("Paid", width="small"),
+            "Raised Since":  st.column_config.TextColumn("Raised", width="small"),
+            "Timing":        st.column_config.TextColumn("Timing", width="small"),
+            "Freq":          st.column_config.TextColumn("Freq", width="small"),
+            "Payout %":      st.column_config.TextColumn("Payout", width="small"),
+            "Last Bump %":   st.column_config.TextColumn("Last Bump", width="small"),
+            "1Y DG %":       st.column_config.TextColumn("1Y DG", width="small"),
+            "3Y DG %":       st.column_config.TextColumn("3Y DG", width="small"),
+            "5Y DG %":       st.column_config.TextColumn("5Y DG", width="small"),
+            "FCF Yld %":     st.column_config.TextColumn("FCF Yld", width="small"),
+            "Weight":        st.column_config.TextColumn("Wt", width="small"),
+        },
+    )
+
+    st.markdown(
+        "<div style='font-size:10px;color:rgba(255,255,255,0.3);"
+        "margin-top:14px;text-align:right;'>"
+        "Source: Tamarac (positions) · yfinance (yield, market cap, ROE, "
+        "leverage, FCF yield, frequency, timing) · Fish CCC (raised since, "
+        "payout, DGR, paid since, last bump) · Notion (S&amp;P quality)"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# TAB 3 — RISK CORRELATION
+# ══════════════════════════════════════════════════════════════════════════
+
+def _render_risk_correlation(
+    tam_df, active_strategy,
+    price_data, notion_data, warbook_data,
+):
+    """
+    Replicates the warbook spreadsheet's "Risk Correlation" tab.
+
+    Columns (sorted by Super Sector A→Z, then Sector A→Z, then Symbol A→Z):
+      Symbol · Yesterday's Close · Mkt Cap $Bln · Super Sector · Sector ·
+      Sub-Industry · Credit (S&P) · Debt Coverage Ratio · LT Debt/Cap % ·
+      Beta · Style Classification · Mstar Growth Grade · Mstar Profitability
+      Grade · Mstar Financial Health Grade · Country · Weight
+
+    Sources:
+      - Yesterday's Close, Mkt Cap, Sector, Beta: yfinance / market_data
+      - Super Sector, Sub-Industry, Country, Debt Coverage, LT D/Cap: warbook_metrics
+      - Credit (S&P), all 4 Mstar grades, Style Classification: Notion
+    """
+    rows = []
+    for _, h in tam_df.iterrows():
+        sym = str(h["symbol"]).strip().upper()
+        mkt = price_data.get(sym, {})
+        nm = notion_data.get(sym, {})
+        wm = warbook_data.get(sym, {})
+
+        mkt_cap_raw = mkt.get("market_cap") or 0
+        mkt_cap_bln = round(mkt_cap_raw / 1e9, 1) if mkt_cap_raw else None
+
+        rows.append({
+            "Symbol":            sym,
+            "Close":              mkt.get("price") or 0,
+            "Mkt Cap $Bln":       mkt_cap_bln,
+            "Super Sector":       wm.get("super_sector") or "",
+            "Sector":             normalize_sector(mkt.get("sector", "")),
+            "Sub-Industry":       wm.get("sub_industry") or "",
+            "Credit (S&P)":       nm.get("sp_credit") or "",
+            "Debt Cov":           wm.get("debt_coverage_ratio"),
+            "LT D/Cap %":         wm.get("lt_debt_to_capital"),
+            "Beta":               mkt.get("beta") if mkt.get("beta") else None,
+            "Style":              nm.get("mstar_style") or "",
+            "Mstar Gr":           nm.get("mstar_growth") or "",
+            "Mstar Pf":           nm.get("mstar_profitability") or "",
+            "Mstar FH":           nm.get("mstar_fin_health") or "",
+            "Country":            wm.get("country") or "",
+            "Weight":             round(h["weight_pct"], 2),
+        })
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        st.info("No data available for Risk Correlation view.")
+        return
+
+    numeric_cols = [
+        "Close", "Mkt Cap $Bln", "Debt Cov", "LT D/Cap %", "Beta", "Weight",
+    ]
+    for c in numeric_cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    # Sort: Super Sector A→Z, Sector A→Z, Symbol A→Z (Symbol is tiebreaker
+    # within same sector, per Sprint 23C scope decision).
+    # NaN/empty Super Sector goes last via na_position="last".
+    df = df.sort_values(
+        by=["Super Sector", "Sector", "Symbol"],
+        ascending=[True, True, True],
+        na_position="last",
+    ).reset_index(drop=True)
+
+    styler = (
+        df.style
+        .format({
+            "Close":         lambda v: f"${v:,.2f}" if _is_num(v) else "—",
+            "Mkt Cap $Bln":  lambda v: f"${v:,.1f}" if _is_num(v) else "—",
+            "Debt Cov":      lambda v: f"{v:.1f}x" if _is_num(v) else "—",
+            "LT D/Cap %":    lambda v: f"{v:.1f}%" if _is_num(v) else "—",
+            "Beta":          lambda v: f"{v:.2f}" if _is_num(v) else "—",
+            "Weight":        lambda v: f"{v:.2f}%" if _is_num(v) else "—",
+        }, na_rep="—")
+    )
+
+    height = min(80 + len(df) * 36, 1400)
+    st.dataframe(
+        styler, width="stretch", hide_index=True, height=height,
+        column_config={
+            "Symbol":        st.column_config.TextColumn("Symbol", width="small"),
+            "Close":         st.column_config.TextColumn("Close", width="small"),
+            "Mkt Cap $Bln":  st.column_config.TextColumn("Mkt Cap", width="small"),
+            "Super Sector":  st.column_config.TextColumn("Super Sector", width="small"),
+            "Sector":        st.column_config.TextColumn("Sector", width="medium"),
+            "Sub-Industry":  st.column_config.TextColumn("Sub-Industry", width="medium"),
+            "Credit (S&P)":  st.column_config.TextColumn("S&P Cr", width="small"),
+            "Debt Cov":      st.column_config.TextColumn("Debt Cov", width="small"),
+            "LT D/Cap %":    st.column_config.TextColumn("LT D/Cap", width="small"),
+            "Beta":          st.column_config.TextColumn("Beta", width="small"),
+            "Style":         st.column_config.TextColumn("Style", width="small"),
+            "Mstar Gr":      st.column_config.TextColumn("Gr", width="small"),
+            "Mstar Pf":      st.column_config.TextColumn("Pf", width="small"),
+            "Mstar FH":      st.column_config.TextColumn("FH", width="small"),
+            "Country":       st.column_config.TextColumn("Country", width="small"),
+            "Weight":        st.column_config.TextColumn("Wt", width="small"),
+        },
+    )
+
+    st.markdown(
+        "<div style='font-size:10px;color:rgba(255,255,255,0.3);"
+        "margin-top:14px;text-align:right;'>"
+        "Source: Tamarac (positions) · yfinance (price, market cap, beta) · "
+        "warbook_metrics (super sector, sub-industry, country, debt coverage) · "
+        "Notion (S&amp;P credit, Mstar grades, style)"
         "</div>",
         unsafe_allow_html=True,
     )
