@@ -47,6 +47,45 @@ from data.dividends import get_batch_dividend_details
 WARBOOK_STRATEGIES = {"DAC", "OR", "QDVD", "SMID"}
 
 
+def _fmt_date_short(dt):
+    """
+    Format a datetime as M/YY (e.g., "1/20" for Jan 2020). Cross-platform —
+    avoids the Linux-only %-m / Windows-only %#m strftime tokens by building
+    the string from datetime attributes directly.
+    """
+    if dt is None:
+        return ""
+    try:
+        return f"{dt.month}/{str(dt.year)[-2:]}"
+    except (AttributeError, TypeError):
+        return ""
+
+
+def _fmt_date_md(dt):
+    """Format a datetime as M/D/YY. Cross-platform (no strftime tokens)."""
+    if dt is None:
+        return ""
+    try:
+        return f"{dt.month}/{dt.day}/{str(dt.year)[-2:]}"
+    except (AttributeError, TypeError):
+        return ""
+
+
+def _is_num(v):
+    """
+    True if v is a non-NaN numeric. Used by all format lambdas in this module
+    because pandas coerces None to NaN when building DataFrames with mixed
+    columns, and isinstance(NaN, float) is True — so a plain isinstance check
+    would render NaN as "nanx" or "nan%" instead of an em dash.
+    """
+    if v is None:
+        return False
+    if not isinstance(v, (int, float)):
+        return False
+    # NaN check: NaN is the only float that doesn't equal itself
+    return v == v
+
+
 def render_warbook_tab(tamarac_parsed, active_strategy, strat_config):
     """
     Top-level entry point. Renders the warbook sub-tabs for the active
@@ -188,30 +227,34 @@ def _render_strategy_overview(tam_df, active_strategy, price_data, notion_data, 
         if isinstance(growth_5y, (int, float)) and isinstance(baseline, (int, float)):
             exceeds = "Yes" if growth_5y >= baseline else "No"
 
-        # Original purchase date from Tamarac (open_date column)
+        # Original purchase date from Tamarac (open_date column).
+        # Tamarac stores it variously as datetime, ISO string, or M/D/YYYY.
+        # _fmt_date_short produces "M/YY" cross-platform (avoids %-m issues).
         open_date_raw = h.get("open_date", "")
         open_date_str = ""
         if open_date_raw:
-            # Tamarac stores as datetime sometimes, string others
             if isinstance(open_date_raw, datetime):
-                open_date_str = open_date_raw.strftime("%-m/%y") if hasattr(open_date_raw, "strftime") else str(open_date_raw)
+                open_date_str = _fmt_date_short(open_date_raw)
             else:
-                # Try to parse common formats
+                # Tamarac sometimes stores as string — try to parse
                 try:
-                    parsed = pd.to_datetime(open_date_raw)
-                    open_date_str = parsed.strftime("%-m/%y") if hasattr(parsed, "strftime") else str(open_date_raw)
+                    parsed = pd.to_datetime(open_date_raw, errors="coerce")
+                    if pd.notna(parsed):
+                        open_date_str = _fmt_date_short(parsed)
+                    else:
+                        open_date_str = str(open_date_raw)
                 except Exception:
                     open_date_str = str(open_date_raw)
 
-        # Date Evaluated from Notion
-        date_eval_str = nm.get("date_evaluated") or ""
-        # Format YYYY-MM-DD as M/D/YY for compactness (matches spreadsheet)
-        if date_eval_str:
+        # Date Evaluated from Notion — formatted M/D/YY
+        date_eval_str = ""
+        date_eval_raw = nm.get("date_evaluated") or ""
+        if date_eval_raw:
             try:
-                d = datetime.strptime(date_eval_str, "%Y-%m-%d")
-                date_eval_str = d.strftime("%-m/%-d/%y") if hasattr(d, "strftime") else date_eval_str
+                d = datetime.strptime(date_eval_raw, "%Y-%m-%d")
+                date_eval_str = _fmt_date_md(d)
             except Exception:
-                pass
+                date_eval_str = str(date_eval_raw)
 
         rows.append({
             "Company":              h["description"],
@@ -262,7 +305,7 @@ def _render_strategy_overview(tam_df, active_strategy, price_data, notion_data, 
 
     def _color_delta_from_cost(v):
         """Green/red based on sign — matches the dashboard's 1D % logic."""
-        if not isinstance(v, (int, float)):
+        if not _is_num(v):
             return ""
         if v >= 0:
             return f"color: {BRAND['green']};"
@@ -270,7 +313,7 @@ def _render_strategy_overview(tam_df, active_strategy, price_data, notion_data, 
 
     def _color_pct_to_tgt(v):
         """Color: positive (room above price) green, negative red."""
-        if not isinstance(v, (int, float)):
+        if not _is_num(v):
             return ""
         if v >= 0:
             return f"color: {BRAND['green']};"
@@ -280,16 +323,16 @@ def _render_strategy_overview(tam_df, active_strategy, price_data, notion_data, 
     styler = (
         df.style
         .format({
-            "Weight":      lambda v: f"{v:.2f}%" if isinstance(v, (int, float)) else "—",
-            "Yield":       lambda v: f"{v:.2f}%" if isinstance(v, (int, float)) else "—",
-            "Cost Basis":  lambda v: f"${v:,.2f}" if isinstance(v, (int, float)) else "—",
-            "Close":       lambda v: f"${v:,.2f}" if isinstance(v, (int, float)) else "—",
-            "Δ from Cost": lambda v: f"{v:+.1f}%" if isinstance(v, (int, float)) else "—",
-            "CLD":         lambda v: f"{v:.0f}" if isinstance(v, (int, float)) else "—",
-            "3yr Tgt":     lambda v: f"${v:,.0f}" if isinstance(v, (int, float)) else "—",
-            "% To Tgt":    lambda v: f"{v:+.1f}%" if isinstance(v, (int, float)) else "—",
-            "Baseline":    lambda v: f"{v:.0f}%" if isinstance(v, (int, float)) else "—",
-            "5yr DG":      lambda v: f"{v:.1f}%" if isinstance(v, (int, float)) else "—",
+            "Weight":      lambda v: f"{v:.2f}%" if _is_num(v) else "—",
+            "Yield":       lambda v: f"{v:.2f}%" if _is_num(v) else "—",
+            "Cost Basis":  lambda v: f"${v:,.2f}" if _is_num(v) else "—",
+            "Close":       lambda v: f"${v:,.2f}" if _is_num(v) else "—",
+            "Δ from Cost": lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "CLD":         lambda v: f"{v:.0f}" if _is_num(v) else "—",
+            "3yr Tgt":     lambda v: f"${v:,.0f}" if _is_num(v) else "—",
+            "% To Tgt":    lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "Baseline":    lambda v: f"{v:.0f}%" if _is_num(v) else "—",
+            "5yr DG":      lambda v: f"{v:.1f}%" if _is_num(v) else "—",
         })
         .map(_color_delta_from_cost, subset=["Δ from Cost"])
         .map(_color_pct_to_tgt, subset=["% To Tgt"])
@@ -369,10 +412,18 @@ def _render_attribution(tam_df, active_strategy, price_data, warbook_data):
         if price and w52_high:
             from_52w_high = round((price - w52_high) / w52_high * 100, 1)
 
+        # Value: prefer Tamarac's `value` column, fall back to qty × price.
+        # Some Tamarac export templates don't include the Value column
+        # (template 41 omits it); the fallback ensures we still show a
+        # meaningful position size in the warbook.
+        qty = h.get("quantity") or 0
+        tam_value = h.get("value") or 0
+        value = tam_value if tam_value else (qty * price if qty and price else 0)
+
         rows.append({
             "Symbol":           sym,
-            "Shares":            h.get("quantity") or 0,
-            "Value":             h.get("value") or 0,
+            "Shares":            qty,
+            "Value":             value,
             "Company":           h["description"],
             "YTD TR":            wm.get("tr_ytd"),
             "3M TR":             wm.get("tr_3m"),
@@ -400,7 +451,7 @@ def _render_attribution(tam_df, active_strategy, price_data, warbook_data):
     df = df.sort_values("Weight", ascending=False).reset_index(drop=True)
 
     def _color_signed(v):
-        if not isinstance(v, (int, float)):
+        if not _is_num(v):
             return ""
         if v > 0:
             return f"color: {BRAND['green']};"
@@ -410,7 +461,7 @@ def _render_attribution(tam_df, active_strategy, price_data, warbook_data):
 
     def _color_neg_only(v):
         """Red only on negative — neutral on positive."""
-        if not isinstance(v, (int, float)):
+        if not _is_num(v):
             return ""
         if v < 0:
             return f"color: {BRAND['red']};"
@@ -419,24 +470,24 @@ def _render_attribution(tam_df, active_strategy, price_data, warbook_data):
     styler = (
         df.style
         .format({
-            "Shares":         lambda v: f"{v:,.0f}" if isinstance(v, (int, float)) else "—",
-            "Value":          lambda v: f"${v:,.0f}" if isinstance(v, (int, float)) else "—",
-            "YTD TR":         lambda v: f"{v:+.1f}%" if isinstance(v, (int, float)) else "—",
-            "3M TR":          lambda v: f"{v:+.1f}%" if isinstance(v, (int, float)) else "—",
-            "1Y TR":          lambda v: f"{v:+.1f}%" if isinstance(v, (int, float)) else "—",
-            "MTD TR":         lambda v: f"{v:+.1f}%" if isinstance(v, (int, float)) else "—",
-            "QTD TR":         lambda v: f"{v:+.1f}%" if isinstance(v, (int, float)) else "—",
-            "QTD vs SPX":     lambda v: f"{v:+.1f}%" if isinstance(v, (int, float)) else "—",
-            "YTD vs SPX":     lambda v: f"{v:+.1f}%" if isinstance(v, (int, float)) else "—",
-            "% From 52W Hi":  lambda v: f"{v:+.1f}%" if isinstance(v, (int, float)) else "—",
-            "% Net Debt/Cap": lambda v: f"{v:.1f}%" if isinstance(v, (int, float)) else "—",
-            "ROE 5Y Avg":     lambda v: f"{v:.1f}%" if isinstance(v, (int, float)) else "—",
-            "EPS Cov":        lambda v: f"{v:.1f}x" if isinstance(v, (int, float)) else "—",
-            "CF Cov":         lambda v: f"{v:.1f}x" if isinstance(v, (int, float)) else "—",
-            "FCF Cov":        lambda v: f"{v:.1f}x" if isinstance(v, (int, float)) else "—",
-            "FWD P/E":        lambda v: f"{v:.1f}" if isinstance(v, (int, float)) else "—",
-            "CF/EV Yield":    lambda v: f"{v:.1f}%" if isinstance(v, (int, float)) else "—",
-            "Weight":         lambda v: f"{v:.2f}%" if isinstance(v, (int, float)) else "—",
+            "Shares":         lambda v: f"{v:,.0f}" if _is_num(v) else "—",
+            "Value":          lambda v: f"${v:,.0f}" if _is_num(v) else "—",
+            "YTD TR":         lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "3M TR":          lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "1Y TR":          lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "MTD TR":         lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "QTD TR":         lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "QTD vs SPX":     lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "YTD vs SPX":     lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "% From 52W Hi":  lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
+            "% Net Debt/Cap": lambda v: f"{v:.1f}%" if _is_num(v) else "—",
+            "ROE 5Y Avg":     lambda v: f"{v:.1f}%" if _is_num(v) else "—",
+            "EPS Cov":        lambda v: f"{v:.1f}x" if _is_num(v) else "—",
+            "CF Cov":         lambda v: f"{v:.1f}x" if _is_num(v) else "—",
+            "FCF Cov":        lambda v: f"{v:.1f}x" if _is_num(v) else "—",
+            "FWD P/E":        lambda v: f"{v:.1f}" if _is_num(v) else "—",
+            "CF/EV Yield":    lambda v: f"{v:.1f}%" if _is_num(v) else "—",
+            "Weight":         lambda v: f"{v:.2f}%" if _is_num(v) else "—",
         })
         .map(_color_neg_only, subset=[
             "YTD TR", "3M TR", "1Y TR", "MTD TR", "QTD TR",
