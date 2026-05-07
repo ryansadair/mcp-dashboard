@@ -70,6 +70,13 @@ try:
 except ImportError:
     DIV_TAB_AVAILABLE = False
 
+# Warbook tab (Sprint 23B) — Strategy Overview + Attribution sub-tabs
+try:
+    from data.warbook_tab import render_warbook_tab
+    WARBOOK_AVAILABLE = True
+except ImportError:
+    WARBOOK_AVAILABLE = False
+
 # Macro Environment tab
 try:
     from data.macro_tab import render_macro_tab
@@ -385,8 +392,8 @@ with _sel_col:
         on_change=_on_strategy_change,
     )
 
-tab_overview, tab_holdings, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
-    "Overview", "Holdings", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "News & Alerts"
+tab_overview, tab_holdings, tab_warbook, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
+    "Overview", "Holdings", "Warbook", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "News & Alerts"
 ])
 
 def _render_strategy_header(tab_key):
@@ -985,9 +992,6 @@ with tab_holdings:
                         "Yield on Cost %": round(yoc_pct, 2) if yoc_pct is not None else None,
                         "Div Yield %": mkt.get("dividend_yield", 0),
                         "MCP Target": nm.get("mcp_target") if nm.get("mcp_target") is not None else "—",
-                        "Baseline": nm.get("div_baseline") if nm.get("div_baseline") is not None else "—",
-                        "Style": nm.get("style_bucket", "—") or "—",
-                        "CLD": nm.get("cld") if nm.get("cld") is not None else "—",
                         "P/E": round(mkt.get("pe_ratio", 0), 1) if mkt.get("pe_ratio") else "—",
                         "Unit Cost": round(unit_cost, 2) if unit_cost is not None else None,
                         "% From 52W Hi": round(
@@ -1027,7 +1031,6 @@ with tab_holdings:
                     "Yield on Cost %": lambda v: "—" if v is None or pd.isna(v) else f"{v:.2f}%",
                     "Div Yield %": "{:.2f}%",
                     "MCP Target": lambda v: f"${v:,.0f}" if isinstance(v, (int, float)) else v,
-                    "CLD": lambda v: f"{v:.0f}" if isinstance(v, (int, float)) else v,
                     "Unit Cost": lambda v: "—" if v is None or pd.isna(v) else f"${v:.2f}",
                     "% From 52W Hi": "{:+.2f}%",
                 })
@@ -1051,9 +1054,6 @@ with tab_holdings:
                         "Yield on Cost %": st.column_config.NumberColumn("Yield on Cost", format="%.2f%%"),
                         "Div Yield %": st.column_config.NumberColumn("Curr Yield", format="%.2f%%"),
                         "MCP Target": st.column_config.TextColumn("MCP Target", width="small"),
-                        "Baseline": st.column_config.TextColumn("Baseline", width="small"),
-                        "Style": st.column_config.TextColumn("Style", width="small"),
-                        "CLD": st.column_config.TextColumn("CLD", width="small"),
                         "P/E": st.column_config.NumberColumn("P/E", format="%.2f"),
                         "Unit Cost": st.column_config.NumberColumn("Unit Cost", format="$%.2f"),
                         "% From 52W Hi": st.column_config.NumberColumn("% From Hi", format="%+.2f%%"),
@@ -1395,6 +1395,25 @@ with tab_holdings:
                 st.info("No holdings in Tamarac file for this strategy.")
         else:
             st.info("Price charts require Tamarac holdings data.")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# WARBOOK — Sprint 23B: Strategy Overview + Attribution sub-tabs
+# Replaces the printed warbook spreadsheets (DAC, OR, QDVD, SMID).
+# DCP excluded — MCP doesn't maintain a warbook for that strategy.
+# ══════════════════════════════════════════════════════════════════════════
+with tab_warbook:
+    _render_strategy_header("warbook")
+
+    if WARBOOK_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed:
+        render_warbook_tab(tamarac_parsed, active, strat)
+    elif not WARBOOK_AVAILABLE:
+        st.error(
+            "Warbook module not available. Ensure `data/warbook_tab.py` and "
+            "`data/warbook_metrics.py` are present."
+        )
+    else:
+        st.info("Warbook requires Tamarac holdings data.")
 
 
 # ══════════════════════════════════════════════════════════════════════════
