@@ -3,11 +3,24 @@ Martin Capital Partners — Notion Proprietary Metrics Fetcher
 data/notion_metrics.py
 
 Pulls MCP-proprietary fields from the "MCP Master Holdings" Notion database:
-  - MCP Dividend Baseline  (number, e.g. 4, 6, 8, 10, 12)
-  - MCP Style Bucket       (select: DG, HG, TC, HY)
-  - CLD                    (number — MCP's proprietary culture/quality grade)
-  - CLD Source             (select)
-  - MCP Target             (number — price target)
+
+  Core MCP fields:
+  - MCP Dividend Baseline       (number, e.g. 4, 6, 8, 10, 12)
+  - MCP Style Bucket            (select: DG, HG, TC, HY)
+  - CLD                         (number — competitive leadership duration in years)
+  - CLD Source                  (select — e.g., Cost, Switch, Network, Intangibles)
+  - MCP Target                  (number — price target)
+  - Strategies                  (multi-select — which strategies hold this name)
+
+  Sprint 23A — warbook research metadata:
+  - Date Evaluated              (date — last MCP review date)
+  - Quality (S&P)               (select — A+, A, A-, B+, B, B-, C, NR)
+  - Credit (S&P)                (select — AAA, AA+, AA, AA-, A+, A, A-, BBB+, BBB, BBB-, ...)
+  - Mstar Financial Health Grade  (select — A, B, C, D, F)
+  - Mstar Growth Grade          (select — A, B, C, D, F)
+  - Mstar Profitability Grade   (select — A, B, C, D, F)
+  - Mstar Stock Type            (select — Cyclical, Classic Growth, High Yield, ...)
+  - Mstar Style Classification  (select — LCC, LCG, LCV, MCC, MCG, MCV, SCC, SCG, SCV)
 
 Designed to merge into the holdings table by ticker symbol.
 
@@ -115,6 +128,26 @@ def _extract_multi_select(prop):
     return [item.get("name", "") for item in prop.get("multi_select", [])]
 
 
+def _extract_date(prop):
+    """
+    Extract date string from a Notion date property.
+    Returns ISO date string (e.g. "2024-01-02") or None.
+    Notion date properties have shape:
+        { "type": "date", "date": { "start": "2024-01-02", "end": null, ... } }
+    """
+    if not prop or prop.get("type") != "date":
+        return None
+    date_obj = prop.get("date")
+    if not date_obj:
+        return None
+    start = date_obj.get("start")
+    if not start:
+        return None
+    # Notion sometimes returns full ISO datetime; trim to date portion only.
+    # Downstream renderers will format as needed.
+    return str(start)[:10]
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def fetch_notion_metrics():
     """
@@ -124,12 +157,22 @@ def fetch_notion_metrics():
     Returns:
         {
             "MSFT": {
+                # Core MCP fields
                 "div_baseline": 10,
                 "style_bucket": "HG",
                 "cld": 8,
                 "cld_source": "Switch",
                 "mcp_target": 563,
                 "strategies": ["QDVD", "DAC", "OR"],
+                # Sprint 23A: warbook research metadata
+                "date_evaluated": "2024-01-02",
+                "sp_quality": "A+",
+                "sp_credit": "AAA",
+                "mstar_fin_health": "A",
+                "mstar_growth": "B",
+                "mstar_profitability": "A",
+                "mstar_stock_type": "Classic Growth",
+                "mstar_style": "LCG",
             },
             ...
         }
@@ -155,12 +198,23 @@ def fetch_notion_metrics():
 
         sym = symbol.upper().strip()
         result[sym] = {
-            "div_baseline":  _extract_number(props.get("MCP Dividend Baseline", {})),
-            "style_bucket":  _extract_select(props.get("MCP Style Bucket", {})),
-            "cld":           _extract_number(props.get("CLD", {})),
-            "cld_source":    _extract_select(props.get("CLD Source", {})),
-            "mcp_target":    _extract_number(props.get("MCP Target", {})),
-            "strategies":    _extract_multi_select(props.get("Strategies", {})),
+            # Existing fields (unchanged — preserves all current callers)
+            "div_baseline":         _extract_number(props.get("MCP Dividend Baseline", {})),
+            "style_bucket":         _extract_select(props.get("MCP Style Bucket", {})),
+            "cld":                  _extract_number(props.get("CLD", {})),
+            "cld_source":           _extract_select(props.get("CLD Source", {})),
+            "mcp_target":           _extract_number(props.get("MCP Target", {})),
+            "strategies":           _extract_multi_select(props.get("Strategies", {})),
+
+            # Sprint 23A: warbook research metadata
+            "date_evaluated":       _extract_date(props.get("Date Evaluated", {})),
+            "sp_quality":           _extract_select(props.get("Quality (S&P)", {})),
+            "sp_credit":            _extract_select(props.get("Credit (S&P)", {})),
+            "mstar_fin_health":     _extract_select(props.get("Mstar Financial Health Grade", {})),
+            "mstar_growth":         _extract_select(props.get("Mstar Growth Grade", {})),
+            "mstar_profitability":  _extract_select(props.get("Mstar Profitability Grade", {})),
+            "mstar_stock_type":     _extract_select(props.get("Mstar Stock Type", {})),
+            "mstar_style":          _extract_select(props.get("Mstar Style Classification", {})),
         }
 
     return result
@@ -169,8 +223,10 @@ def fetch_notion_metrics():
 def get_metrics_for_ticker(ticker):
     """
     Get Notion metrics for a single ticker.
-    Returns dict with keys: div_baseline, style_bucket, cld, cld_source, mcp_target, strategies
-    Returns empty dict if not found.
+    Returns dict with keys: div_baseline, style_bucket, cld, cld_source,
+    mcp_target, strategies, date_evaluated, sp_quality, sp_credit,
+    mstar_fin_health, mstar_growth, mstar_profitability, mstar_stock_type,
+    mstar_style. Returns empty dict if not found.
     """
     data = fetch_notion_metrics()
     return data.get(ticker.upper(), {})
@@ -179,7 +235,7 @@ def get_metrics_for_ticker(ticker):
 def get_metrics_for_tickers(tickers):
     """
     Get Notion metrics for a list of tickers.
-    Returns: {ticker: {div_baseline, style_bucket, cld, ...}}
+    Returns: {ticker: {div_baseline, style_bucket, cld, ..., mstar_style}}
     Missing tickers will have empty dicts.
     """
     data = fetch_notion_metrics()
