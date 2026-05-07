@@ -333,7 +333,7 @@ def _render_strategy_overview(tam_df, active_strategy, price_data, notion_data, 
             "% To Tgt":    lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
             "Baseline":    lambda v: f"{v:.0f}%" if _is_num(v) else "—",
             "5yr DG":      lambda v: f"{v:.1f}%" if _is_num(v) else "—",
-        })
+        }, na_rep="—")
         .map(_color_delta_from_cost, subset=["Δ from Cost"])
         .map(_color_pct_to_tgt, subset=["% To Tgt"])
     )
@@ -488,7 +488,7 @@ def _render_attribution(tam_df, active_strategy, price_data, warbook_data):
             "FWD P/E":        lambda v: f"{v:.1f}" if _is_num(v) else "—",
             "CF/EV Yield":    lambda v: f"{v:.1f}%" if _is_num(v) else "—",
             "Weight":         lambda v: f"{v:.2f}%" if _is_num(v) else "—",
-        })
+        }, na_rep="—")
         .map(_color_neg_only, subset=[
             "YTD TR", "3M TR", "1Y TR", "MTD TR", "QTD TR",
             "QTD vs SPX", "YTD vs SPX", "% From 52W Hi",
