@@ -78,6 +78,31 @@ def _fmt_date_md(dt):
         return ""
 
 
+# Super Sector mapping. Mirrors the one in warbook_metrics.py but applied at
+# render time using the Supabase-sourced sector (not yfinance info, which is
+# throttled on Streamlit Cloud). Supabase reliably has the sector string.
+_SUPER_SECTOR_BY_SECTOR = {
+    # Cyclical
+    "Materials":               "Cyclical",
+    "Basic Materials":         "Cyclical",
+    "Consumer Discretionary":  "Cyclical",
+    "Consumer Cyclical":       "Cyclical",
+    "Financials":              "Cyclical",
+    "Financial Services":      "Cyclical",
+    "Real Estate":             "Cyclical",
+    # Sensitive
+    "Communication Services":  "Sensitive",
+    "Energy":                  "Sensitive",
+    "Industrials":             "Sensitive",
+    "Technology":              "Sensitive",
+    # Defensive
+    "Consumer Staples":        "Defensive",
+    "Consumer Defensive":      "Defensive",
+    "Healthcare":              "Defensive",
+    "Utilities":               "Defensive",
+}
+
+
 def _is_num(v):
     """
     True if v is a non-NaN numeric. Used by all format lambdas in this module
@@ -501,15 +526,25 @@ def _render_qdg_characteristics(
 
         # Last Bump % — most recent annual ÷ prior annual, expressed as %.
         # Use Fish Historical because Fish is curated and consistent.
-        # Skip current calendar year if it's likely incomplete.
+        # Filter to years with actual non-zero dividends before picking the
+        # last two — Fish sometimes stores zeros for years before a name
+        # started paying, which would otherwise yield prior_v=0 and skip
+        # the calculation. Also skip the current calendar year if we have
+        # data through last year (otherwise an incomplete current year
+        # would be compared against last year's full annual).
         last_bump = None
         if fh:
             from datetime import date as _date
             current_year = _date.today().year
-            sorted_years = sorted([y for y in fh.keys() if y < current_year])
-            if len(sorted_years) >= 2:
-                latest_y = sorted_years[-1]
-                prior_y = sorted_years[-2]
+            # Years with actual dividends (>0)
+            valid_years = sorted(y for y, v in fh.items() if v and v > 0)
+            # If we have at least 2 historical years, compute bump.
+            # Prefer last-completed-year vs prior. If only the current year
+            # is in valid_years (not yet annualized), we still try.
+            past_years = [y for y in valid_years if y < current_year]
+            if len(past_years) >= 2:
+                latest_y = past_years[-1]
+                prior_y = past_years[-2]
                 latest_v = fh.get(latest_y)
                 prior_v = fh.get(prior_y)
                 if latest_v and prior_v and prior_v > 0:
@@ -667,12 +702,25 @@ def _render_risk_correlation(
         mkt_cap_raw = mkt.get("market_cap") or 0
         mkt_cap_bln = round(mkt_cap_raw / 1e9, 1) if mkt_cap_raw else None
 
+        # Super Sector: derive from the Supabase-sourced sector at render time
+        # rather than relying on warbook_metrics' yfinance-info-derived value.
+        # yfinance info is throttled on Streamlit Cloud, so the render-time
+        # mapping using Supabase data is dramatically more reliable. Fall
+        # back to warbook_metrics' value if the local mapping doesn't have
+        # the sector (shouldn't happen, but defensive).
+        sector_normalized = normalize_sector(mkt.get("sector", ""))
+        super_sector = (
+            _SUPER_SECTOR_BY_SECTOR.get(sector_normalized)
+            or wm.get("super_sector")
+            or ""
+        )
+
         rows.append({
             "Symbol":            sym,
             "Close":              mkt.get("price") or 0,
             "Mkt Cap $Bln":       mkt_cap_bln,
-            "Super Sector":       wm.get("super_sector") or "",
-            "Sector":             normalize_sector(mkt.get("sector", "")),
+            "Super Sector":       super_sector,
+            "Sector":             sector_normalized,
             "Sub-Industry":       wm.get("sub_industry") or "",
             "Credit (S&P)":       nm.get("sp_credit") or "",
             "Debt Cov":           wm.get("debt_coverage_ratio"),
