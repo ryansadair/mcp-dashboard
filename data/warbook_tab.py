@@ -282,6 +282,17 @@ def _render_strategy_overview(tam_df, active_strategy, price_data, notion_data, 
         st.info("No data available for the warbook.")
         return
 
+    # Coerce numeric columns to float dtype. None values in object-dtype
+    # columns break Streamlit's click-sort. See _render_attribution for
+    # the full rationale.
+    numeric_cols = [
+        "Weight", "Yield", "Cost Basis", "Close", "Δ from Cost",
+        "CLD", "3yr Tgt", "% To Tgt", "Baseline", "5yr DG",
+    ]
+    for c in numeric_cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
     # Sort by weight descending — matches printed spreadsheet
     df = df.sort_values("Weight", ascending=False).reset_index(drop=True)
 
@@ -438,7 +449,9 @@ def _render_attribution(tam_df, active_strategy, price_data, warbook_data):
             "EPS Cov":           wm.get("eps_div_coverage"),
             "CF Cov":            wm.get("cf_div_coverage"),
             "FCF Cov":           wm.get("fcf_div_coverage"),
-            "FWD P/E":           wm.get("forward_pe"),
+            # Forward P/E: prefer Supabase (more reliable on Streamlit Cloud
+            # where yfinance is throttled), fall back to warbook_metrics.
+            "FWD P/E":           mkt.get("forward_pe") or wm.get("forward_pe"),
             "CF/EV Yield":       wm.get("cash_flow_ev_yield"),
             "Weight":            round(h["weight_pct"], 2),
         })
@@ -448,7 +461,23 @@ def _render_attribution(tam_df, active_strategy, price_data, warbook_data):
         st.info("No data available for attribution view.")
         return
 
-    df = df.sort_values("Weight", ascending=False).reset_index(drop=True)
+    # Coerce numeric columns to float dtype. None values in object-dtype
+    # columns break Streamlit's click-sort and trigger the styler's
+    # missing-value path. pd.to_numeric with errors='coerce' turns None
+    # into NaN, and na_rep on the styler handles the display.
+    numeric_cols = [
+        "Shares", "Value", "YTD TR", "3M TR", "1Y TR", "MTD TR", "QTD TR",
+        "QTD vs SPX", "YTD vs SPX", "% From 52W Hi", "% Net Debt/Cap",
+        "ROE 5Y Avg", "EPS Cov", "CF Cov", "FCF Cov", "FWD P/E",
+        "CF/EV Yield", "Weight",
+    ]
+    for c in numeric_cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    # Default sort: YTD TR descending (best YTD performers at top).
+    # NaN values sort to the bottom via na_position="last".
+    df = df.sort_values("YTD TR", ascending=False, na_position="last").reset_index(drop=True)
 
     def _color_signed(v):
         if not _is_num(v):
