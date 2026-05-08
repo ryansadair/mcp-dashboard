@@ -41,6 +41,11 @@ from data.market_data import fetch_batch_prices
 from data.notion_metrics import fetch_notion_metrics
 from data.warbook_metrics import fetch_warbook_metrics_batch
 from data.dividends import get_batch_dividend_details
+from data.warbook_export import (
+    build_strategy_xlsx,
+    build_single_tab_xlsx,
+    build_filename,
+)
 
 # Fish CCC data is optional — gracefully degrade if not available
 try:
@@ -212,6 +217,20 @@ def render_warbook_tab(tamarac_parsed, active_strategy, strat_config):
                 except Exception:
                     pass
 
+    # ── XLSX Archive Export (Sprint 23D) ─────────────────────────────────
+    # Per-tab download buttons + bundle of all 4. Uses the data dicts
+    # already fetched in the spinner block above — no extra calls.
+    _render_export_section(
+        active_strategy=active_strategy,
+        tam_df=tam_df,
+        price_data=price_data,
+        notion_data=notion_data,
+        div_data=div_data,
+        warbook_data=warbook_data,
+        fish_data=fish_data,
+        fish_history=fish_history,
+    )
+
     # ── Strategy Overview (Tab 1) ────────────────────────────────────────
     with sub_overview:
         _render_strategy_overview(
@@ -240,6 +259,138 @@ def render_warbook_tab(tamarac_parsed, active_strategy, strat_config):
             tam_df, active_strategy,
             price_data, warbook_data,
         )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# XLSX EXPORT — Sprint 23D
+# ══════════════════════════════════════════════════════════════════════════
+
+def _render_export_section(
+    *,
+    active_strategy,
+    tam_df,
+    price_data,
+    notion_data,
+    div_data,
+    warbook_data,
+    fish_data,
+    fish_history,
+):
+    """
+    Renders the xlsx archive download row above the sub-tabs.
+
+    Five buttons in one row:
+        [Strategy Overview] [QDG] [Risk] [Attribution] [Download All 4]
+
+    Each download_button accepts BytesIO. The build_*_xlsx functions are
+    cheap (~50ms for ~30 holdings on warm cache) since all data dicts are
+    already populated. Any build failure is caught and surfaced via st.error
+    rather than crashing the warbook.
+    """
+    st.markdown(
+        "<div style='font-size:11px;color:rgba(255,255,255,0.4);"
+        "margin-top:4px;margin-bottom:8px;text-transform:uppercase;"
+        "letter-spacing:0.06em;font-weight:600;'>"
+        "Archive Export"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    col_ov, col_qdg, col_risk, col_attr, col_all = st.columns([1, 1, 1, 1, 1.4])
+
+    common = dict(
+        strategy_code=active_strategy,
+        tam_df=tam_df,
+        price_data=price_data,
+        notion_data=notion_data,
+        div_data=div_data,
+        warbook_data=warbook_data,
+        fish_data=fish_data,
+        fish_history=fish_history,
+    )
+
+    def _safe_build_single(tab_key):
+        try:
+            return build_single_tab_xlsx(tab_key=tab_key, **common).getvalue()
+        except Exception as e:
+            st.error(f"{tab_key} export failed: {e}")
+            return None
+
+    def _safe_build_all():
+        try:
+            return build_strategy_xlsx(**common).getvalue()
+        except Exception as e:
+            st.error(f"Bundle export failed: {e}")
+            return None
+
+    MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    with col_ov:
+        data = _safe_build_single("overview")
+        if data:
+            st.download_button(
+                label="Strategy Overview",
+                data=data,
+                file_name=build_filename(active_strategy, tab_key="overview"),
+                mime=MIME,
+                width="stretch",
+                key=f"dl_overview_{active_strategy}",
+            )
+
+    with col_qdg:
+        data = _safe_build_single("qdg")
+        if data:
+            st.download_button(
+                label="QDG Characteristics",
+                data=data,
+                file_name=build_filename(active_strategy, tab_key="qdg"),
+                mime=MIME,
+                width="stretch",
+                key=f"dl_qdg_{active_strategy}",
+            )
+
+    with col_risk:
+        data = _safe_build_single("risk")
+        if data:
+            st.download_button(
+                label="Risk Correlation",
+                data=data,
+                file_name=build_filename(active_strategy, tab_key="risk"),
+                mime=MIME,
+                width="stretch",
+                key=f"dl_risk_{active_strategy}",
+            )
+
+    with col_attr:
+        data = _safe_build_single("attribution")
+        if data:
+            st.download_button(
+                label="Attribution",
+                data=data,
+                file_name=build_filename(active_strategy, tab_key="attribution"),
+                mime=MIME,
+                width="stretch",
+                key=f"dl_attr_{active_strategy}",
+            )
+
+    with col_all:
+        data = _safe_build_all()
+        if data:
+            st.download_button(
+                label="Download All 4",
+                data=data,
+                file_name=build_filename(active_strategy),
+                mime=MIME,
+                width="stretch",
+                type="primary",
+                key=f"dl_all_{active_strategy}",
+            )
+
+    st.markdown(
+        "<div style='height:1px;background:rgba(255,255,255,0.06);"
+        "margin:14px 0 12px;'></div>",
+        unsafe_allow_html=True,
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════
