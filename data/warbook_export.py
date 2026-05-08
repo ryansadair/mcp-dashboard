@@ -480,92 +480,105 @@ F_MULT_1    = "0.0\"x\""
 F_TEXT      = "@"
 F_INT       = "0"
 
+# Alignment tokens — one of these per column, applied uniformly to data
+# cells in that column. Keeps the export consistent (no length-based
+# heuristics that produce inconsistent justification within a column).
+A_LEFT   = "left"
+A_CENTER = "center"
+A_RIGHT  = "right"
+
+# Column metadata: (label, key, width, number_format, alignment)
+#
+# Alignment convention (mirrors the printed warbook):
+#   - Long descriptive text (Company, Sub-Industry, CLD Source) → left
+#   - Short text codes (Symbol, Sector, ratings, dates, Yes/No) → center
+#   - All numeric columns                                       → right
+
 OVERVIEW_COLS = [
-    # (label, key, width, number_format)
-    ("Company",     "Company",     32, F_TEXT),
-    ("Symbol",      "Symbol",      8,  F_TEXT),
-    ("Weight",      "Weight",      8,  F_PCT_2),
-    ("Sector",      "Sector",      12, F_TEXT),
-    ("Yield",       "Yield",       8,  F_PCT_2),
-    ("Open Date",   "Open Date",   10, F_TEXT),
-    ("Cost Basis",  "Cost Basis",  12, F_USD_2),
-    ("Close",       "Close",       12, F_USD_2),
-    ("Δ from Cost", "Δ from Cost", 11, F_PCT_SIGN1),
-    ("CLD",         "CLD",         8,  F_INT),
-    ("CLD Source",  "CLD Source",  14, F_TEXT),
-    ("Style",       "Style",       8,  F_TEXT),
-    ("3yr Tgt",     "3yr Tgt",     10, F_USD_0),
-    ("% To Tgt",    "% To Tgt",    10, F_PCT_SIGN1),
-    ("Baseline",    "Baseline",    10, F_PCT_0),
-    ("5yr DG",      "5yr DG",      10, F_PCT_1),
-    ("DG ≥ Base",   "DG ≥ Base",   10, F_TEXT),
-    ("Date Eval",   "Date Eval",   12, F_TEXT),
+    ("Company",     "Company",     32, F_TEXT,      A_LEFT),
+    ("Symbol",      "Symbol",      8,  F_TEXT,      A_CENTER),
+    ("Weight",      "Weight",      8,  F_PCT_2,     A_RIGHT),
+    ("Sector",      "Sector",      14, F_TEXT,      A_CENTER),
+    ("Yield",       "Yield",       8,  F_PCT_2,     A_RIGHT),
+    ("Open Date",   "Open Date",   10, F_TEXT,      A_CENTER),
+    ("Cost Basis",  "Cost Basis",  12, F_USD_2,     A_RIGHT),
+    ("Close",       "Close",       12, F_USD_2,     A_RIGHT),
+    ("Δ from Cost", "Δ from Cost", 11, F_PCT_SIGN1, A_RIGHT),
+    ("CLD",         "CLD",         8,  F_INT,       A_RIGHT),
+    ("CLD Source",  "CLD Source",  14, F_TEXT,      A_LEFT),
+    ("Style",       "Style",       8,  F_TEXT,      A_CENTER),
+    ("3yr Tgt",     "3yr Tgt",     10, F_USD_0,     A_RIGHT),
+    ("% To Tgt",    "% To Tgt",    10, F_PCT_SIGN1, A_RIGHT),
+    ("Baseline",    "Baseline",    10, F_PCT_0,     A_RIGHT),
+    ("5yr DG",      "5yr DG",      10, F_PCT_1,     A_RIGHT),
+    ("DG ≥ Base",   "DG ≥ Base",   10, F_TEXT,      A_CENTER),
+    ("Date Eval",   "Date Eval",   12, F_TEXT,      A_CENTER),
 ]
 
 QDG_COLS = [
-    ("Symbol",        "Symbol",       8,  F_TEXT),
-    ("Shares",        "Shares",       10, F_NUM_0),
-    ("Value",         "Value",        14, F_USD_0),
-    ("Company",       "Company",      32, F_TEXT),
-    ("Yield",         "Yield",        8,  F_PCT_2),
-    ("Mkt Cap $Bln",  "Mkt Cap $Bln", 11, F_NUM_1),     # Stored already-in-billions; one decimal matches printed warbook
-    ("Sector",        "Sector",       12, F_TEXT),
-    ("ROE %",         "ROE %",        9,  F_PCT_1),
-    ("LT D/Cap %",    "LT D/Cap %",   10, F_PCT_1),
-    ("Qual (S&P)",    "Qual (S&P)",   10, F_TEXT),
-    ("Paid Since",    "Paid Since",   10, F_INT),
-    ("Raised Since",  "Raised Since", 11, F_INT),
-    ("Timing",        "Timing",       8,  F_TEXT),
-    ("Freq",          "Freq",         7,  F_TEXT),
-    ("Payout %",      "Payout %",     10, F_PCT_1),
-    ("Last Bump %",   "Last Bump %",  11, F_PCT_SIGN1),
-    ("1Y DG %",       "1Y DG %",      9,  F_PCT_SIGN1),
-    ("3Y DG %",       "3Y DG %",      9,  F_PCT_SIGN1),
-    ("5Y DG %",       "5Y DG %",      9,  F_PCT_SIGN1),
-    ("FCF Yld %",     "FCF Yld %",    10, F_PCT_2),
-    ("Weight",        "Weight",       8,  F_PCT_2),
+    ("Symbol",        "Symbol",       8,  F_TEXT,      A_CENTER),
+    ("Shares",        "Shares",       10, F_NUM_0,     A_RIGHT),
+    ("Value",         "Value",        14, F_USD_0,     A_RIGHT),
+    ("Company",       "Company",      32, F_TEXT,      A_LEFT),
+    ("Yield",         "Yield",        8,  F_PCT_2,     A_RIGHT),
+    ("Mkt Cap $Bln",  "Mkt Cap $Bln", 11, F_NUM_1,     A_RIGHT),     # Stored already-in-billions; one decimal matches printed warbook
+    ("Sector",        "Sector",       14, F_TEXT,      A_CENTER),
+    ("ROE %",         "ROE %",        9,  F_PCT_1,     A_RIGHT),
+    ("LT D/Cap %",    "LT D/Cap %",   10, F_PCT_1,     A_RIGHT),
+    ("Qual (S&P)",    "Qual (S&P)",   10, F_TEXT,      A_CENTER),
+    ("Paid Since",    "Paid Since",   10, F_INT,       A_CENTER),
+    ("Raised Since",  "Raised Since", 11, F_INT,       A_CENTER),
+    ("Timing",        "Timing",       8,  F_TEXT,      A_CENTER),
+    ("Freq",          "Freq",         7,  F_TEXT,      A_CENTER),
+    ("Payout %",      "Payout %",     10, F_PCT_1,     A_RIGHT),
+    ("Last Bump %",   "Last Bump %",  11, F_PCT_SIGN1, A_RIGHT),
+    ("1Y DG %",       "1Y DG %",      9,  F_PCT_SIGN1, A_RIGHT),
+    ("3Y DG %",       "3Y DG %",      9,  F_PCT_SIGN1, A_RIGHT),
+    ("5Y DG %",       "5Y DG %",      9,  F_PCT_SIGN1, A_RIGHT),
+    ("FCF Yld %",     "FCF Yld %",    10, F_PCT_2,     A_RIGHT),
+    ("Weight",        "Weight",       8,  F_PCT_2,     A_RIGHT),
 ]
 
 RISK_COLS = [
-    ("Symbol",         "Symbol",        8,  F_TEXT),
-    ("Close",          "Close",         12, F_USD_2),
-    ("Mkt Cap $Bln",   "Mkt Cap $Bln",  11, F_NUM_1),
-    ("Super Sector",   "Super Sector",  12, F_TEXT),
-    ("Sector",         "Sector",        12, F_TEXT),
-    ("Sub-Industry",   "Sub-Industry",  22, F_TEXT),
-    ("Credit (S&P)",   "Credit (S&P)",  10, F_TEXT),
-    ("Debt Cov",       "Debt Cov",      10, F_MULT_1),
-    ("LT D/Cap %",     "LT D/Cap %",    10, F_PCT_1),
-    ("Beta",           "Beta",          7,  F_NUM_2),
-    ("Style",          "Style",         8,  F_TEXT),
-    ("Mstar Gr",       "Mstar Gr",      9,  F_TEXT),
-    ("Mstar Pf",       "Mstar Pf",      9,  F_TEXT),
-    ("Mstar FH",       "Mstar FH",      9,  F_TEXT),
-    ("Country",        "Country",       9,  F_TEXT),
-    ("Weight",         "Weight",        8,  F_PCT_2),
+    ("Symbol",         "Symbol",        8,  F_TEXT,    A_CENTER),
+    ("Close",          "Close",         12, F_USD_2,   A_RIGHT),
+    ("Mkt Cap $Bln",   "Mkt Cap $Bln",  11, F_NUM_1,   A_RIGHT),
+    ("Super Sector",   "Super Sector",  12, F_TEXT,    A_CENTER),
+    ("Sector",         "Sector",        14, F_TEXT,    A_CENTER),
+    ("Sub-Industry",   "Sub-Industry",  22, F_TEXT,    A_LEFT),
+    ("Credit (S&P)",   "Credit (S&P)",  10, F_TEXT,    A_CENTER),
+    ("Debt Cov",       "Debt Cov",      10, F_MULT_1,  A_RIGHT),
+    ("LT D/Cap %",     "LT D/Cap %",    10, F_PCT_1,   A_RIGHT),
+    ("Beta",           "Beta",          7,  F_NUM_2,   A_RIGHT),
+    ("Style",          "Style",         8,  F_TEXT,    A_CENTER),
+    ("Mstar Gr",       "Mstar Gr",      9,  F_TEXT,    A_CENTER),
+    ("Mstar Pf",       "Mstar Pf",      9,  F_TEXT,    A_CENTER),
+    ("Mstar FH",       "Mstar FH",      9,  F_TEXT,    A_CENTER),
+    ("Country",        "Country",       9,  F_TEXT,    A_CENTER),
+    ("Weight",         "Weight",        8,  F_PCT_2,   A_RIGHT),
 ]
 
 ATTRIBUTION_COLS = [
-    ("Symbol",         "Symbol",         8,  F_TEXT),
-    ("Shares",         "Shares",         10, F_NUM_0),
-    ("Value",          "Value",          14, F_USD_0),
-    ("Company",        "Company",        32, F_TEXT),
-    ("YTD TR",         "YTD TR",         9,  F_PCT_SIGN1),
-    ("3M TR",          "3M TR",          9,  F_PCT_SIGN1),
-    ("1Y TR",          "1Y TR",          9,  F_PCT_SIGN1),
-    ("MTD TR",         "MTD TR",         9,  F_PCT_SIGN1),
-    ("QTD TR",         "QTD TR",         9,  F_PCT_SIGN1),
-    ("QTD vs SPX",     "QTD vs SPX",     10, F_PCT_SIGN1),
-    ("YTD vs SPX",     "YTD vs SPX",     10, F_PCT_SIGN1),
-    ("% From 52W Hi",  "% From 52W Hi",  12, F_PCT_SIGN1),
-    ("% Net Debt/Cap", "% Net Debt/Cap", 12, F_PCT_1),
-    ("ROE 5Y Avg",     "ROE 5Y Avg",     11, F_PCT_1),
-    ("EPS Cov",        "EPS Cov",        9,  F_MULT_1),
-    ("CF Cov",         "CF Cov",         9,  F_MULT_1),
-    ("FCF Cov",        "FCF Cov",        9,  F_MULT_1),
-    ("FWD P/E",        "FWD P/E",        9,  F_NUM_1),
-    ("CF/EV Yield",    "CF/EV Yield",    10, F_PCT_1),
-    ("Weight",         "Weight",         8,  F_PCT_2),
+    ("Symbol",         "Symbol",         8,  F_TEXT,      A_CENTER),
+    ("Shares",         "Shares",         10, F_NUM_0,     A_RIGHT),
+    ("Value",          "Value",          14, F_USD_0,     A_RIGHT),
+    ("Company",        "Company",        32, F_TEXT,      A_LEFT),
+    ("YTD TR",         "YTD TR",         9,  F_PCT_SIGN1, A_RIGHT),
+    ("3M TR",          "3M TR",          9,  F_PCT_SIGN1, A_RIGHT),
+    ("1Y TR",          "1Y TR",          9,  F_PCT_SIGN1, A_RIGHT),
+    ("MTD TR",         "MTD TR",         9,  F_PCT_SIGN1, A_RIGHT),
+    ("QTD TR",         "QTD TR",         9,  F_PCT_SIGN1, A_RIGHT),
+    ("QTD vs SPX",     "QTD vs SPX",     10, F_PCT_SIGN1, A_RIGHT),
+    ("YTD vs SPX",     "YTD vs SPX",     10, F_PCT_SIGN1, A_RIGHT),
+    ("% From 52W Hi",  "% From 52W Hi",  12, F_PCT_SIGN1, A_RIGHT),
+    ("% Net Debt/Cap", "% Net Debt/Cap", 12, F_PCT_1,     A_RIGHT),
+    ("ROE 5Y Avg",     "ROE 5Y Avg",     11, F_PCT_1,     A_RIGHT),
+    ("EPS Cov",        "EPS Cov",        9,  F_MULT_1,    A_RIGHT),
+    ("CF Cov",         "CF Cov",         9,  F_MULT_1,    A_RIGHT),
+    ("FCF Cov",        "FCF Cov",        9,  F_MULT_1,    A_RIGHT),
+    ("FWD P/E",        "FWD P/E",        9,  F_NUM_1,     A_RIGHT),
+    ("CF/EV Yield",    "CF/EV Yield",    10, F_PCT_1,     A_RIGHT),
+    ("Weight",         "Weight",         8,  F_PCT_2,     A_RIGHT),
 ]
 
 # Columns whose negative values should render in red (matches the printed
@@ -620,51 +633,64 @@ def _write_tab(
     Write one tab's worth of data to a worksheet.
 
     Layout:
-      Row 1:  Logo at A1 (overlapping a few rows), strategy name in column F+
-      Row 2:  Tab subtitle (italic)
-      Row 3:  As-of date
+      Row 1:  Logo (anchored A1, ~36px tall) + Strategy name in column B+
+      Row 2:  Tab subtitle in column B+ (italic)
+      Row 3:  As-of date in column B+
       Row 4:  blank spacer
       Row 5:  Headers (rotated 90° vertical)
       Row 6+: Data
+
+    Title text is placed in column B onward so the logo (anchored to column A)
+    has its own dedicated horizontal space and never overlaps text. Rows 1-3
+    are made tall enough to give the logo vertical room.
     """
+    HEADER_ROW = 5
+    DATA_START_ROW = 6
+
     # ── Title block ────────────────────────────────────────────────────
-    ws["A1"] = f"Martin Capital Partners — {strategy_display_name}"
-    ws["A1"].font = Font(name="Arial", size=16, bold=True, color=_BRAND_BLACK)
+    # Place title text starting at column B so the logo (anchored A1) has
+    # its own column. Don't merge across columns — that interacts badly
+    # with print fit-to-width on some Excel versions.
+    ws["B1"] = f"Martin Capital Partners — {strategy_display_name}"
+    ws["B1"].font = Font(name="Arial", size=16, bold=True, color=_BRAND_BLACK)
+    ws["B1"].alignment = Alignment(horizontal="left", vertical="center")
 
-    ws["A2"] = TAB_SUBTITLES.get(tab_key, "")
-    ws["A2"].font = Font(name="Arial", size=11, italic=True, color="595959")
+    ws["B2"] = TAB_SUBTITLES.get(tab_key, "")
+    ws["B2"].font = Font(name="Arial", size=11, italic=True, color="595959")
+    ws["B2"].alignment = Alignment(horizontal="left", vertical="center")
 
-    ws["A3"] = f"As of {as_of_date.strftime('%-m/%-d/%Y')}" if hasattr(as_of_date, "strftime") and _safe_strftime(as_of_date) else f"As of {as_of_date.month}/{as_of_date.day}/{as_of_date.year}"
-    ws["A3"].font = Font(name="Arial", size=10, color="808080")
+    date_str = _safe_strftime(as_of_date) or f"{as_of_date.month}/{as_of_date.day}/{as_of_date.year}"
+    ws["B3"] = f"As of {date_str}"
+    ws["B3"].font = Font(name="Arial", size=10, color="808080")
+    ws["B3"].alignment = Alignment(horizontal="left", vertical="center")
 
-    # Logo at top-left if available (sits in/near A1, doesn't push content)
+    # Make rows 1-3 tall enough that the logo (~50px = ~38pt) clears them
+    ws.row_dimensions[1].height = 26
+    ws.row_dimensions[2].height = 18
+    ws.row_dimensions[3].height = 16
+
+    # Logo anchored at A1. Sized small enough to fit within column A's width
+    # without bleeding into the title text in column B.
     if logo_path and _XL_IMAGE_AVAILABLE:
         try:
             p = Path(logo_path)
             if p.exists():
                 img = XLImage(str(p))
-                # Resize logo proportionally — original is vector but at insert
-                # we get pixel dimensions. Fix height to ~50px so it fits the
-                # title block without overlapping headers.
-                target_h = 50
+                # Target ~50px tall — fits the 60pt total height of rows 1-3
+                # (26+18+16 = 60pt ≈ 80px) with margin. The width is derived
+                # from the original aspect ratio so the logo doesn't squash.
+                target_h_px = 50
                 if img.height and img.width:
                     aspect = img.width / img.height
-                    img.height = target_h
-                    img.width = int(target_h * aspect)
+                    img.height = target_h_px
+                    img.width = int(target_h_px * aspect)
                 img.anchor = "A1"
                 ws.add_image(img)
-                # Push title text right so it doesn't sit under the logo
-                ws.column_dimensions["A"].width = max(
-                    ws.column_dimensions["A"].width or 0, 8
-                )
         except Exception:
             # Logo failures should never break the export
             pass
 
     # ── Headers ────────────────────────────────────────────────────────
-    HEADER_ROW = 5
-    DATA_START_ROW = 6
-
     header_font = Font(name="Arial", size=10, bold=True, color=_BRAND_BLACK)
     header_fill = PatternFill("solid", start_color=_HEADER_FILL, end_color=_HEADER_FILL)
     header_align = Alignment(
@@ -672,7 +698,7 @@ def _write_tab(
         text_rotation=90, wrap_text=False,
     )
 
-    for i, (label, _key, width, _fmt) in enumerate(cols, start=1):
+    for i, (label, _key, width, _fmt, _align) in enumerate(cols, start=1):
         cell = ws.cell(row=HEADER_ROW, column=i, value=label)
         cell.font = header_font
         cell.fill = header_fill
@@ -689,33 +715,33 @@ def _write_tab(
 
     body_font_base = Font(name="Arial", size=10, color=_BRAND_BLACK)
     body_font_red  = Font(name="Arial", size=10, color=_BRAND_RED)
-    align_left     = Alignment(horizontal="left",   vertical="center")
-    align_right    = Alignment(horizontal="right",  vertical="center")
-    align_center   = Alignment(horizontal="center", vertical="center")
+
+    # Pre-build alignment objects (one per align token) — reused across all
+    # data cells so we don't allocate a new Alignment per cell.
+    _align_objs = {
+        A_LEFT:   Alignment(horizontal="left",   vertical="center"),
+        A_CENTER: Alignment(horizontal="center", vertical="center"),
+        A_RIGHT:  Alignment(horizontal="right",  vertical="center"),
+    }
 
     for r_offset, (_, row) in enumerate(df.iterrows()):
         excel_row = DATA_START_ROW + r_offset
-        for c_idx, (label, key, _w, fmt) in enumerate(cols, start=1):
+        for c_idx, (label, key, _w, fmt, align) in enumerate(cols, start=1):
             raw_val = row.get(key)
             cell = ws.cell(row=excel_row, column=c_idx)
             cell.border = _DATA_BORDER
+            # Per-column alignment — applies whether the cell ends up text,
+            # numeric, or em dash. Keeps every value in a column in lockstep.
+            cell.alignment = _align_objs[align]
+            cell.font = body_font_base
 
-            # Decide what to write
             if not _is_num(raw_val):
-                # Text or em dash
+                # Text or em dash — preserve the column's intended alignment
                 if raw_val is None or (isinstance(raw_val, float) and raw_val != raw_val):
                     cell.value = EM_DASH
-                    cell.font = body_font_base
-                    cell.alignment = align_center
                 else:
                     s = str(raw_val).strip()
                     cell.value = s if s else EM_DASH
-                    cell.font = body_font_base
-                    # Long text columns left-align; short codes center
-                    if len(str(cell.value)) > 4 and fmt == F_TEXT:
-                        cell.alignment = align_left
-                    else:
-                        cell.alignment = align_center
             else:
                 # Numeric — divide by 100 for percent columns whose source is
                 # stored as already-multiplied (e.g. 5.2 meaning 5.2%).
@@ -724,12 +750,9 @@ def _write_tab(
                     v = v / 100.0
                 cell.value = v
                 cell.number_format = fmt
-                cell.alignment = align_right
                 # Red text for negative values in flagged columns
                 if label in red_neg and v < 0:
                     cell.font = body_font_red
-                else:
-                    cell.font = body_font_base
 
     # ── Print setup ────────────────────────────────────────────────────
     ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
