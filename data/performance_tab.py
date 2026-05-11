@@ -84,18 +84,11 @@ def _data_unavailable_card(msg="Composite returns data unavailable", detail=None
 @st.cache_data(ttl=86400, show_spinner=False)
 @disk_cached(namespace="perf_composite_raw", ttl=86400, version=2)
 def _load_cached_composite(_v=2):
-    """Cache composite data for 24 hours.
+    """Cache composite data for 24 hours (Sprint 24-2: was 1 hour).
 
     Three-tier cache: memory (per session) → disk (survives session eviction)
     → Excel parse. On return-from-idle, disk layer avoids the multi-second
     openpyxl/xlrd parse that was blocking every tab after Performance.
-
-    Sprint 24-2: TTL bumped from 1h to 24h. The Composite Returns file updates
-    quarterly when Ryan drops the new export; sub-hourly invalidation just
-    means more frequent cold parses with no data benefit. Disk cache still
-    busts whenever the file's mtime advances (handled via _v invalidation
-    when the parser changes; bump the outer version for spreadsheet shape
-    changes).
 
     Bump the outer version (decorator) to force disk cache busts after Excel
     format changes; bump _v for behavioral changes to the parser.
@@ -103,20 +96,12 @@ def _load_cached_composite(_v=2):
     return load_composite_data()
 
 
-# ── Per-strategy computation cache (Sprint 24-2: bundled) ──────────────────
-# Previously this section had three separate @disk_cached functions
-# (_cached_cumulative, _cached_risk_metrics, _cached_heatmap). Each one
-# re-read the composite_df from _load_cached_composite() and wrote its own
-# small payload to disk. On Streamlit Cloud's ephemeral disk that's three
-# round-trips per strategy view.
-#
-# Now collapsed to a single bundled function so cold-path strategy switches
-# pay one parse + serialize + write cycle instead of three. The bundled dict
-# is small enough (a few hundred KB of pandas objects) that combining costs
-# nothing in memory and meaningfully cuts cold latency.
-#
-# Keys are (strategy, as_of_iso) so entries auto-invalidate when the quarterly
-# Composite Returns file updates. TTL is 24h to match _load_cached_composite.
+# Per-strategy computation cache (Sprint 24-2: bundled)
+# Previously three separate @disk_cached functions (_cached_cumulative,
+# _cached_risk_metrics, _cached_heatmap). Each re-read _load_cached_composite()
+# and wrote its own payload to disk. On Streamlit Cloud ephemeral disk
+# that is three round-trips per strategy view.
+# Now collapsed to one bundled function: one parse, one serialize, one write.
 
 @st.cache_data(ttl=86400, show_spinner=False)
 @disk_cached(namespace="perf_per_strategy", ttl=86400, version=1)
@@ -125,27 +110,17 @@ def _cached_per_strategy(strategy: str, as_of_iso: str, _v=1):
 
     Returns:
         {
-          "cumulative": {
-            "strat_cum":     pd.Series,
-            "bench1_name":   str,
-            "bench1_cum":    pd.Series,
-            "bench2_name":   str,
-            "bench2_cum":    pd.Series,
-          },
-          "risk":    dict from compute_risk_metrics(),
-          "heatmap": pd.DataFrame from build_monthly_heatmap_data(),
+          "cumulative": { strat_cum, bench1_name, bench1_cum,
+                          bench2_name, bench2_cum },
+          "risk":       dict from compute_risk_metrics(),
+          "heatmap":    pd.DataFrame from build_monthly_heatmap_data(),
         }
-
-    Each sub-result mirrors the shape the renderer functions expect. Anything
-    that needs to invalidate per file update is keyed on as_of_iso.
     """
     data = _load_cached_composite()
     comp_df = data["composites"][strategy]
-
     strat_cum = get_cumulative_series(comp_df, "gross")
     bench1_name, bench1_cum = get_benchmark_cumulative(comp_df, "primary")
     bench2_name, bench2_cum = get_benchmark_cumulative(comp_df, "secondary")
-
     return {
         "cumulative": {
             "strat_cum":   strat_cum,
@@ -157,6 +132,8 @@ def _cached_per_strategy(strategy: str, as_of_iso: str, _v=1):
         "risk":    compute_risk_metrics(comp_df, return_type="gross"),
         "heatmap": build_monthly_heatmap_data(comp_df, return_type="gross"),
     }
+
+
 
 
 def render_performance_tab(active_strategy):
@@ -307,45 +284,104 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
 # ── Risk Metrics ────────────────────────────────────────────────────────────
 
 def _render_risk_metrics(comp_df, strategy, color, as_of_iso):
-    """Render risk metrics as a compact flex grid — fits full page width."""
+    """Render risk metrics as two card rows.
+
+    Sprint 24-3: split the original 11-card grid into two visually distinct
+    rows. Row 1 keeps the original Risk Metrics (Sharpe, Sortino, Beta, ...).
+    Row 2 adds Capture & Drawdown stats lifted from Cameron's quarterly
+    Characteristics & Risk Metrics spreadsheet.
+    """
     risk = _cached_per_strategy(strategy, as_of_iso)["risk"]
 
     if risk is None:
         _data_unavailable_card("Insufficient data for risk metrics", "Need 12+ months")
         return
 
-    metrics = [
-        ("Ann. Return", f"{risk['annualized_return']:.1%}", BRAND["green"] if risk['annualized_return'] >= 0 else BRAND["red"]),
-        ("Ann. Volatility", f"{risk['annualized_vol']:.1%}", "rgba(255,255,255,0.85)"),
-        ("Sharpe Ratio", f"{risk['sharpe']:.2f}", "rgba(255,255,255,0.85)"),
-        ("Sortino Ratio", f"{risk['sortino']:.2f}", "rgba(255,255,255,0.85)"),
-        ("Beta", f"{risk['beta']:.2f}" if not np.isnan(risk['beta']) else "—", "rgba(255,255,255,0.85)"),
-        ("Max Drawdown", f"{risk['max_drawdown']:.1%}", BRAND["red"]),
-        ("Tracking Error", f"{risk['tracking_error']:.1%}" if not np.isnan(risk['tracking_error']) else "—", "rgba(255,255,255,0.85)"),
-        ("Info Ratio", f"{risk['information_ratio']:.2f}" if not np.isnan(risk['information_ratio']) else "—", "rgba(255,255,255,0.85)"),
-        ("Best Month", f"{risk['best_month']:.1%}", BRAND["green"]),
-        ("Worst Month", f"{risk['worst_month']:.1%}", BRAND["red"]),
-        ("% Positive", f"{risk['pct_positive_months']:.0%}", "rgba(255,255,255,0.85)"),
+    def _fmt_pct(v, decimals=1, signed=False):
+        if v is None or (isinstance(v, float) and np.isnan(v)):
+            return "\u2014"
+        sign = "+" if signed and v >= 0 else ""
+        return f"{sign}{v * 100:.{decimals}f}%"
+
+    def _fmt_num(v, decimals=2):
+        if v is None or (isinstance(v, float) and np.isnan(v)):
+            return "\u2014"
+        return f"{v:.{decimals}f}"
+
+    def _fmt_int(v):
+        if v is None or (isinstance(v, float) and np.isnan(v)):
+            return "\u2014"
+        return str(int(v))
+
+    def _is_neg(v):
+        if v is None:
+            return False
+        if isinstance(v, float) and np.isnan(v):
+            return False
+        return v < 0
+
+    NEUTRAL = "rgba(255,255,255,0.85)"
+
+    row1 = [
+        ("Ann. Return", _fmt_pct(risk["annualized_return"]),
+            BRAND["green"] if risk["annualized_return"] >= 0 else BRAND["red"]),
+        ("Ann. Volatility", _fmt_pct(risk["annualized_vol"]), NEUTRAL),
+        ("Sharpe Ratio", _fmt_num(risk["sharpe"]), NEUTRAL),
+        ("Sortino Ratio", _fmt_num(risk["sortino"]), NEUTRAL),
+        ("Beta", _fmt_num(risk["beta"]), NEUTRAL),
+        ("Max Drawdown", _fmt_pct(risk["max_drawdown"]), BRAND["red"]),
+        ("Tracking Error", _fmt_pct(risk["tracking_error"]), NEUTRAL),
+        ("Info Ratio", _fmt_num(risk["information_ratio"]), NEUTRAL),
+        ("Best Month", _fmt_pct(risk["best_month"]), BRAND["green"]),
+        ("Worst Month", _fmt_pct(risk["worst_month"]), BRAND["red"]),
+        ("% Positive", _fmt_pct(risk["pct_positive_months"], decimals=0), NEUTRAL),
     ]
 
-    st.markdown("""<div style="font-size:13px; font-weight:700; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:8px;">Risk Metrics</div>""", unsafe_allow_html=True)
+    row2 = [
+        ("Rolling 12M Std Dev", _fmt_pct(risk["rolling_12m_std"]), NEUTRAL),
+        ("Worst Quarter", _fmt_pct(risk["worst_quarter"], decimals=2), BRAND["red"]),
+        ("CALMAR Ratio", _fmt_num(risk["calmar"]), NEUTRAL),
+        ("CALMAR Drawdown", _fmt_pct(risk["calmar_drawdown"]), BRAND["red"]),
+        ("MAR Ratio", _fmt_num(risk["mar"]), NEUTRAL),
+        ("Up Capture (Mo)", _fmt_pct(risk["up_capture_monthly"]), NEUTRAL),
+        ("Down Capture (Mo)", _fmt_pct(risk["down_capture_monthly"]), NEUTRAL),
+        ("Up Capture (Qtr)", _fmt_pct(risk["up_capture_quarterly"]), NEUTRAL),
+        ("Down Capture (Qtr)", _fmt_pct(risk["down_capture_quarterly"]), NEUTRAL),
+        ("Ann. Return when SPX Neg.", _fmt_pct(risk["ann_return_when_bench_neg"], decimals=2),
+            BRAND["red"] if _is_neg(risk["ann_return_when_bench_neg"]) else BRAND["green"]),
+        ("Rolling 6M Loss Count", _fmt_int(risk["rolling_6m_loss_count"]), NEUTRAL),
+        ("Rolling Qtr Loss Count", _fmt_int(risk["rolling_qtr_loss_count"]), NEUTRAL),
+        ("R Sq. vs Primary", _fmt_pct(risk["r_squared_primary"]), NEUTRAL),
+        ("R Sq. vs Secondary", _fmt_pct(risk["r_squared_secondary"]), NEUTRAL),
+    ]
 
-    # Build cards in a flex grid — wraps naturally on all screen sizes
-    cards_html = ""
-    for label, val, val_color in metrics:
-        cards_html += f"""<div style="
-            flex:1 1 130px; min-width:100px;
-            background:rgba(255,255,255,0.02);
-            border:1px solid rgba(255,255,255,0.05);
-            border-radius:8px; padding:10px 12px;
-        ">
-            <div style="font-size:10px; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:3px;">{label}</div>
-            <div style="font-size:16px; font-weight:700; color:{val_color};">{val}</div>
-        </div>"""
+    def _emit_row(title, metrics):
+        st.markdown(
+            f"""<div style="font-size:13px; font-weight:700; color:rgba(255,255,255,0.7); """
+            f"""text-transform:uppercase; letter-spacing:0.04em; margin-top:10px; """
+            f"""margin-bottom:8px;">{title}</div>""",
+            unsafe_allow_html=True,
+        )
+        cards_html = ""
+        for label, val, val_color in metrics:
+            cards_html += f"""<div style="
+                flex:1 1 130px; min-width:100px;
+                background:rgba(255,255,255,0.02);
+                border:1px solid rgba(255,255,255,0.05);
+                border-radius:8px; padding:10px 12px;
+            ">
+                <div style="font-size:10px; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:3px;">{label}</div>
+                <div style="font-size:16px; font-weight:700; color:{val_color};">{val}</div>
+            </div>"""
+        st.markdown(
+            f"""<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">{cards_html}</div>""",
+            unsafe_allow_html=True,
+        )
 
-    st.markdown(f"""<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">{cards_html}</div>""", unsafe_allow_html=True)
+    _emit_row("Risk Metrics", row1)
+    _emit_row("Capture & Drawdown", row2)
 
-    st.caption("Based on monthly gross returns · Risk-free rate: 4%")
+    st.caption("Based on monthly gross returns. Risk-free rate: 4%. CALMAR uses trailing 36 months. MAR uses since inception.")
 
 
 # ── Monthly Returns Heatmap ─────────────────────────────────────────────────
@@ -401,8 +437,7 @@ def _render_monthly_heatmap(comp_df, strategy, color, as_of_iso):
         # Sprint 24-1: drop autorange="reversed" so the largest numeric y
         # (newest year) renders at the top of the heatmap. The upstream
         # build_monthly_heatmap_data already sorts descending; combined
-        # with Plotly's default "higher y = higher position", this puts
-        # 2026 at top and the earliest year at the bottom.
+        # with Plotly default behavior, this puts 2026 at top.
         yaxis=dict(fixedrange=True, dtick=1, tickfont=dict(size=10)),
     )
 

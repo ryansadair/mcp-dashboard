@@ -557,9 +557,20 @@ def compute_risk_metrics(composite_df, return_type="gross", risk_free_rate=0.04)
         risk_free_rate: annual risk-free rate (default 4%)
 
     Returns:
-        dict with: annualized_return, annualized_vol, sharpe, sortino,
-                   max_drawdown, best_month, worst_month, pct_positive_months,
-                   beta (vs primary benchmark)
+        dict with the original 11 fields plus the Sprint 24-3 statistical
+        metrics (capture ratios, rolling stats, CALMAR/MAR, R squared, etc.).
+        Any metric that requires more data than is available returns np.nan so
+        the renderer can show an em dash.
+
+    Conventions matched to the quarterly Characteristics & Risk Metrics
+    spreadsheet that Cameron compiles:
+      - CALMAR uses a trailing 36-month window.
+      - MAR uses since-inception.
+      - Captures and "ann return while bench negative" reference the PRIMARY
+        benchmark (bench1_mo). R squared is reported for both primary and
+        secondary benchmarks.
+      - Quarterly aggregation: months chained via (1+r).prod()-1, grouped
+        by calendar quarter.
     """
     mo_col = "gross_mo" if return_type == "gross" else "net_mo"
     monthly = composite_df[mo_col].dropna()
@@ -567,56 +578,152 @@ def compute_risk_metrics(composite_df, return_type="gross", risk_free_rate=0.04)
     if len(monthly) < 12:
         return None
 
-    # Annualized return (geometric)
+    # Original metrics (unchanged)
     cum = (1 + monthly).prod()
     n_years = len(monthly) / 12
     ann_return = cum ** (1 / n_years) - 1
 
-    # Annualized volatility
     ann_vol = monthly.std() * np.sqrt(12)
 
-    # Sharpe
     monthly_rf = (1 + risk_free_rate) ** (1/12) - 1
     excess = monthly - monthly_rf
     sharpe = (excess.mean() / excess.std()) * np.sqrt(12) if excess.std() > 0 else 0
 
-    # Sortino (downside deviation)
     downside = excess[excess < 0]
     downside_std = np.sqrt((downside ** 2).mean()) if len(downside) > 0 else 0
     sortino = (excess.mean() * 12) / (downside_std * np.sqrt(12)) if downside_std > 0 else 0
 
-    # Max drawdown
     cum_wealth = (1 + monthly).cumprod()
     running_max = cum_wealth.cummax()
     drawdown = (cum_wealth - running_max) / running_max
     max_dd = drawdown.min()
 
-    # Best/worst month
     best_mo = monthly.max()
     worst_mo = monthly.min()
-
-    # Percent positive months
     pct_positive = (monthly > 0).sum() / len(monthly)
 
-    # Beta vs primary benchmark
     bench_mo = composite_df["bench1_mo"].dropna()
-    # Align indices
     aligned = pd.concat([monthly, bench_mo], axis=1).dropna()
-    if len(aligned) > 12 and aligned.iloc[:, 1].var() > 0:
-        cov = aligned.iloc[:, 0].cov(aligned.iloc[:, 1])
-        var = aligned.iloc[:, 1].var()
-        beta = cov / var
+    aligned.columns = ["strat", "bench"]
+    if len(aligned) > 12 and aligned["bench"].var() > 0:
+        beta = aligned["strat"].cov(aligned["bench"]) / aligned["bench"].var()
     else:
         beta = np.nan
 
-    # Tracking error
     if len(aligned) > 12:
-        tracking_diff = aligned.iloc[:, 0] - aligned.iloc[:, 1]
+        tracking_diff = aligned["strat"] - aligned["bench"]
         tracking_error = tracking_diff.std() * np.sqrt(12)
         info_ratio = (tracking_diff.mean() * 12) / tracking_error if tracking_error > 0 else 0
     else:
         tracking_error = np.nan
         info_ratio = np.nan
+
+    # Sprint 24-3: statistical metrics
+    # Each branch independently checks data sufficiency and falls back to
+    # np.nan so a missing benchmark doesn't void the other strategy-only
+    # metrics.
+
+    # Rolling 12-month std dev (annualized)
+    if len(monthly) >= 12:
+        rolling_12m_std = monthly.tail(12).std() * np.sqrt(12)
+    else:
+        rolling_12m_std = np.nan
+
+    # Quarterly returns
+    qmonthly = pd.DataFrame({"r": monthly})
+    qmonthly["q"] = qmonthly.index.to_period("Q")
+    quarterly = qmonthly.groupby("q")["r"].apply(lambda x: (1 + x).prod() - 1)
+    worst_quarter = quarterly.min() if len(quarterly) > 0 else np.nan
+
+    # Rolling 6-month loss count
+    if len(monthly) >= 6:
+        roll6 = (1 + monthly).rolling(6).apply(lambda x: x.prod() - 1, raw=True)
+        rolling_6m_loss_count = int((roll6 < 0).sum())
+    else:
+        rolling_6m_loss_count = np.nan
+
+    # Rolling quarterly loss count
+    rolling_qtr_loss_count = int((quarterly < 0).sum()) if len(quarterly) > 0 else np.nan
+
+    # CALMAR ratio (trailing 36 months)
+    if len(monthly) >= 36:
+        calmar_window = monthly.tail(36)
+        calmar_ann_return = (1 + calmar_window).prod() ** (12 / len(calmar_window)) - 1
+        calmar_cum = (1 + calmar_window).cumprod()
+        calmar_dd = (calmar_cum / calmar_cum.cummax() - 1).min()
+        calmar = calmar_ann_return / abs(calmar_dd) if calmar_dd < 0 else np.nan
+    else:
+        calmar_dd = np.nan
+        calmar = np.nan
+
+    # MAR ratio (since-inception)
+    mar = ann_return / abs(max_dd) if max_dd < 0 else np.nan
+
+    # Benchmark-relative metrics (primary)
+    if len(aligned) >= 12 and aligned["bench"].var() > 0:
+        bench_neg_mask = aligned["bench"] < 0
+        if bench_neg_mask.sum() > 0:
+            strat_neg = aligned.loc[bench_neg_mask, "strat"]
+            ann_ret_when_bench_neg = (1 + strat_neg).prod() ** (12 / len(strat_neg)) - 1
+        else:
+            ann_ret_when_bench_neg = np.nan
+
+        up_mask = aligned["bench"] > 0
+        down_mask = aligned["bench"] < 0
+        if up_mask.sum() > 0 and aligned.loc[up_mask, "bench"].sum() != 0:
+            up_capture_mo = aligned.loc[up_mask, "strat"].sum() / aligned.loc[up_mask, "bench"].sum()
+        else:
+            up_capture_mo = np.nan
+        if down_mask.sum() > 0 and aligned.loc[down_mask, "bench"].sum() != 0:
+            down_capture_mo = aligned.loc[down_mask, "strat"].sum() / aligned.loc[down_mask, "bench"].sum()
+        else:
+            down_capture_mo = np.nan
+
+        if aligned["strat"].std() > 0 and aligned["bench"].std() > 0:
+            r_corr = aligned["strat"].corr(aligned["bench"])
+            r_squared_primary = r_corr * r_corr if not pd.isna(r_corr) else np.nan
+        else:
+            r_squared_primary = np.nan
+    else:
+        ann_ret_when_bench_neg = np.nan
+        up_capture_mo = np.nan
+        down_capture_mo = np.nan
+        r_squared_primary = np.nan
+
+    # Quarterly captures
+    bench_q_df = pd.DataFrame({"b": bench_mo})
+    bench_q_df["q"] = bench_q_df.index.to_period("Q")
+    bench_quarterly = bench_q_df.groupby("q")["b"].apply(lambda x: (1 + x).prod() - 1)
+    aligned_q = pd.concat([quarterly, bench_quarterly], axis=1).dropna()
+    aligned_q.columns = ["strat", "bench"]
+    if len(aligned_q) >= 4:
+        up_qmask = aligned_q["bench"] > 0
+        down_qmask = aligned_q["bench"] < 0
+        if up_qmask.sum() > 0 and aligned_q.loc[up_qmask, "bench"].sum() != 0:
+            up_capture_qtr = aligned_q.loc[up_qmask, "strat"].sum() / aligned_q.loc[up_qmask, "bench"].sum()
+        else:
+            up_capture_qtr = np.nan
+        if down_qmask.sum() > 0 and aligned_q.loc[down_qmask, "bench"].sum() != 0:
+            down_capture_qtr = aligned_q.loc[down_qmask, "strat"].sum() / aligned_q.loc[down_qmask, "bench"].sum()
+        else:
+            down_capture_qtr = np.nan
+    else:
+        up_capture_qtr = np.nan
+        down_capture_qtr = np.nan
+
+    # R squared vs secondary benchmark
+    if "bench2_mo" in composite_df.columns:
+        bench2_mo = composite_df["bench2_mo"].dropna()
+        aligned2 = pd.concat([monthly, bench2_mo], axis=1).dropna()
+        aligned2.columns = ["strat", "bench"]
+        if (len(aligned2) >= 12 and
+                aligned2["strat"].std() > 0 and aligned2["bench"].std() > 0):
+            r_corr_2 = aligned2["strat"].corr(aligned2["bench"])
+            r_squared_secondary = r_corr_2 * r_corr_2 if not pd.isna(r_corr_2) else np.nan
+        else:
+            r_squared_secondary = np.nan
+    else:
+        r_squared_secondary = np.nan
 
     return {
         "annualized_return": ann_return,
@@ -630,6 +737,21 @@ def compute_risk_metrics(composite_df, return_type="gross", risk_free_rate=0.04)
         "beta": beta,
         "tracking_error": tracking_error,
         "information_ratio": info_ratio,
+        # Sprint 24-3 additions
+        "rolling_12m_std": rolling_12m_std,
+        "worst_quarter": worst_quarter,
+        "rolling_6m_loss_count": rolling_6m_loss_count,
+        "rolling_qtr_loss_count": rolling_qtr_loss_count,
+        "calmar": calmar,
+        "calmar_drawdown": calmar_dd,
+        "mar": mar,
+        "ann_return_when_bench_neg": ann_ret_when_bench_neg,
+        "up_capture_monthly": up_capture_mo,
+        "down_capture_monthly": down_capture_mo,
+        "up_capture_quarterly": up_capture_qtr,
+        "down_capture_quarterly": down_capture_qtr,
+        "r_squared_primary": r_squared_primary,
+        "r_squared_secondary": r_squared_secondary,
     }
 
 
