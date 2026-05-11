@@ -636,9 +636,10 @@ def _render_qdg_characteristics(
       - Yield, Mkt Cap, Sector, ROE, LT Debt/Cap, FCF Yield: yfinance / warbook_metrics
       - Quality (S&P): Notion
       - Raised Since, Payout, 1Y/3Y/5Y DG: Fish CCC (preferred — authoritative)
-      - Paid Since: Fish Historical (earliest year with non-zero dividend)
+      - Paid Since: Notion (manually curated; Sprint 24-5)
       - Last Bump: Fish Historical (most recent ÷ prior annual)
-      - Timing of Raise, Frequency: yfinance via warbook_metrics
+      - Timing: Fish CCC "Last Increased on: Pay" month (Sprint 24-5)
+      - Frequency: yfinance via warbook_metrics
     """
     rows = []
     for _, h in tam_df.iterrows():
@@ -658,12 +659,19 @@ def _render_qdg_characteristics(
         mkt_cap_raw = mkt.get("market_cap") or 0
         mkt_cap_bln = round(mkt_cap_raw / 1e9, 1) if mkt_cap_raw else None
 
-        # Paid Since — earliest year in Fish Historical with non-zero dividend
+        # Paid Since — Sprint 24-5: manually curated in Notion (was previously
+        # derived from Fish Historical's earliest non-zero year, but Fish's
+        # Historical sheet floors at 1999, which was producing misleading
+        # values like "1999" for JNJ (real answer: 1944). When the Notion
+        # property is blank the warbook shows an em dash so the team knows
+        # to fill it in.
+        paid_since_raw = nm.get("paid_since")
         paid_since = None
-        if fh:
-            years_with_div = sorted(y for y, v in fh.items() if v and v > 0)
-            if years_with_div:
-                paid_since = years_with_div[0]
+        if paid_since_raw is not None:
+            try:
+                paid_since = int(float(str(paid_since_raw)))
+            except (ValueError, TypeError):
+                pass
 
         # Raised Since — directly from Fish streak_began (more reliable than
         # back-computing from the Historical sheet)
@@ -732,7 +740,14 @@ def _render_qdg_characteristics(
             "Qual (S&P)":         nm.get("sp_quality") or "",
             "Paid Since":         paid_since,
             "Raised Since":       raised_since,
-            "Timing":             wm.get("timing_of_raise") or "",
+            # Sprint 24-5: Timing now reads from Fish's "Last Increased on:
+            # Pay" date (month component) instead of the yfinance modal-month
+            # heuristic. Fish is the authoritative source — it stores the
+            # actual most-recent raise's pay date rather than guessing from
+            # historical dividend dates. Falls back to None (em dash) when
+            # Fish doesn't carry the ticker, since the yfinance heuristic
+            # was unreliable enough not to be worth a silent fallback.
+            "Timing":             fm.get("last_increased_pay_month"),
             "Freq":               wm.get("dividend_frequency") or "",
             "Payout %":           payout,
             "Last Bump %":        last_bump,
@@ -772,6 +787,10 @@ def _render_qdg_characteristics(
             "LT D/Cap %":    lambda v: f"{v:.1f}%" if _is_num(v) else "—",
             "Paid Since":    lambda v: f"{int(v)}" if _is_num(v) else "—",
             "Raised Since":  lambda v: f"{int(v)}" if _is_num(v) else "—",
+            # Sprint 24-5: Timing is a string column (e.g. "Jun") but can
+            # arrive as None when Fish doesn't carry the ticker — explicit
+            # em-dash formatter matches the column's na_rep behavior.
+            "Timing":        lambda v: v if (v is not None and str(v).strip() and str(v).strip() != "nan") else "—",
             "Payout %":      lambda v: f"{v:.1f}%" if _is_num(v) else "—",
             "Last Bump %":   lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
             "1Y DG %":       lambda v: f"{v:+.1f}%" if _is_num(v) else "—",
@@ -814,8 +833,8 @@ def _render_qdg_characteristics(
         "<div style='font-size:10px;color:rgba(255,255,255,0.3);"
         "margin-top:14px;text-align:right;'>"
         "Source: Tamarac (positions) · yfinance (yield, market cap, ROE, "
-        "leverage, FCF yield, frequency, timing) · Fish CCC (raised since, "
-        "payout, DGR, paid since, last bump) · Notion (S&amp;P quality)"
+        "leverage, FCF yield, frequency) · Fish CCC (raised since, "
+        "payout, DGR, timing, last bump) · Notion (S&amp;P quality, paid since)"
         "</div>",
         unsafe_allow_html=True,
     )
