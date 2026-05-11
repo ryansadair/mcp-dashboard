@@ -104,8 +104,8 @@ def _load_cached_composite(_v=2):
 # Now collapsed to one bundled function: one parse, one serialize, one write.
 
 @st.cache_data(ttl=86400, show_spinner=False)
-@disk_cached(namespace="perf_per_strategy", ttl=86400, version=1)
-def _cached_per_strategy(strategy: str, as_of_iso: str, _v=1):
+@disk_cached(namespace="perf_per_strategy", ttl=86400, version=2)
+def _cached_per_strategy(strategy: str, as_of_iso: str, _v=2):
     """Compute every per-strategy artifact in one shot.
 
     Returns:
@@ -338,21 +338,21 @@ def _render_risk_metrics(comp_df, strategy, color, as_of_iso):
     ]
 
     row2 = [
-        ("Rolling 12M Std Dev", _fmt_pct(risk["rolling_12m_std"]), NEUTRAL),
-        ("Worst Quarter", _fmt_pct(risk["worst_quarter"], decimals=2), BRAND["red"]),
-        ("CALMAR Ratio", _fmt_num(risk["calmar"]), NEUTRAL),
-        ("CALMAR Drawdown", _fmt_pct(risk["calmar_drawdown"]), BRAND["red"]),
-        ("MAR Ratio", _fmt_num(risk["mar"]), NEUTRAL),
-        ("Up Capture (Mo)", _fmt_pct(risk["up_capture_monthly"]), NEUTRAL),
-        ("Down Capture (Mo)", _fmt_pct(risk["down_capture_monthly"]), NEUTRAL),
-        ("Up Capture (Qtr)", _fmt_pct(risk["up_capture_quarterly"]), NEUTRAL),
-        ("Down Capture (Qtr)", _fmt_pct(risk["down_capture_quarterly"]), NEUTRAL),
-        ("Ann. Return when SPX Neg.", _fmt_pct(risk["ann_return_when_bench_neg"], decimals=2),
-            BRAND["red"] if _is_neg(risk["ann_return_when_bench_neg"]) else BRAND["green"]),
-        ("Rolling 6M Loss Count", _fmt_int(risk["rolling_6m_loss_count"]), NEUTRAL),
-        ("Rolling Qtr Loss Count", _fmt_int(risk["rolling_qtr_loss_count"]), NEUTRAL),
-        ("R Sq. vs Primary", _fmt_pct(risk["r_squared_primary"]), NEUTRAL),
-        ("R Sq. vs Secondary", _fmt_pct(risk["r_squared_secondary"]), NEUTRAL),
+        ("Rolling 12M Std Dev", _fmt_pct(risk.get("rolling_12m_std", float("nan"))), NEUTRAL),
+        ("Worst Quarter", _fmt_pct(risk.get("worst_quarter", float("nan")), decimals=2), BRAND["red"]),
+        ("CALMAR Ratio", _fmt_num(risk.get("calmar", float("nan"))), NEUTRAL),
+        ("CALMAR Drawdown", _fmt_pct(risk.get("calmar_drawdown", float("nan"))), BRAND["red"]),
+        ("MAR Ratio", _fmt_num(risk.get("mar", float("nan"))), NEUTRAL),
+        ("Up Capture (Mo)", _fmt_pct(risk.get("up_capture_monthly", float("nan"))), NEUTRAL),
+        ("Down Capture (Mo)", _fmt_pct(risk.get("down_capture_monthly", float("nan"))), NEUTRAL),
+        ("Up Capture (Qtr)", _fmt_pct(risk.get("up_capture_quarterly", float("nan"))), NEUTRAL),
+        ("Down Capture (Qtr)", _fmt_pct(risk.get("down_capture_quarterly", float("nan"))), NEUTRAL),
+        ("Ann. Return when SPX Neg.", _fmt_pct(risk.get("ann_return_when_bench_neg", float("nan")), decimals=2),
+            BRAND["red"] if _is_neg(risk.get("ann_return_when_bench_neg", float("nan"))) else BRAND["green"]),
+        ("Rolling 6M Loss Count", _fmt_int(risk.get("rolling_6m_loss_count", float("nan"))), NEUTRAL),
+        ("Rolling Qtr Loss Count", _fmt_int(risk.get("rolling_qtr_loss_count", float("nan"))), NEUTRAL),
+        ("R Sq. vs Primary", _fmt_pct(risk.get("r_squared_primary", float("nan"))), NEUTRAL),
+        ("R Sq. vs Secondary", _fmt_pct(risk.get("r_squared_secondary", float("nan"))), NEUTRAL),
     ]
 
     def _emit_row(title, metrics):
