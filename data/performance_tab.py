@@ -36,6 +36,11 @@ PLOTLY_DARK = dict(
 _XAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10))
 _YAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(size=10))
 PLOTLY_CONFIG = {"displayModeBar": False, "scrollZoom": False, "doubleClick": False, "showTips": False, "staticPlot": True}
+# Sprint 24-4 followup: cumulative chart wants hover tooltips (so values are
+# legible without enabling pan/zoom). Setting staticPlot=False re-enables
+# hover; the layout-level dragmode=False + axis fixedrange=True keep
+# pan/zoom interactions disabled.
+PLOTLY_CHART_CONFIG = {"displayModeBar": False, "scrollZoom": False, "doubleClick": False, "showTips": False, "staticPlot": False}
 
 # Strategy display names and colors
 STRATEGY_NAMES = {
@@ -297,6 +302,8 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
         st.session_state[sk_end] = series_end
 
     # Layout: six narrow preset buttons, then two date pickers
+    # Small vertical spacer so the controls don't crowd the period-return cards above.
+    st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
     preset_cols = st.columns([1, 1, 1, 1, 1, 1, 2, 2])
     if preset_cols[0].button("YTD", key=f"preset_ytd_{strategy}", use_container_width=True):
         _apply_preset(ytd=True)
@@ -407,13 +414,16 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
 
     _layout = {**PLOTLY_DARK}
     _layout["margin"] = dict(l=50, r=20, t=16, b=40)
+    # Pan/zoom disabled at the layout level (fixedrange axes + dragmode=False)
+    # so re-enabling hover via PLOTLY_CHART_CONFIG doesn't bring back drag-to-zoom.
     fig.update_layout(
         **_layout,
-        xaxis=_XAXIS,
-        yaxis={**_YAXIS, "tickprefix": "$"},
+        xaxis={**_XAXIS, "fixedrange": True},
+        yaxis={**_YAXIS, "tickprefix": "$", "fixedrange": True},
         height=380,
         hovermode="x unified",
         showlegend=True,
+        dragmode=False,
     )
 
     # Title line includes the actual rendered range (snaps to data points)
@@ -426,7 +436,7 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
         f'· {actual_start} – {actual_end}</span></div>',
         unsafe_allow_html=True,
     )
-    st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+    st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CHART_CONFIG)
 
     if invalid_msg:
         st.caption(invalid_msg)
@@ -506,11 +516,19 @@ def _render_risk_metrics(comp_df, strategy, color, as_of_iso):
         ("R Sq. vs Secondary", _fmt_pct(risk.get("r_squared_secondary", float("nan"))), NEUTRAL),
     ]
 
-    def _emit_row(title, metrics):
+    def _emit_row(title, metrics, suffix=""):
+        # suffix is appended inline next to the title in a muted style.
+        # Used to clarify that these metrics are computed from the full
+        # composite series and don't change with the chart's date range.
+        suffix_html = (
+            f'<span style="font-weight:400;color:rgba(255,255,255,0.4);'
+            f'font-size:11px;text-transform:none;letter-spacing:0;'
+            f'margin-left:8px;">{suffix}</span>' if suffix else ""
+        )
         st.markdown(
             f"""<div style="font-size:13px; font-weight:700; color:rgba(255,255,255,0.7); """
             f"""text-transform:uppercase; letter-spacing:0.04em; margin-top:10px; """
-            f"""margin-bottom:8px;">{title}</div>""",
+            f"""margin-bottom:8px;">{title}{suffix_html}</div>""",
             unsafe_allow_html=True,
         )
         cards_html = ""
@@ -529,8 +547,16 @@ def _render_risk_metrics(comp_df, strategy, color, as_of_iso):
             unsafe_allow_html=True,
         )
 
-    _emit_row("Risk Metrics", row1)
-    _emit_row("Capture & Drawdown", row2)
+    # Build a human-readable as-of suffix to clarify these metrics use the
+    # full composite series, not the chart's selected date range.
+    try:
+        as_of_dt = datetime.fromisoformat(as_of_iso)
+        as_of_suffix = f"as of {as_of_dt.strftime('%b %d, %Y')} · full series"
+    except (ValueError, TypeError):
+        as_of_suffix = "full series"
+
+    _emit_row("Risk Metrics", row1, suffix=as_of_suffix)
+    _emit_row("Capture & Drawdown", row2, suffix=as_of_suffix)
 
     st.caption("Based on monthly gross returns. Risk-free rate: 4%. CALMAR uses trailing 36 months. MAR uses since inception.")
 
