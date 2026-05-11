@@ -392,11 +392,17 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
     r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
 
     def _pct_arr(s):
-        return (s - 100).values
+        # Plotly wraps 1D customdata as 2D internally, and format specs
+        # only apply to indexed elements. Pass an explicit column vector
+        # so %{customdata[0]:+.2f} works as expected in the hovertemplate.
+        return (s - 100).values.reshape(-1, 1)
 
     def _final_pct(s):
         return float(s.iloc[-1]) - 100.0
 
+    # Note: hovertemplate omits the date prefix because hovermode="x unified"
+    # already shows the date in the tooltip header. Including it again here
+    # would render "Jan 31, 2026" + "Jan 2026" stacked.
     strat_label = f"{name}  {_final_pct(strat_plot):+.2f}%"
     fig.add_trace(go.Scatter(
         x=strat_plot.index, y=strat_plot.values,
@@ -404,7 +410,7 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
         name=strat_label, fill="tozeroy",
         fillcolor=f"rgba({r},{g},{b},0.06)",
         line=dict(color=color, width=2.5),
-        hovertemplate="%{x|%b %Y}<br>" + name + ": %{customdata:+.2f}%<extra></extra>",
+        hovertemplate=name + ": %{customdata[0]:+.2f}%<extra></extra>",
     ))
 
     if bench1_plot is not None and len(bench1_plot) > 0 and bench1_name:
@@ -414,7 +420,7 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
             customdata=_pct_arr(bench1_plot),
             name=bench1_label,
             line=dict(color="rgba(255,255,255,0.35)", width=1.5, dash="dot"),
-            hovertemplate="%{x|%b %Y}<br>" + bench1_name + ": %{customdata:+.2f}%<extra></extra>",
+            hovertemplate=bench1_name + ": %{customdata[0]:+.2f}%<extra></extra>",
         ))
 
     if bench2_plot is not None and len(bench2_plot) > 0 and bench2_name:
@@ -424,7 +430,7 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
             customdata=_pct_arr(bench2_plot),
             name=bench2_label,
             line=dict(color="rgba(201,168,76,0.4)", width=1.5, dash="dash"),
-            hovertemplate="%{x|%b %Y}<br>" + bench2_name + ": %{customdata:+.2f}%<extra></extra>",
+            hovertemplate=bench2_name + ": %{customdata[0]:+.2f}%<extra></extra>",
         ))
 
     fig.add_hline(y=100, line=dict(color="rgba(255,255,255,0.1)", width=1, dash="dash"))
