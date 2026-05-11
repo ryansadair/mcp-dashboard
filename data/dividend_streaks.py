@@ -8,6 +8,7 @@ Reads comprehensive dividend data from the David Fish / IREIT CCC spreadsheet
 Data extracted:
   "All CCC" sheet:
     - Consecutive years of increases (col 4)
+    - Last Increased on: Pay date (col 16) — month name only, used for Timing
     - DGR 1/3/5/10-year (cols 18-21) -- replaces unreliable yfinance growth rates
     - EPS Payout Ratio (col 25) -- replaces unreliable yfinance payout ratio
     - Chowder Rule (col 41) -- yield + 5Y DGR
@@ -67,6 +68,42 @@ def _sf(val):
         return 0.0
 
 
+_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def _extract_month(val):
+    """Return three-letter month name from a Fish cell value, or None.
+
+    Fish stores "Last Increased on: Pay" as an Excel date (openpyxl will
+    surface this as datetime.datetime when data_only=True). For older Fish
+    versions or unusual cells the value can also arrive as a string in
+    common date formats. Try a few common shapes and bail out cleanly.
+    """
+    if val is None:
+        return None
+    # openpyxl datetime path (most common)
+    try:
+        m = val.month  # datetime, date — both have .month
+        if 1 <= m <= 12:
+            return _MONTH_NAMES[m - 1]
+    except AttributeError:
+        pass
+    # String path — try ISO and a couple of common US formats
+    try:
+        from datetime import datetime
+        s = str(val).strip()
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%Y-%m-%dT%H:%M:%S"):
+            try:
+                dt = datetime.strptime(s.split(" ")[0], fmt)
+                return _MONTH_NAMES[dt.month - 1]
+            except ValueError:
+                continue
+    except Exception:
+        pass
+    return None
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def _load_fish_data():
     """
@@ -74,7 +111,8 @@ def _load_fish_data():
     Returns dict: {
         "streaks": {ticker: (years, tier)},
         "metrics": {ticker: {dgr_1y, dgr_3y, dgr_5y, dgr_10y, payout_ratio,
-                             chowder, streak_began, recessions_survived}},
+                             chowder, streak_began, recessions_survived,
+                             last_increased_pay_month}},
         "history": {ticker: {year: dividend_per_share}},
     }
     """
@@ -129,6 +167,14 @@ def _load_fish_data():
                 "recessions":   int(_sf(row[57])) if len(row) > 57 else 0,
                 "div_amount":   round(_sf(row[12]), 4) if len(row) > 12 else 0,
                 "qtly_div":     round(_sf(row[10]), 4) if len(row) > 10 else 0,
+                # Sprint 24-5: "Last Increased on: Pay" date (col Q, index 16).
+                # Stored as datetime in Fish; we keep just the month name so the
+                # warbook can use it as the Timing column (e.g. "Jun" for JNJ).
+                # Falls back to None if the cell is missing or not a date —
+                # warbook then shows an em dash for that row.
+                "last_increased_pay_month": _extract_month(
+                    row[16] if len(row) > 16 else None
+                ),
             }
 
     # ── Parse "Historical" sheet ───────────────────────────────────────
@@ -201,7 +247,8 @@ def get_fish_metrics(ticker):
     """
     Get all CCC metrics for a ticker.
     Returns dict with keys: dgr_1y, dgr_3y, dgr_5y, dgr_10y,
-    payout_ratio, chowder, streak_began, recessions
+    payout_ratio, chowder, streak_began, recessions,
+    last_increased_pay_month
     Returns empty dict if not found.
     """
     data = _load_fish_data()

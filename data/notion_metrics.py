@@ -22,6 +22,9 @@ Pulls MCP-proprietary fields from the "MCP Master Holdings" Notion database:
   - Mstar Stock Type            (select — Cyclical, Classic Growth, High Yield, ...)
   - Mstar Style Classification  (select — LCC, LCG, LCV, MCC, MCG, MCV, SCC, SCG, SCV)
 
+  Sprint 24-5 — first-dividend-paid year (manually curated):
+  - Paid Since                  (number — e.g. 1944 for JNJ, 1890 for PG)
+
 Designed to merge into the holdings table by ticker symbol.
 
 Setup:
@@ -173,6 +176,8 @@ def fetch_notion_metrics():
                 "mstar_profitability": "A",
                 "mstar_stock_type": "Classic Growth",
                 "mstar_style": "LCG",
+                # Sprint 24-5: manually curated first-dividend-paid year
+                "paid_since": 1944,
             },
             ...
         }
@@ -215,6 +220,12 @@ def fetch_notion_metrics():
             "mstar_profitability":  _extract_select(props.get("Mstar Profitability Grade", {})),
             "mstar_stock_type":     _extract_select(props.get("Mstar Stock Type", {})),
             "mstar_style":          _extract_select(props.get("Mstar Style Classification", {})),
+
+            # Sprint 24-5: warbook "Paid Since" — year of the first dividend
+            # paid (e.g. JNJ 1944, PG 1890). Manually curated in Notion from
+            # dividendinvestor.com because Fish's Historical sheet floors at
+            # 1999 and yfinance has no first-payment field.
+            "paid_since":           _extract_number(props.get("Paid Since", {})),
         }
 
     return result
@@ -226,7 +237,7 @@ def get_metrics_for_ticker(ticker):
     Returns dict with keys: div_baseline, style_bucket, cld, cld_source,
     mcp_target, strategies, date_evaluated, sp_quality, sp_credit,
     mstar_fin_health, mstar_growth, mstar_profitability, mstar_stock_type,
-    mstar_style. Returns empty dict if not found.
+    mstar_style, paid_since. Returns empty dict if not found.
     """
     data = fetch_notion_metrics()
     return data.get(ticker.upper(), {})
