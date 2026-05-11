@@ -81,14 +81,21 @@ def _data_unavailable_card(msg="Composite returns data unavailable", detail=None
         st.caption(detail)
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-@disk_cached(namespace="perf_composite_raw", ttl=3600, version=2)
+@st.cache_data(ttl=86400, show_spinner=False)
+@disk_cached(namespace="perf_composite_raw", ttl=86400, version=2)
 def _load_cached_composite(_v=2):
-    """Cache composite data for 1 hour.
+    """Cache composite data for 24 hours.
 
     Three-tier cache: memory (per session) → disk (survives session eviction)
     → Excel parse. On return-from-idle, disk layer avoids the multi-second
     openpyxl/xlrd parse that was blocking every tab after Performance.
+
+    Sprint 24-2: TTL bumped from 1h to 24h. The Composite Returns file updates
+    quarterly when Ryan drops the new export; sub-hourly invalidation just
+    means more frequent cold parses with no data benefit. Disk cache still
+    busts whenever the file's mtime advances (handled via _v invalidation
+    when the parser changes; bump the outer version for spreadsheet shape
+    changes).
 
     Bump the outer version (decorator) to force disk cache busts after Excel
     format changes; bump _v for behavioral changes to the parser.
@@ -96,45 +103,60 @@ def _load_cached_composite(_v=2):
     return load_composite_data()
 
 
-# ── Per-strategy computation caches ─────────────────────────────────────────
-# These are keyed on (strategy, as_of_iso) so they auto-invalidate when the
-# quarterly Composite Returns file updates. All four functions are pure and
-# safe to cache — they depend only on comp_df (already cached upstream).
-# Cache entries are small (dicts of Series/DataFrames / floats), so we can
-# hold many strategies in memory without pressure.
+# ── Per-strategy computation cache (Sprint 24-2: bundled) ──────────────────
+# Previously this section had three separate @disk_cached functions
+# (_cached_cumulative, _cached_risk_metrics, _cached_heatmap). Each one
+# re-read the composite_df from _load_cached_composite() and wrote its own
+# small payload to disk. On Streamlit Cloud's ephemeral disk that's three
+# round-trips per strategy view.
+#
+# Now collapsed to a single bundled function so cold-path strategy switches
+# pay one parse + serialize + write cycle instead of three. The bundled dict
+# is small enough (a few hundred KB of pandas objects) that combining costs
+# nothing in memory and meaningfully cuts cold latency.
+#
+# Keys are (strategy, as_of_iso) so entries auto-invalidate when the quarterly
+# Composite Returns file updates. TTL is 24h to match _load_cached_composite.
 
-@st.cache_data(ttl=3600, show_spinner=False)
-@disk_cached(namespace="perf_cumulative", ttl=3600, version=1)
-def _cached_cumulative(strategy: str, as_of_iso: str, _v=1):
-    """Compute cumulative growth-of-$100 series + benchmarks. Keyed on strategy+as_of."""
+@st.cache_data(ttl=86400, show_spinner=False)
+@disk_cached(namespace="perf_per_strategy", ttl=86400, version=1)
+def _cached_per_strategy(strategy: str, as_of_iso: str, _v=1):
+    """Compute every per-strategy artifact in one shot.
+
+    Returns:
+        {
+          "cumulative": {
+            "strat_cum":     pd.Series,
+            "bench1_name":   str,
+            "bench1_cum":    pd.Series,
+            "bench2_name":   str,
+            "bench2_cum":    pd.Series,
+          },
+          "risk":    dict from compute_risk_metrics(),
+          "heatmap": pd.DataFrame from build_monthly_heatmap_data(),
+        }
+
+    Each sub-result mirrors the shape the renderer functions expect. Anything
+    that needs to invalidate per file update is keyed on as_of_iso.
+    """
     data = _load_cached_composite()
     comp_df = data["composites"][strategy]
+
     strat_cum = get_cumulative_series(comp_df, "gross")
     bench1_name, bench1_cum = get_benchmark_cumulative(comp_df, "primary")
     bench2_name, bench2_cum = get_benchmark_cumulative(comp_df, "secondary")
+
     return {
-        "strat_cum": strat_cum,
-        "bench1_name": bench1_name, "bench1_cum": bench1_cum,
-        "bench2_name": bench2_name, "bench2_cum": bench2_cum,
+        "cumulative": {
+            "strat_cum":   strat_cum,
+            "bench1_name": bench1_name,
+            "bench1_cum":  bench1_cum,
+            "bench2_name": bench2_name,
+            "bench2_cum":  bench2_cum,
+        },
+        "risk":    compute_risk_metrics(comp_df, return_type="gross"),
+        "heatmap": build_monthly_heatmap_data(comp_df, return_type="gross"),
     }
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-@disk_cached(namespace="perf_risk", ttl=3600, version=1)
-def _cached_risk_metrics(strategy: str, as_of_iso: str, _v=1):
-    """Compute Sharpe/Sortino/beta/drawdown etc. Keyed on strategy+as_of."""
-    data = _load_cached_composite()
-    comp_df = data["composites"][strategy]
-    return compute_risk_metrics(comp_df, return_type="gross")
-
-
-@st.cache_data(ttl=3600, show_spinner=False)
-@disk_cached(namespace="perf_heatmap", ttl=3600, version=1)
-def _cached_heatmap(strategy: str, as_of_iso: str, _v=1):
-    """Build monthly heatmap pivot. Keyed on strategy+as_of."""
-    data = _load_cached_composite()
-    comp_df = data["composites"][strategy]
-    return build_monthly_heatmap_data(comp_df, return_type="gross")
 
 
 def render_performance_tab(active_strategy):
@@ -228,7 +250,7 @@ def _render_period_returns(data, strategy, color):
 
 def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
     """Cumulative growth of $100 chart with benchmark overlays."""
-    cached = _cached_cumulative(strategy, as_of_iso)
+    cached = _cached_per_strategy(strategy, as_of_iso)["cumulative"]
     strat_cum = cached["strat_cum"]
     bench1_name = cached["bench1_name"]
     bench1_cum = cached["bench1_cum"]
@@ -286,7 +308,7 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
 
 def _render_risk_metrics(comp_df, strategy, color, as_of_iso):
     """Render risk metrics as a compact flex grid — fits full page width."""
-    risk = _cached_risk_metrics(strategy, as_of_iso)
+    risk = _cached_per_strategy(strategy, as_of_iso)["risk"]
 
     if risk is None:
         _data_unavailable_card("Insufficient data for risk metrics", "Need 12+ months")
@@ -333,7 +355,7 @@ def _render_monthly_heatmap(comp_df, strategy, color, as_of_iso):
     Uses a minimum width of 760px so the 13-column grid never gets
     squeezed — on narrow screens the chart container scrolls horizontally.
     """
-    hm = _cached_heatmap(strategy, as_of_iso)
+    hm = _cached_per_strategy(strategy, as_of_iso)["heatmap"]
 
     if hm.empty:
         _data_unavailable_card("No heatmap data available")
