@@ -20,14 +20,22 @@ Note: dividend metadata (paid_since, raised_since, frequency, last bump) is
 NOT computed here — Sprint 23A direction was to use Fish CCC exclusively for
 that data via data/dividend_streaks.py. This module covers everything else.
 
+Sprint 23E architecture: most fields now read from Supabase's warbook_metrics
+table, populated daily by prefetch_cloud.py --mode slow (running on GitHub
+Actions). This eliminates the throttle gaps that previously left ROE, FCF
+Yield, Sub-Industry, and coverage ratios showing as None on Streamlit Cloud.
+
+  Supabase warbook_metrics table — primary source (Sprint 23E)
+  Live yfinance compute          — fallback for tickers not in Supabase
+                                   AND for fields that aren't stored there
+                                   (TR windows are still computed live since
+                                   they change every market day)
+
 Caching architecture:
   Memory   (@st.cache_data, ttl=3600)  — fastest, per-session
   Disk     (@disk_cached,  ttl=86400)  — fast, survives session eviction
-  Compute  (yfinance + financial stmts)
-
-Cold path is ~2-3 minutes for ~50 tickers due to per-ticker financial-
-statement queries. Disk cache makes that a once-per-day cost. Subsequent
-calls within 24h read from disk (~10ms per ticker).
+  Supabase (warbook_metrics table)     — slow-path fundamentals, daily refresh
+  Compute  (yfinance + financial stmts) — fallback for missing data
 
 The single public entry point is fetch_warbook_metrics_batch().
 """
@@ -586,13 +594,114 @@ def _compute_ticker(ticker, spx_hist):
     return out
 
 
+# ── Supabase read helpers (Sprint 23E) ────────────────────────────────────
+
+# Fields that the warbook_metrics Supabase table provides. These are the
+# slow-path yfinance fields populated by prefetch_cloud.py --mode slow.
+# TR windows (tr_mtd, tr_qtd, etc.) are NOT in this list — they change every
+# market day and are still computed live below.
+_SUPABASE_BACKED_FIELDS = (
+    "roe_ttm", "roe_5y_avg",
+    "lt_debt_to_capital", "net_debt_to_capital", "debt_coverage_ratio",
+    "fcf_yield", "fcf_div_coverage", "cf_div_coverage",
+    "eps_div_coverage", "cash_flow_ev_yield",
+    "super_sector", "sub_industry", "country",
+    "forward_pe",
+    "timing_of_raise", "dividend_frequency",
+)
+
+
+def _fetch_supabase_warbook_metrics(tickers_tuple):
+    """
+    Pull the slow-path warbook metric set from Supabase. Returns a dict
+    keyed by ticker. Missing tickers (or any failure) → empty dict, which
+    means the live-compute fallback fills them in.
+
+    Imported lazily so the data layer can be exercised without configuring
+    Supabase (useful for local dev / tests).
+    """
+    if not tickers_tuple:
+        return {}
+    try:
+        from data.market_data import _sb_get
+    except Exception:
+        return {}
+
+    try:
+        tickers_filter = f"in.({','.join(tickers_tuple)})"
+        rows = _sb_get("warbook_metrics", filters={"ticker": tickers_filter})
+        if not rows:
+            return {}
+        out = {}
+        for row in rows:
+            t = row.get("ticker")
+            if not t:
+                continue
+            out[t] = {field: row.get(field) for field in _SUPABASE_BACKED_FIELDS}
+        return out
+    except Exception:
+        return {}
+
+
+def _compute_tr_windows_only(ticker, spx_hist):
+    """
+    Lightweight per-ticker compute that only fetches what's NOT in Supabase:
+    the TR windows (MTD/QTD/YTD/3M/1Y and vs-SPX deltas). Used when Supabase
+    has the slow fields and we just need fresh TR data.
+
+    This is ~1 yfinance call per ticker (tk.history) vs the full _compute_ticker
+    path which makes 4-5 calls. Cuts the cold path from ~2-3 min to ~30s for
+    a 50-ticker universe.
+    """
+    out = {
+        "tr_mtd": None, "tr_qtd": None, "tr_ytd": None,
+        "tr_3m": None, "tr_1y": None,
+        "tr_qtd_vs_spx": None, "tr_ytd_vs_spx": None,
+    }
+
+    try:
+        import yfinance as yf
+    except ImportError:
+        return out
+
+    try:
+        tk = yf.Ticker(ticker)
+        try:
+            hist = tk.history(period="1y", auto_adjust=True, actions=True)
+        except Exception:
+            hist = None
+
+        for label in ("MTD", "QTD", "YTD", "3M", "1Y"):
+            start, _ = _period_start_end(label)
+            tr = _total_return_from_history(hist, start)
+            out[f"tr_{label.lower()}"] = tr
+
+        for label in ("QTD", "YTD"):
+            start, _ = _period_start_end(label)
+            stock_tr = out[f"tr_{label.lower()}"]
+            spx_tr = _total_return_from_history(spx_hist, start) if spx_hist is not None else None
+            if stock_tr is not None and spx_tr is not None:
+                out[f"tr_{label.lower()}_vs_spx"] = round(stock_tr - spx_tr, 2)
+    except Exception:
+        pass
+
+    return out
+
+
 # ── Public API ────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=3600, show_spinner=False)
-@disk_cached(namespace="warbook", ttl=86400, version=2)
+@disk_cached(namespace="warbook", ttl=86400, version=3)
 def fetch_warbook_metrics_batch(tickers_tuple):
     """
     Fetch warbook-specific metrics for a batch of tickers.
+
+    Sprint 23E architecture:
+      1. Pull slow-path fields (ROE, FCF yield, debt ratios, sub-industry,
+         coverage ratios, etc.) from Supabase warbook_metrics in one call.
+      2. Compute live TR windows (MTD/QTD/YTD/3M/1Y + vs SPX) per ticker.
+      3. For any ticker missing from Supabase, fall back to the full live
+         compute path (preserves correctness on cold start / new tickers).
 
     Returns:
         { "TICK": {
@@ -607,23 +716,31 @@ def fetch_warbook_metrics_batch(tickers_tuple):
               "cash_flow_ev_yield": ...,
               "super_sector": ..., "sub_industry": ..., "country": ...,
               "forward_pe": ...,
+              "timing_of_raise": ..., "dividend_frequency": ...,
           },
           ...
         }
 
-    Cold path is ~2-3 minutes for ~50 tickers (per-ticker income/balance
-    sheet queries are slow). Disk cache makes that a once-per-day cost;
-    subsequent calls within 24h read from disk in milliseconds.
+    With Supabase warm: cold path is ~30s for ~50 tickers (TR-only compute).
+    Cold start / no Supabase data: ~2-3 min for ~50 tickers (full compute).
+    Disk cache makes that a once-per-day cost; subsequent calls within 24h
+    read from disk in milliseconds.
 
-    Errors during compute leave the affected fields as None — the caller
-    is expected to render em dashes for missing data.
+    Note: version=3 on the disk_cached decorator forces a cache miss after
+    deploying Sprint 23E so callers immediately benefit from the Supabase
+    read path. Bump again if the field shape changes.
+
+    Errors leave affected fields as None — caller renders em dashes.
     """
     results = {}
     if not tickers_tuple:
         return results
 
-    # Fetch SPX/SPY history once for vs-SPX comparisons. This avoids
-    # re-fetching it for every ticker.
+    # ── 1. Pull slow-path fields from Supabase ────────────────────────────
+    supabase_data = _fetch_supabase_warbook_metrics(tickers_tuple)
+    tickers_with_supabase = set(supabase_data.keys())
+
+    # ── 2. Fetch SPX history once for vs-SPX deltas ───────────────────────
     try:
         import yfinance as yf
         spx_hist = yf.Ticker(_SPX_PROXY_TICKER).history(
@@ -634,12 +751,20 @@ def fetch_warbook_metrics_batch(tickers_tuple):
     except Exception:
         spx_hist = None
 
-    # Per-ticker compute with throttle
+    # ── 3. Per-ticker fill ────────────────────────────────────────────────
     for ticker in tickers_tuple:
         try:
-            results[ticker] = _compute_ticker(ticker, spx_hist)
+            if ticker in tickers_with_supabase:
+                # Fast path: Supabase has the slow fields, compute TR live
+                tr_data = _compute_tr_windows_only(ticker, spx_hist)
+                merged = dict(supabase_data[ticker])
+                merged.update(tr_data)
+                results[ticker] = merged
+            else:
+                # Fallback: full live compute for tickers not yet in Supabase
+                # (new ticker, or first run before slow prefetch ran)
+                results[ticker] = _compute_ticker(ticker, spx_hist)
         except Exception:
-            # Per-ticker failure shouldn't kill the whole batch
             results[ticker] = {}
         _time.sleep(_THROTTLE_SECONDS)
 

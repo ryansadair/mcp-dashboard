@@ -13,6 +13,10 @@ Run modes:
                    NOTE: dividend_history removed — Fish CCC file in data/
                    is the authoritative source for historical dividends.
     --mode eod     Prices + indices + benchmarks (final EOD snapshot, ~3 min)
+    --mode slow    Warbook metrics only — ROE, FCF yield, debt ratios, sub-
+                   industry, etc. Runs once a day off-hours via prefetch-slow.yml
+                   (Sprint 23E). ~8-12 min for ~60 tickers because of yfinance
+                   financial-statement throttling.
 
 Environment variables (set via GitHub Secrets):
     SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
@@ -680,8 +684,19 @@ def fetch_financials(tickers):
 
 def push_to_supabase(prices=None, dividends=None, indices=None,
                      benchmarks=None, price_history=None,
-                     financials=None):
+                     financials=None, warbook_metrics=None):
     """Upsert all fetched data to Supabase."""
+
+    if warbook_metrics:
+        # Sprint 23E — slow-path yfinance fields. Upsert all rows even when
+        # values are None; the warbook renderer treats None as em dash. We
+        # do NOT preserve previous values like the prices table does, because
+        # if yfinance throttled this run we'd rather show em dashes than
+        # stale data that misleads (e.g. an ROE from 2 quarters ago).
+        rows = list(warbook_metrics.values())
+        print(f"  Pushing: warbook_metrics ({len(rows)} rows)...")
+        if sb_upsert("warbook_metrics", rows):
+            print(f"    ✓ warbook_metrics OK")
 
     if prices:
         # Preserve existing dividend_yield and sector when yfinance returns 0/empty
@@ -768,8 +783,373 @@ def push_to_supabase(prices=None, dividends=None, indices=None,
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# WARBOOK METRICS (Sprint 23E — slow mode)
+# ══════════════════════════════════════════════════════════════════════════
+#
+# Slow-path yfinance fields the warbook tabs need but which throttle out on
+# Streamlit Cloud's shared egress. Run once a day via prefetch-slow.yml and
+# upserted to the warbook_metrics Supabase table.
+#
+# Compute logic is lifted from data/warbook_metrics.py — duplicated rather
+# than imported because prefetch_cloud.py is a standalone GitHub Actions
+# script that shouldn't pull in Streamlit / disk_cache dependencies.
+# If the compute logic changes in data/warbook_metrics.py, mirror it here.
+
+# Morningstar super-sector groupings. Mirror of _SUPER_SECTOR_MAP in
+# data/warbook_metrics.py.
+_WB_SUPER_SECTOR_MAP = {
+    "Basic Materials":         "Cyclical",
+    "Materials":               "Cyclical",
+    "Consumer Cyclical":       "Cyclical",
+    "Consumer Discretionary":  "Cyclical",
+    "Financial Services":      "Cyclical",
+    "Financials":              "Cyclical",
+    "Real Estate":             "Cyclical",
+    "Communication Services":  "Sensitive",
+    "Energy":                  "Sensitive",
+    "Industrials":             "Sensitive",
+    "Technology":              "Sensitive",
+    "Consumer Defensive":      "Defensive",
+    "Consumer Staples":        "Defensive",
+    "Healthcare":              "Defensive",
+    "Utilities":               "Defensive",
+}
+
+
+def _wb_safe_float(v, default=None):
+    """Coerce to float, returning default on any failure or NaN."""
+    if v is None:
+        return default
+    try:
+        f = float(v)
+        if f != f:  # NaN
+            return default
+        return f
+    except (TypeError, ValueError):
+        return default
+
+
+def _wb_balance_sheet_metrics(tk):
+    """LT D/Cap, Net D/Cap, debt coverage ratio from balance + income statements."""
+    out = {
+        "lt_debt_to_capital": None,
+        "net_debt_to_capital": None,
+        "debt_coverage_ratio": None,
+    }
+
+    try:
+        bs = tk.balance_sheet
+        if bs is None or bs.empty:
+            return out
+
+        col = bs.columns[0]
+
+        def _bs_get(*keys):
+            for k in keys:
+                if k in bs.index:
+                    v = _wb_safe_float(bs.loc[k, col])
+                    if v is not None:
+                        return v
+            return None
+
+        lt_debt = _bs_get("Long Term Debt", "Long-Term Debt", "LongTermDebt")
+        equity = _bs_get(
+            "Stockholders Equity",
+            "Common Stock Equity",
+            "Total Stockholder Equity",
+            "Total Equity Gross Minority Interest",
+        )
+        cash = _bs_get(
+            "Cash And Cash Equivalents",
+            "Cash Cash Equivalents And Short Term Investments",
+            "Cash",
+        )
+
+        if lt_debt is not None and equity is not None:
+            denom = lt_debt + equity
+            if denom > 0:
+                out["lt_debt_to_capital"] = round((lt_debt / denom) * 100, 1)
+
+        if lt_debt is not None and equity is not None and cash is not None:
+            net_debt = lt_debt - cash
+            denom = lt_debt + equity
+            if denom > 0:
+                out["net_debt_to_capital"] = round((net_debt / denom) * 100, 1)
+    except Exception:
+        pass
+
+    try:
+        is_ = tk.income_stmt
+        if is_ is not None and not is_.empty:
+            col = is_.columns[0]
+
+            def _is_get(*keys):
+                for k in keys:
+                    if k in is_.index:
+                        v = _wb_safe_float(is_.loc[k, col])
+                        if v is not None:
+                            return v
+                return None
+
+            op_income = _is_get(
+                "Operating Income",
+                "Total Operating Income As Reported",
+                "Operating Revenue",
+            )
+            interest_exp = _is_get("Interest Expense", "Interest Expense Non Operating")
+
+            if op_income is not None and interest_exp is not None:
+                ie_abs = abs(interest_exp)
+                if ie_abs > 0:
+                    out["debt_coverage_ratio"] = round(op_income / ie_abs, 1)
+    except Exception:
+        pass
+
+    return out
+
+
+def _wb_cash_flow_metrics(tk, info):
+    """FCF yield, dividend coverage ratios, CF/EV yield."""
+    out = {
+        "fcf_yield": None,
+        "fcf_div_coverage": None,
+        "cf_div_coverage": None,
+        "eps_div_coverage": None,
+        "cash_flow_ev_yield": None,
+    }
+
+    fcf = _wb_safe_float(info.get("freeCashflow"))
+    op_cf = _wb_safe_float(info.get("operatingCashflow"))
+    market_cap = _wb_safe_float(info.get("marketCap"))
+    enterprise_value = _wb_safe_float(info.get("enterpriseValue"))
+    eps = _wb_safe_float(info.get("trailingEps"))
+    div_rate = _wb_safe_float(info.get("dividendRate"))
+    shares_out = _wb_safe_float(info.get("sharesOutstanding"))
+
+    if fcf is not None and market_cap is not None and market_cap > 0:
+        out["fcf_yield"] = round((fcf / market_cap) * 100, 2)
+
+    if op_cf is not None and enterprise_value is not None and enterprise_value > 0:
+        out["cash_flow_ev_yield"] = round((op_cf / enterprise_value) * 100, 2)
+
+    if div_rate is not None and div_rate > 0 and shares_out is not None and shares_out > 0:
+        annual_divs_total = div_rate * shares_out
+        if fcf is not None and annual_divs_total > 0:
+            out["fcf_div_coverage"] = round(fcf / annual_divs_total, 1)
+        if op_cf is not None and annual_divs_total > 0:
+            out["cf_div_coverage"] = round(op_cf / annual_divs_total, 1)
+
+    if eps is not None and div_rate is not None and div_rate > 0:
+        out["eps_div_coverage"] = round(eps / div_rate, 1)
+
+    return out
+
+
+def _wb_5yr_roe_avg(tk):
+    """5-year average ROE from income statement + balance sheet history."""
+    try:
+        is_ = tk.income_stmt
+        bs = tk.balance_sheet
+        if is_ is None or bs is None or is_.empty or bs.empty:
+            return None
+
+        roes = []
+        max_periods = min(5, len(is_.columns), len(bs.columns))
+
+        for i in range(max_periods):
+            try:
+                is_col = is_.columns[i]
+                bs_col = bs.columns[i] if i < len(bs.columns) else None
+                if bs_col is None:
+                    continue
+
+                ni = None
+                for k in ("Net Income", "Net Income Common Stockholders",
+                         "Net Income Continuous Operations"):
+                    if k in is_.index:
+                        ni = _wb_safe_float(is_.loc[k, is_col])
+                        if ni is not None:
+                            break
+
+                eq = None
+                for k in ("Stockholders Equity", "Common Stock Equity",
+                         "Total Stockholder Equity"):
+                    if k in bs.index:
+                        eq = _wb_safe_float(bs.loc[k, bs_col])
+                        if eq is not None:
+                            break
+
+                if ni is not None and eq is not None and eq > 0:
+                    roes.append((ni / eq) * 100)
+            except Exception:
+                continue
+
+        if len(roes) < 2:
+            return None
+
+        return round(sum(roes) / len(roes), 1)
+    except Exception:
+        return None
+
+
+def _wb_dividend_metadata(tk):
+    """Modal month of dividend increase + payment frequency (Q/M/SA/A)."""
+    out = {"timing_of_raise": None, "dividend_frequency": None}
+    try:
+        divs = tk.dividends
+        if divs is None or len(divs) == 0:
+            return out
+
+        cutoff = datetime.now().replace(tzinfo=None) - timedelta(days=365 * 5)
+        recent = divs.copy()
+        try:
+            recent.index = recent.index.tz_localize(None) if recent.index.tz is not None else recent.index
+        except Exception:
+            pass
+        recent = recent[recent.index >= cutoff] if len(recent) > 0 else recent
+
+        if len(recent) == 0:
+            return out
+
+        from collections import Counter
+        years = recent.index.year
+        per_year = Counter(years)
+        if per_year:
+            counts = sorted(per_year.values())
+            median_count = counts[len(counts) // 2]
+            if median_count >= 11:
+                out["dividend_frequency"] = "M"
+            elif median_count >= 3:
+                out["dividend_frequency"] = "Q"
+            elif median_count == 2:
+                out["dividend_frequency"] = "SA"
+            elif median_count == 1:
+                out["dividend_frequency"] = "A"
+
+        months_with_increase = []
+        prior = None
+        for ts, amt in recent.items():
+            try:
+                amt_f = float(amt)
+            except (TypeError, ValueError):
+                continue
+            if prior is not None and amt_f > prior * 1.001:
+                months_with_increase.append(ts.month)
+            prior = amt_f
+
+        if months_with_increase:
+            month_counts = Counter(months_with_increase)
+            modal_month = month_counts.most_common(1)[0][0]
+            month_names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            out["timing_of_raise"] = month_names[modal_month - 1]
+    except Exception:
+        pass
+
+    return out
+
+
+def fetch_warbook_metrics(tickers):
+    """
+    Fetch all warbook-specific metrics for the given tickers. Returns a dict
+    keyed by ticker; each value is a row ready to upsert to warbook_metrics.
+
+    Cold path is the slow one — financial statement queries throttle worse
+    than price data, so we use a 0.5s inter-ticker delay (vs 0.3s for the
+    price fetch). For ~60 tickers that's ~30s of throttle padding, but the
+    actual compute time is dominated by yfinance's per-statement HTTP cost
+    (~8-12 min total for the full universe is typical).
+    """
+    try:
+        import yfinance as yf
+    except ImportError:
+        print("  [FATAL] yfinance not installed")
+        return {}
+
+    results = {}
+    total = len(tickers)
+
+    for i, ticker in enumerate(tickers, 1):
+        row = {
+            "ticker": ticker,
+            "roe_ttm": None,
+            "roe_5y_avg": None,
+            "lt_debt_to_capital": None,
+            "net_debt_to_capital": None,
+            "debt_coverage_ratio": None,
+            "fcf_yield": None,
+            "fcf_div_coverage": None,
+            "cf_div_coverage": None,
+            "eps_div_coverage": None,
+            "cash_flow_ev_yield": None,
+            "super_sector": None,
+            "sub_industry": None,
+            "country": None,
+            "forward_pe": None,
+            "timing_of_raise": None,
+            "dividend_frequency": None,
+            "fetched_at": _utc_now().isoformat(),
+        }
+
+        try:
+            tk = yf.Ticker(ticker)
+
+            try:
+                info = tk.info or {}
+            except Exception:
+                info = {}
+
+            # ROE TTM (heuristic: <5 means decimal fraction)
+            roe = _wb_safe_float(info.get("returnOnEquity"))
+            if roe is not None:
+                row["roe_ttm"] = round(roe * 100, 1) if abs(roe) < 5 else round(roe, 1)
+
+            # ROE 5Y avg (slow — financial statement query)
+            row["roe_5y_avg"] = _wb_5yr_roe_avg(tk)
+
+            # Balance sheet metrics
+            row.update(_wb_balance_sheet_metrics(tk))
+
+            # Cash flow metrics
+            row.update(_wb_cash_flow_metrics(tk, info))
+
+            # Dividend metadata (uses tk.dividends — generally reliable)
+            row.update(_wb_dividend_metadata(tk))
+
+            # Industry / geo classification
+            sector_raw = info.get("sector", "") or ""
+            row["super_sector"] = _WB_SUPER_SECTOR_MAP.get(sector_raw)
+            row["sub_industry"] = info.get("industry", "") or None
+            row["country"] = info.get("country", "") or None
+
+            fwd_pe = _wb_safe_float(info.get("forwardPE"))
+            if fwd_pe is not None:
+                row["forward_pe"] = round(fwd_pe, 1)
+
+            if i % 5 == 0 or i == total:
+                # Cherry-pick a few fields for the progress line so we can
+                # eyeball whether the compute is producing real values
+                roe_v = row.get("roe_ttm")
+                fcf_v = row.get("fcf_yield")
+                sub = row.get("sub_industry") or "?"
+                print(f"  Warbook: {i}/{total} ({ticker}: "
+                      f"ROE={roe_v}, FCF Yld={fcf_v}, sub={sub[:24]})")
+
+        except Exception as e:
+            print(f"  [ERROR] {ticker}: {e}")
+
+        results[ticker] = row
+
+        # Throttle — financial-statement queries are heavier than price queries
+        time.sleep(0.5)
+
+    return results
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════════════════════
+
 
 def _is_market_hours():
     """
@@ -827,8 +1207,9 @@ def _auto_detect_mode(et_hour, et_min):
 
 def main():
     parser = argparse.ArgumentParser(description="Martin Capital — Cloud Data Pre-Fetcher")
-    parser.add_argument("--mode", choices=["quick", "full", "eod", "auto"], default="auto",
-                        help="quick=prices+indices, full=everything, eod=prices+indices+benchmarks, auto=detect from time")
+    parser.add_argument("--mode", choices=["quick", "full", "eod", "slow", "auto"], default="auto",
+                        help="quick=prices+indices, full=everything, eod=prices+indices+benchmarks, "
+                             "slow=warbook_metrics only (Sprint 23E daily cron), auto=detect from time")
     parser.add_argument("--dry", action="store_true", help="Skip Supabase push (testing)")
     parser.add_argument("--force", action="store_true", help="Run even outside market hours")
     args = parser.parse_args()
@@ -866,7 +1247,32 @@ def main():
         print("  [FATAL] No tickers found! Check Supabase prices table.")
         sys.exit(1)
 
-    # 2. Always fetch prices + indices
+    # ── slow mode: warbook_metrics only (Sprint 23E) ──────────────────────
+    # No prices/indices/benchmarks — the fast prefetch handles those. This
+    # mode runs once a day to populate the slow-changing fundamentals that
+    # Streamlit Cloud can't fetch reliably from yfinance (ROE, FCF yield,
+    # debt ratios, sub-industry, etc.).
+    if mode == "slow":
+        print(f"\n[2] Fetching warbook metrics for {len(tickers)} tickers...")
+        warbook = fetch_warbook_metrics(tickers)
+
+        elapsed = round(time.time() - start, 1)
+        print(f"\n  Fetch complete in {elapsed}s")
+
+        if not args.dry:
+            print(f"\n[Push] Pushing to Supabase...")
+            push_to_supabase(warbook_metrics=warbook)
+        else:
+            print(f"\n  DRY RUN — skipping Supabase push")
+            if warbook:
+                sample = list(warbook.items())[0]
+                print(f"  Sample: {sample[0]} = {sample[1]}")
+
+        total_elapsed = round(time.time() - start, 1)
+        print(f"\n  Done in {total_elapsed}s at {_utc_now().strftime('%H:%M:%S UTC')}")
+        return
+
+    # 2. Always fetch prices + indices (quick/full/eod modes)
     print(f"\n[2] Fetching prices for {len(tickers)} tickers...")
     prices = fetch_all_prices(tickers)
 
