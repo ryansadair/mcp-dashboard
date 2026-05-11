@@ -104,8 +104,8 @@ def _load_cached_composite(_v=2):
 # Now collapsed to one bundled function: one parse, one serialize, one write.
 
 @st.cache_data(ttl=86400, show_spinner=False)
-@disk_cached(namespace="perf_per_strategy", ttl=86400, version=2)
-def _cached_per_strategy(strategy: str, as_of_iso: str, _v=2):
+@disk_cached(namespace="perf_per_strategy", ttl=86400, version=3)
+def _cached_per_strategy(strategy: str, as_of_iso: str, _v=3):
     """Compute every per-strategy artifact in one shot.
 
     Returns:

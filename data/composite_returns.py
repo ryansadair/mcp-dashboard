@@ -629,10 +629,11 @@ def compute_risk_metrics(composite_df, return_type="gross", risk_free_rate=0.04)
     else:
         rolling_12m_std = np.nan
 
-    # Quarterly returns
-    qmonthly = pd.DataFrame({"r": monthly})
-    qmonthly["q"] = qmonthly.index.to_period("Q")
-    quarterly = qmonthly.groupby("q")["r"].apply(lambda x: (1 + x).prod() - 1)
+    # Quarterly returns — composite_df has a RangeIndex and stores dates
+    # in a "date" column (matching the rest of this module's convention).
+    q_df = composite_df[["date", mo_col]].dropna().copy()
+    q_df["q"] = pd.to_datetime(q_df["date"]).dt.to_period("Q")
+    quarterly = q_df.groupby("q")[mo_col].apply(lambda x: (1 + x).prod() - 1)
     worst_quarter = quarterly.min() if len(quarterly) > 0 else np.nan
 
     # Rolling 6-month loss count
@@ -690,10 +691,10 @@ def compute_risk_metrics(composite_df, return_type="gross", risk_free_rate=0.04)
         down_capture_mo = np.nan
         r_squared_primary = np.nan
 
-    # Quarterly captures
-    bench_q_df = pd.DataFrame({"b": bench_mo})
-    bench_q_df["q"] = bench_q_df.index.to_period("Q")
-    bench_quarterly = bench_q_df.groupby("q")["b"].apply(lambda x: (1 + x).prod() - 1)
+    # Quarterly captures — same RangeIndex-aware pattern as above.
+    bench_q_df = composite_df[["date", "bench1_mo"]].dropna().copy()
+    bench_q_df["q"] = pd.to_datetime(bench_q_df["date"]).dt.to_period("Q")
+    bench_quarterly = bench_q_df.groupby("q")["bench1_mo"].apply(lambda x: (1 + x).prod() - 1)
     aligned_q = pd.concat([quarterly, bench_quarterly], axis=1).dropna()
     aligned_q.columns = ["strat", "bench"]
     if len(aligned_q) >= 4:
