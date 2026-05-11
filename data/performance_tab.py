@@ -226,7 +226,15 @@ def _render_period_returns(data, strategy, color):
 # ── Cumulative Performance Chart ────────────────────────────────────────────
 
 def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
-    """Cumulative growth of $100 chart with benchmark overlays."""
+    """Cumulative growth of $100 chart with benchmark overlays.
+
+    Sprint 24-4: adds date-range controls so the user can zoom into any
+    window. Six preset buttons (YTD/1Y/3Y/5Y/10Y/All) plus two
+    st.date_input widgets for arbitrary ranges. The series are filtered
+    and re-rebased to $100 at the new start date, so a "2020-2023" view
+    starts at $100 on Jan 2020 — making side-by-side comparison with
+    benchmarks meaningful for any sub-period.
+    """
     cached = _cached_per_strategy(strategy, as_of_iso)["cumulative"]
     strat_cum = cached["strat_cum"]
     bench1_name = cached["bench1_name"]
@@ -234,28 +242,162 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
     bench2_name = cached["bench2_name"]
     bench2_cum = cached["bench2_cum"]
 
+    if strat_cum is None or len(strat_cum) == 0:
+        _data_unavailable_card("No cumulative return data")
+        return
+
+    # ── Range bounds from the actual data ───────────────────────────────
+    series_start = strat_cum.index.min().date()
+    series_end = strat_cum.index.max().date()
+
+    # Session state keys are namespaced per strategy so QDVD/DCP/etc.
+    # don't share a single range (their inceptions differ). These are
+    # ALSO the date_input widget keys — Streamlit lets you set widget
+    # state directly via session_state before the widget is constructed,
+    # which is how preset buttons update the date pickers.
+    sk_start = f"perf_range_start_{strategy}"
+    sk_end = f"perf_range_end_{strategy}"
+
+    # Initialize on first render. If a stale value exists from another
+    # strategy (or out-of-range), clamp it to the current strategy bounds.
+    def _clamp(d):
+        if d < series_start:
+            return series_start
+        if d > series_end:
+            return series_end
+        return d
+
+    if sk_start not in st.session_state:
+        st.session_state[sk_start] = series_start
+    else:
+        st.session_state[sk_start] = _clamp(st.session_state[sk_start])
+    if sk_end not in st.session_state:
+        st.session_state[sk_end] = series_end
+    else:
+        st.session_state[sk_end] = _clamp(st.session_state[sk_end])
+
+    # ── Preset helpers ──────────────────────────────────────────────────
+    import datetime as _dt
+    today = series_end  # use latest data point as anchor for preset math
+
+    def _apply_preset(years=None, ytd=False, inception=False):
+        if inception:
+            new_start = series_start
+        elif ytd:
+            new_start = _dt.date(today.year, 1, 1)
+        elif years is not None:
+            try:
+                new_start = today.replace(year=today.year - years)
+            except ValueError:
+                new_start = today.replace(year=today.year - years, day=28)
+        else:
+            return
+        # Write directly to widget keys so date_input picks up the change.
+        st.session_state[sk_start] = max(new_start, series_start)
+        st.session_state[sk_end] = series_end
+
+    # Layout: six narrow preset buttons, then two date pickers
+    preset_cols = st.columns([1, 1, 1, 1, 1, 1, 2, 2])
+    if preset_cols[0].button("YTD", key=f"preset_ytd_{strategy}", use_container_width=True):
+        _apply_preset(ytd=True)
+        st.rerun()
+    if preset_cols[1].button("1Y", key=f"preset_1y_{strategy}", use_container_width=True):
+        _apply_preset(years=1)
+        st.rerun()
+    if preset_cols[2].button("3Y", key=f"preset_3y_{strategy}", use_container_width=True):
+        _apply_preset(years=3)
+        st.rerun()
+    if preset_cols[3].button("5Y", key=f"preset_5y_{strategy}", use_container_width=True):
+        _apply_preset(years=5)
+        st.rerun()
+    if preset_cols[4].button("10Y", key=f"preset_10y_{strategy}", use_container_width=True):
+        _apply_preset(years=10)
+        st.rerun()
+    if preset_cols[5].button("All", key=f"preset_all_{strategy}", use_container_width=True):
+        _apply_preset(inception=True)
+        st.rerun()
+
+    # date_input widgets — NO `value=` parameter when key is already in
+    # session_state; Streamlit reads the value from session_state directly.
+    # This is what lets the preset buttons drive the date pickers.
+    with preset_cols[6]:
+        st.date_input(
+            "From",
+            min_value=series_start,
+            max_value=series_end,
+            key=sk_start,
+            format="MM/DD/YYYY",
+        )
+    with preset_cols[7]:
+        st.date_input(
+            "To",
+            min_value=series_start,
+            max_value=series_end,
+            key=sk_end,
+            format="MM/DD/YYYY",
+        )
+
+    # Read the current values from session state (post-widget interaction)
+    range_start = st.session_state[sk_start]
+    range_end = st.session_state[sk_end]
+
+    # date_input can occasionally return tuples for ranged mode; we used
+    # scalar mode but normalize defensively.
+    if isinstance(range_start, (list, tuple)):
+        range_start = range_start[0]
+    if isinstance(range_end, (list, tuple)):
+        range_end = range_end[0]
+
+    invalid_msg = None
+    if range_start > range_end:
+        invalid_msg = "Start date is after end date — showing full range instead."
+        range_start, range_end = series_start, series_end
+
+    # ── Filter and rebase ───────────────────────────────────────────────
+    range_start_ts = pd.Timestamp(range_start)
+    range_end_ts = pd.Timestamp(range_end)
+
+    def _slice_and_rebase(series):
+        """Slice to [start, end] and rebase to 100 at the new start."""
+        if series is None or len(series) == 0:
+            return series
+        mask = (series.index >= range_start_ts) & (series.index <= range_end_ts)
+        sliced = series[mask]
+        if len(sliced) == 0:
+            return sliced
+        return sliced / sliced.iloc[0] * 100.0
+
+    strat_plot = _slice_and_rebase(strat_cum)
+    bench1_plot = _slice_and_rebase(bench1_cum) if bench1_cum is not None and len(bench1_cum) > 0 else bench1_cum
+    bench2_plot = _slice_and_rebase(bench2_cum) if bench2_cum is not None and len(bench2_cum) > 0 else bench2_cum
+
+    if strat_plot is None or len(strat_plot) < 2:
+        st.caption("Selected range has too few data points — try a wider window.")
+        return
+
+    # ── Plot ────────────────────────────────────────────────────────────
     fig = go.Figure()
     r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
 
     fig.add_trace(go.Scatter(
-        x=strat_cum.index, y=strat_cum.values,
+        x=strat_plot.index, y=strat_plot.values,
         name=name, fill="tozeroy",
         fillcolor=f"rgba({r},{g},{b},0.06)",
         line=dict(color=color, width=2.5),
         hovertemplate="%{x|%b %Y}<br>" + name + ": $%{y:.0f}<extra></extra>",
     ))
 
-    if len(bench1_cum) > 0 and bench1_name:
+    if bench1_plot is not None and len(bench1_plot) > 0 and bench1_name:
         fig.add_trace(go.Scatter(
-            x=bench1_cum.index, y=bench1_cum.values,
+            x=bench1_plot.index, y=bench1_plot.values,
             name=bench1_name,
             line=dict(color="rgba(255,255,255,0.35)", width=1.5, dash="dot"),
             hovertemplate="%{x|%b %Y}<br>" + bench1_name + ": $%{y:.0f}<extra></extra>",
         ))
 
-    if len(bench2_cum) > 0 and bench2_name:
+    if bench2_plot is not None and len(bench2_plot) > 0 and bench2_name:
         fig.add_trace(go.Scatter(
-            x=bench2_cum.index, y=bench2_cum.values,
+            x=bench2_plot.index, y=bench2_plot.values,
             name=bench2_name,
             line=dict(color="rgba(201,168,76,0.4)", width=1.5, dash="dash"),
             hovertemplate="%{x|%b %Y}<br>" + bench2_name + ": $%{y:.0f}<extra></extra>",
@@ -273,12 +415,21 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
         hovermode="x unified",
         showlegend=True,
     )
+
+    # Title line includes the actual rendered range (snaps to data points)
+    actual_start = strat_plot.index.min().strftime("%b %Y")
+    actual_end = strat_plot.index.max().strftime("%b %Y")
     st.markdown(
         f'<div style="font-size:14px;font-weight:600;color:rgba(255,255,255,0.8);margin-bottom:4px;">'
-        f'Growth of $100 — {name} vs Benchmarks (Gross)</div>',
+        f'Growth of $100 — {name} vs Benchmarks (Gross) '
+        f'<span style="font-weight:400;color:rgba(255,255,255,0.4);font-size:12px;">'
+        f'· {actual_start} – {actual_end}</span></div>',
         unsafe_allow_html=True,
     )
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+
+    if invalid_msg:
+        st.caption(invalid_msg)
 
 
 # ── Risk Metrics ────────────────────────────────────────────────────────────
