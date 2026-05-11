@@ -365,7 +365,7 @@ def _render_risk_metrics(comp_df, strategy, color, as_of_iso):
         cards_html = ""
         for label, val, val_color in metrics:
             cards_html += f"""<div style="
-                flex:1 1 130px; min-width:100px;
+                flex:1 1 110px; min-width:90px;
                 background:rgba(255,255,255,0.02);
                 border:1px solid rgba(255,255,255,0.05);
                 border-radius:8px; padding:10px 12px;
