@@ -1,0 +1,52 @@
+name: Prefetch Slow (Warbook Metrics)
+
+# Sprint 23E — runs once a day before market open to populate the
+# warbook_metrics Supabase table with slow-path yfinance fields
+# (ROE, FCF yield, debt ratios, sub-industry, coverage ratios, etc.).
+#
+# This workflow does NOT run during market hours — those slots are reserved
+# for the fast prefetch (prefetch.yml). The slow yfinance financial-statement
+# queries take 8-12 minutes and would interfere with the 15-min fast cadence.
+
+on:
+  schedule:
+    # 12:00 UTC daily = 7:00 AM EST / 8:00 AM EDT. Before market open in
+    # both timezones, after most overnight yfinance updates have settled.
+    # GitHub schedules use UTC and ignore DST.
+    - cron: "0 12 * * *"
+
+  # Manual trigger for the one-time backfill and any ad-hoc refreshes.
+  # GitHub Actions UI → "Run workflow" button on this workflow's page.
+  workflow_dispatch:
+
+jobs:
+  prefetch-slow:
+    runs-on: ubuntu-latest
+    # Generous timeout — the slow path is throttle-bound, not CPU-bound.
+    # ~60 tickers × 0.5s throttle + per-ticker financial-statement HTTP cost
+    # typically runs 8-12 min. 30 min gives headroom for yfinance hiccups.
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance pandas requests
+
+      - name: Run slow prefetch
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        # --force bypasses the market-hours gate (since we WANT this to run
+        # before market open, not during). The slow mode doesn't auto-detect
+        # via --mode auto so this is required even though the cron schedule
+        # already targets off-hours.
+        run: python prefetch_cloud.py --mode slow --force
