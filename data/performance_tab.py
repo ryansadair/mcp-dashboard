@@ -376,7 +376,12 @@ def _render_monthly_heatmap(comp_df, strategy, color, as_of_iso):
         **_hm_layout,
         height=chart_height,
         xaxis=dict(side="top", fixedrange=True, tickfont=dict(size=10)),
-        yaxis=dict(autorange="reversed", fixedrange=True, dtick=1, tickfont=dict(size=10)),
+        # Sprint 24-1: drop autorange="reversed" so the largest numeric y
+        # (newest year) renders at the top of the heatmap. The upstream
+        # build_monthly_heatmap_data already sorts descending; combined
+        # with Plotly's default "higher y = higher position", this puts
+        # 2026 at top and the earliest year at the bottom.
+        yaxis=dict(fixedrange=True, dtick=1, tickfont=dict(size=10)),
     )
 
     # Title outside chart so it never overlaps month labels
