@@ -806,6 +806,133 @@ st.markdown("---")
 st.markdown('<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">Price Chart</div>', unsafe_allow_html=True)
 
 if not hist.empty:
+    # ── Stats card: FOCUS / LAST / 1D CHG / YTD / 52W RANGE ─────────────────
+    # Mirrors the look of the Markets tab focus charts. Computes everything
+    # from data already in hand (info + hist) — no extra API calls.
+    def _fmt_price(p):
+        try:
+            p = float(p)
+        except (TypeError, ValueError):
+            return "—"
+        if p <= 0:
+            return "—"
+        if p >= 10000:
+            return f"${p:,.0f}"
+        elif p >= 100:
+            return f"${p:,.2f}"
+        return f"${p:.2f}"
+
+    # Current price: prefer info, fall back to last close
+    _stat_price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
+    try:
+        _stat_price = float(_stat_price) if _stat_price else 0
+    except (TypeError, ValueError):
+        _stat_price = 0
+    if not _stat_price and len(hist) > 0:
+        try:
+            _stat_price = float(hist["Close"].iloc[-1])
+        except Exception:
+            _stat_price = 0
+
+    # 1D change from last two closes in hist
+    _stat_chg_pct = 0
+    if len(hist) >= 2:
+        try:
+            _last = float(hist["Close"].iloc[-1])
+            _prev = float(hist["Close"].iloc[-2])
+            if _prev > 0:
+                _stat_chg_pct = ((_last - _prev) / _prev) * 100
+        except Exception:
+            pass
+
+    # YTD: first close on or after Jan 1 of current year vs current price
+    _stat_ytd_pct = 0
+    try:
+        _year_start = pd.Timestamp(datetime(datetime.now().year, 1, 1))
+        _hist_idx = hist.index
+        if not isinstance(_hist_idx, pd.DatetimeIndex):
+            _hist_idx = pd.to_datetime(_hist_idx)
+        _ytd_slice = hist.loc[_hist_idx >= _year_start, "Close"]
+        if len(_ytd_slice) > 0 and _stat_price > 0:
+            _ytd_start_px = float(_ytd_slice.iloc[0])
+            if _ytd_start_px > 0:
+                _stat_ytd_pct = ((_stat_price - _ytd_start_px) / _ytd_start_px) * 100
+    except Exception:
+        pass
+
+    # 52W high/low from the trailing 252 trading days
+    _stat_high_52w = 0
+    _stat_low_52w = 0
+    try:
+        _last252 = hist["Close"].tail(252).dropna()
+        if len(_last252) > 0:
+            _stat_high_52w = float(_last252.max())
+            _stat_low_52w = float(_last252.min())
+    except Exception:
+        pass
+
+    _chg_color = "#569542" if _stat_chg_pct >= 0 else "#c45454"
+    _ytd_color = "#569542" if _stat_ytd_pct >= 0 else "#c45454"
+
+    # 52W marker position (0–100% from low)
+    if _stat_high_52w > _stat_low_52w > 0 and _stat_price > 0:
+        _pos_pct = ((_stat_price - _stat_low_52w) / (_stat_high_52w - _stat_low_52w)) * 100
+        _pos_pct = max(0, min(100, _pos_pct))
+    else:
+        _pos_pct = 50
+
+    _name_display = info.get("shortName") or info.get("longName") or ticker_input
+    if len(_name_display) > 28:
+        _name_display = _name_display[:26] + "…"
+
+    _range_bar_html = (
+        f'<div style="position:relative;height:6px;background:rgba(255,255,255,0.06);'
+        f'border-radius:3px;margin-top:6px;">'
+        f'<div style="position:absolute;left:{_pos_pct:.1f}%;top:-3px;'
+        f'width:2px;height:12px;background:#C9A84C;border-radius:1px;'
+        f'transform:translateX(-1px);"></div>'
+        f'</div>'
+    )
+
+    _stats_html = (
+        '<div style="display:flex;gap:28px;align-items:flex-start;padding:14px 16px;'
+        'background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);'
+        'border-radius:8px;margin:8px 0 12px;flex-wrap:wrap;">'
+        # Focus / Ticker / Name
+        f'<div style="min-width:140px;">'
+        f'<div style="font-size:10px;color:rgba(255,255,255,0.35);'
+        f'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">Focus</div>'
+        f'<div style="font-size:16px;font-weight:700;color:#C9A84C;'
+        f'font-family:monospace;letter-spacing:0.02em;">{ticker_input}</div>'
+        f'<div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:2px;">{_name_display}</div>'
+        f'</div>'
+        # Last
+        f'<div><div style="font-size:10px;color:rgba(255,255,255,0.35);'
+        f'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">Last</div>'
+        f'<div style="font-size:16px;font-weight:700;color:rgba(255,255,255,0.95);">'
+        f'{_fmt_price(_stat_price)}</div></div>'
+        # 1D Chg
+        f'<div><div style="font-size:10px;color:rgba(255,255,255,0.35);'
+        f'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">1D Chg</div>'
+        f'<div style="font-size:16px;font-weight:700;color:{_chg_color};">'
+        f'{_stat_chg_pct:+.2f}%</div></div>'
+        # YTD
+        f'<div><div style="font-size:10px;color:rgba(255,255,255,0.35);'
+        f'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">YTD</div>'
+        f'<div style="font-size:16px;font-weight:700;color:{_ytd_color};">'
+        f'{_stat_ytd_pct:+.2f}%</div></div>'
+        # 52W Range
+        f'<div style="min-width:160px;">'
+        f'<div style="font-size:10px;color:rgba(255,255,255,0.35);'
+        f'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">52W Range</div>'
+        f'<div style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.85);">'
+        f'{_fmt_price(_stat_low_52w)} – {_fmt_price(_stat_high_52w)}</div>'
+        f'{_range_bar_html}'
+        f'</div>'
+        '</div>'
+    )
+    st.markdown(_stats_html, unsafe_allow_html=True)
+
     period_options = {"1M": 21, "3M": 63, "YTD": None, "1Y": 252, "2Y": 504, "3Y": 756, "5Y": 1260, "10Y": 2520, "Max": 0}
     if "chart_period" not in st.session_state:
         st.session_state["chart_period"] = "1Y"
