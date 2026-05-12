@@ -546,18 +546,24 @@ def render_macro_tab(qdvd_yield=None):
     if vix_price:
         vix_color = "#569542" if vix_price < 16 else "#C9A84C" if vix_price < 25 else "#c45454"
         sentiment_items.append(("VIX", f"{vix_price:.2f}", vix_color))
+    else:
+        sentiment_items.append(("VIX", "—", "rgba(255,255,255,0.3)"))
 
     # UMich Sentiment
     um_latest, um_prev, _ = _fred_latest("UMCSENT")
     if um_latest:
         um_color = "#569542" if um_latest > 80 else "#C9A84C" if um_latest > 60 else "#c45454"
         sentiment_items.append(("UMich Sentiment", f"{um_latest:.1f}", um_color))
+    else:
+        sentiment_items.append(("UMich Sentiment", "—", "rgba(255,255,255,0.3)"))
 
     # Yield curve signal
     if spread_bp is not None:
         curve_label_s = "Normal" if spread_bp > 0 else "Inverted"
         curve_color_s = "#569542" if spread_bp > 0 else "#c45454"
         sentiment_items.append(("Yield Curve", f"{curve_label_s} ({spread_bp:+d}bp)", curve_color_s))
+    else:
+        sentiment_items.append(("Yield Curve", "—", "rgba(255,255,255,0.3)"))
 
     # Build sentiment rows HTML
     sent_rows_html = ""
@@ -598,6 +604,7 @@ def render_macro_tab(qdvd_yield=None):
                 border-radius: 8px;
                 padding: 4px 16px;
                 height: calc(100% - 40px);
+                min-height: 220px;
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
@@ -701,8 +708,18 @@ def render_macro_tab(qdvd_yield=None):
             )
 
     with col_fed:
-        st.markdown("**Fed Meeting Calendar**")
-        st.caption("Kalshi prediction-market implied · 15-min cache")
+        # Match the uppercase title styling used by Dividend Strategy Context
+        # and Sentiment in the left panel so all three header rows line up
+        # height-wise across the row.
+        st.markdown(
+            '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
+            'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
+            'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:12px">'
+            'Fed Meeting Calendar</div>'
+            '<div style="font-size:11px;color:rgba(255,255,255,0.35);margin:-8px 0 8px;">'
+            'Kalshi prediction-market implied · 15-min cache</div>',
+            unsafe_allow_html=True,
+        )
 
         # Sprint 25-3: Live Kalshi data replaces the hardcoded calendar.
         # Math: for each upcoming FOMC meeting, we read the Kalshi market
