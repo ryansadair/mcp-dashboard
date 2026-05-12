@@ -5,6 +5,13 @@ data/watchlist_tab.py
 Reads from data/Watchlists.xlsx (5 sheets, ticker-only).
 Dropdown selector switches between watchlists.
 yfinance enriches with live price, valuation, and dividend data.
+
+Sprint 25-2: converted from custom HTML table to st.dataframe with row
+selection. Drill-through to the Stock Detail page now matches the
+Holdings tab pattern. Sortable columns come for free. The custom red /
+gold / green tier coloring on "% From 52W Hi" is gone — Streamlit's
+NumberColumn doesn't support value-based color tiers. Sortability +
+drill-through is the better trade.
 """
 
 import streamlit as st
@@ -13,7 +20,7 @@ from datetime import datetime
 
 from utils.config import normalize_sector
 
-# Brand colors
+# Brand colors — used by the yield comparison chart at the bottom
 GREEN = "#569542"
 BLUE = "#07415A"
 GOLD = "#C9A84C"
@@ -96,17 +103,18 @@ def render_watchlist_tab():
         live_data = _enrich_tickers(tuple(tickers))
 
     # ── Build display rows ─────────────────────────────────────────────────
+    # All values stay numeric so st.dataframe can sort them properly. The
+    # NumberColumn formatters below handle the $ / % / decimals display.
     rows = []
     for tk in tickers:
         live = live_data.get(tk, {})
-        price = live.get("current_price", 0)
-        hi = live.get("52w_high", 0)
-        lo = live.get("52w_low", 0)
+        price = live.get("current_price", 0) or 0
+        hi = live.get("52w_high", 0) or 0
+        lo = live.get("52w_low", 0) or 0
 
-        # % From 52W Hi — Holdings-tab convention. Negative = below the high
-        # (typical case). None when we lack price/hi data so the formatter
-        # can render an em dash. Sprint 20: replaced the prior "52W Range"
-        # column (position-within-range %) with this MCP-standard metric.
+        # % From 52W Hi — Holdings-tab convention. Negative = below the high.
+        # None when we lack price/hi data so the formatter can render it
+        # as em-dash (st.column_config drops NaN to "—" by default).
         if hi > 0 and price > 0:
             from_hi = round((price - hi) / hi * 100, 2)
         else:
@@ -114,56 +122,75 @@ def render_watchlist_tab():
 
         rows.append({
             "Ticker": tk,
-            "Company": live.get("company_name", ""),
+            "Company": live.get("company_name", "") or "",
             "Sector": normalize_sector(live.get("sector", "")),
-            "Price": price,
-            "Div Yield": min(live.get("dividend_yield", 0), 15),  # cap at 15% — no legit equity yield is higher
-            "P/E": live.get("pe_ratio", 0),
-            "Fwd P/E": live.get("forward_pe", 0),
-            "P/B": live.get("price_to_book", 0),
-            "Beta": live.get("beta", 0),
-            "Mkt Cap": live.get("market_cap", ""),
+            "Price": price if price > 0 else None,
+            # Cap insane-looking yields at 15% (data quality guard)
+            "Div Yield": min(live.get("dividend_yield", 0) or 0, 15) or None,
+            "P/E": live.get("pe_ratio", 0) or None,
+            "Fwd P/E": live.get("forward_pe", 0) or None,
+            "P/B": live.get("price_to_book", 0) or None,
+            "Beta": live.get("beta", 0) or None,
+            "Mkt Cap": live.get("market_cap", "") or "",
             "% From 52W Hi": from_hi,
-            "52W High": hi,
-            "52W Low": lo,
         })
 
     display_df = pd.DataFrame(rows)
 
     # ── KPI Cards ──────────────────────────────────────────────────────────
-    avg_yield = display_df["Div Yield"].mean() if not display_df.empty else 0
-    pe_valid = display_df[display_df["P/E"] > 0]
-    avg_pe = pe_valid["P/E"].mean() if len(pe_valid) > 0 else 0
-    fwd_valid = display_df[display_df["Fwd P/E"] > 0]
-    avg_fwd_pe = fwd_valid["Fwd P/E"].mean() if len(fwd_valid) > 0 else 0
+    avg_yield = display_df["Div Yield"].dropna().mean() if not display_df.empty else 0
+    pe_valid = display_df["P/E"].dropna()
+    avg_pe = pe_valid.mean() if len(pe_valid) > 0 else 0
+    fwd_valid = display_df["Fwd P/E"].dropna()
+    avg_fwd_pe = fwd_valid.mean() if len(fwd_valid) > 0 else 0
 
     kc1, kc2, kc3, kc4 = st.columns(4)
     kc1.metric("Tickers", len(display_df))
-    kc2.metric("Avg Div Yield", f"{avg_yield:.2f}%")
-    kc3.metric("Avg P/E", f"{avg_pe:.1f}")
-    kc4.metric("Avg Fwd P/E", f"{avg_fwd_pe:.1f}")
+    kc2.metric("Avg Div Yield", f"{avg_yield:.2f}%" if pd.notna(avg_yield) else "—")
+    kc3.metric("Avg P/E", f"{avg_pe:.1f}" if pd.notna(avg_pe) and avg_pe > 0 else "—")
+    kc4.metric("Avg Fwd P/E", f"{avg_fwd_pe:.1f}" if pd.notna(avg_fwd_pe) and avg_fwd_pe > 0 else "—")
 
-    # ── Main Table ─────────────────────────────────────────────────────────
-    table_cols = ["Ticker", "Company", "Sector", "Price", "Div Yield",
-                  "P/E", "Fwd P/E", "P/B", "Beta", "Mkt Cap", "% From 52W Hi"]
-    table_df = display_df[table_cols].copy()
+    # ── Main Table — st.dataframe with single-row selection ────────────────
+    # Height calculation mirrors the Holdings tab — generous to prevent an
+    # internal scrollbar on mobile.
+    _df_height = min(80 + len(display_df) * 40, 2000)
 
-    # Format for display
-    table_df["Price"] = table_df["Price"].apply(lambda x: f"${x:.2f}" if x > 0 else "—")
-    table_df["Div Yield"] = table_df["Div Yield"].apply(lambda x: f"{x:.2f}%" if x > 0 else "—")
-    table_df["P/E"] = table_df["P/E"].apply(lambda x: f"{x:.2f}" if x > 0 else "—")
-    table_df["Fwd P/E"] = table_df["Fwd P/E"].apply(lambda x: f"{x:.2f}" if x > 0 else "—")
-    table_df["P/B"] = table_df["P/B"].apply(lambda x: f"{x:.2f}" if x > 0 else "—")
-    table_df["Beta"] = table_df["Beta"].apply(lambda x: f"{x:.2f}" if x > 0 else "—")
-    table_df["% From 52W Hi"] = table_df["% From 52W Hi"].apply(
-        lambda x: f"{x:+.2f}%" if isinstance(x, (int, float)) else "—"
+    event = st.dataframe(
+        display_df,
+        width="stretch",
+        hide_index=True,
+        height=_df_height,
+        selection_mode="single-row",
+        on_select="rerun",
+        key="watchlist_table",
+        column_config={
+            "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+            "Company": st.column_config.TextColumn("Company", width="medium"),
+            "Sector": st.column_config.TextColumn("Sector", width="medium"),
+            "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
+            "Div Yield": st.column_config.NumberColumn("Div Yield", format="%.2f%%"),
+            "P/E": st.column_config.NumberColumn("P/E", format="%.2f"),
+            "Fwd P/E": st.column_config.NumberColumn("Fwd P/E", format="%.2f"),
+            "P/B": st.column_config.NumberColumn("P/B", format="%.2f"),
+            "Beta": st.column_config.NumberColumn("Beta", format="%.2f"),
+            "Mkt Cap": st.column_config.TextColumn("Mkt Cap", width="small"),
+            "% From 52W Hi": st.column_config.NumberColumn("% From Hi", format="%+.2f%%"),
+        },
     )
 
-    html = _build_watchlist_html(table_df)
-    st.markdown(html, unsafe_allow_html=True)
+    # ── Drill-through to Stock Detail when a row is selected ───────────────
+    # Same pattern as Holdings tab and Dividends Detail sub-tab.
+    if event and event.selection and event.selection.rows:
+        selected_idx = event.selection.rows[0]
+        selected_ticker = display_df.iloc[selected_idx]["Ticker"]
+        st.session_state["detail_ticker"] = selected_ticker
+        st.query_params["ticker"] = selected_ticker
+        st.switch_page("pages/2_Stock_Detail.py")
 
     # ── Yield Chart ────────────────────────────────────────────────────────
-    yield_df = display_df[display_df["Div Yield"] > 0][["Ticker", "Div Yield"]].sort_values("Div Yield", ascending=True)
+    yield_df = display_df[display_df["Div Yield"].notna() & (display_df["Div Yield"] > 0)][
+        ["Ticker", "Div Yield"]
+    ].sort_values("Div Yield", ascending=True)
     if not yield_df.empty and len(yield_df) > 1:
         st.markdown("---")
         st.markdown("**Dividend Yield Comparison**")
@@ -199,69 +226,4 @@ def render_watchlist_tab():
             "staticPlot": True,
         })
 
-    st.caption(f"Data via yfinance · {datetime.now().strftime('%I:%M %p PT')}")
-
-
-def _build_watchlist_html(df):
-    """Dark-themed HTML table matching Martin Capital styling."""
-    header_style = (
-        "padding:8px 10px; font-size:10px; font-weight:600; "
-        "color:rgba(255,255,255,0.35); text-transform:uppercase; "
-        "letter-spacing:0.06em; border-bottom:1px solid rgba(255,255,255,0.08); "
-        "text-align:right; white-space:nowrap;"
-    )
-    cell_style = (
-        "padding:10px 10px; font-size:13px; color:rgba(255,255,255,0.65); "
-        "border-bottom:1px solid rgba(255,255,255,0.03); text-align:right; white-space:nowrap;"
-    )
-    left_align = "text-align:left;"
-
-    html = '<div style="overflow-x:auto;">'
-    html += '<table style="width:100%; border-collapse:collapse; font-family:DM Sans, sans-serif;">'
-
-    # Header
-    html += "<thead><tr>"
-    for col in df.columns:
-        align = left_align if col in ("Ticker", "Company", "Sector") else ""
-        html += f'<th style="{header_style}{align}">{col}</th>'
-    html += "</tr></thead>"
-
-    # Rows
-    html += "<tbody>"
-    for _, row in df.iterrows():
-        html += "<tr>"
-        for col in df.columns:
-            val = row[col]
-            align = left_align if col in ("Ticker", "Company", "Sector") else ""
-
-            if col == "Ticker":
-                style = f'{cell_style}{align}font-weight:600; color:{GOLD}; letter-spacing:0.03em;'
-            elif col == "Company":
-                style = f'{cell_style}{align}color:rgba(255,255,255,0.7);'
-            elif col == "Div Yield" and val != "—":
-                style = f'{cell_style}{align}color:{GOLD};'
-            elif col == "Sector":
-                style = f'{cell_style}{align}color:rgba(255,255,255,0.45); font-size:12px;'
-            elif col == "% From 52W Hi" and val != "—":
-                # Parse the leading sign+number for color tiers. At-or-near
-                # the high reads green; -10 to -20% gold; beyond -20% red.
-                try:
-                    _v = float(str(val).rstrip("%"))
-                    if _v >= -2:
-                        _c = GREEN
-                    elif _v >= -10:
-                        _c = "rgba(255,255,255,0.75)"
-                    elif _v >= -20:
-                        _c = GOLD
-                    else:
-                        _c = RED
-                except (ValueError, TypeError):
-                    _c = "rgba(255,255,255,0.65)"
-                style = f'{cell_style}{align}color:{_c};'
-            else:
-                style = f'{cell_style}{align}'
-
-            html += f'<td style="{style}">{val}</td>'
-        html += "</tr>"
-    html += "</tbody></table></div>"
-    return html
+    st.caption(f"Data via yfinance · Click any row to view full Stock Detail · {datetime.now().strftime('%I:%M %p PT')}")
