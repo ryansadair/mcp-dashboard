@@ -2,25 +2,24 @@
 Martin Capital Partners — News & Alerts Tab
 data/alerts_tab.py
 
-Top section: Market news headlines from RSS feeds (CNBC, MarketWatch).
-Bottom section: Portfolio alerts computed live from Supabase data.
-
-News sources (RSS, no API keys needed):
-  - MarketWatch Top Stories
-  - CNBC Top News
-  - CNBC Economy
-
-Alert types:
+Section order (top to bottom):
   1. Price Movers     — holdings with ±2% daily change
-  2. Dividend Events  — upcoming ex-dates, recent increases/cuts
-  3. Earnings Dates   — holdings reporting within the next 14 days
-  4. 52-Week Extremes — holdings within 5% of 52-week high or low
+  2. Dividend Events  — upcoming ex-dates within 14 days
+  3. Upcoming Earnings — holdings reporting within the next 14 days
+  4. Market Headlines — markets-focused RSS feeds
+  5. Holdings News    — filtered ticker-specific news (quality-sourced)
+
+News filtering:
+  - Holdings news requires ticker symbol or company name in the title.
+  - Listicle/clickbait patterns are blocklisted ("3 stocks to buy", etc.).
+  - Junk publishers (Zacks, MarketBeat, Motley Fool, InvestorPlace, etc.) are
+    suppressed unless they are the only available source for a holding.
 
 Data sources:
-  - RSS feeds via feedparser (cached 15 min)
-  - Supabase prices table (change_1d_pct, week52_high, week52_low, price)
-  - Supabase dividends table (ex_dividend_date, div_growth_1y, dividend_rate)
-  - yfinance earnings dates (fetched live, cached 1hr)
+  - RSS feeds via feedparser (cached 15 min) — CNBC/MarketWatch/Reuters/WSJ Markets
+  - Supabase prices table (change_1d_pct, price)
+  - Supabase dividends table (ex_dividend_date, dividend_rate)
+  - yfinance earnings dates (cached 1 hr) and ticker news (cached 15 min)
 """
 
 import streamlit as st
@@ -212,48 +211,26 @@ def _earnings_alerts(tickers, price_data, days_ahead=14):
     return alerts
 
 
-def _proximity_alerts(tickers, price_data, threshold_pct=5.0):
-    """
-    Flag holdings near their 52-week high or low.
-    Returns list of alert dicts.
-    """
-    alerts = []
+def _build_ticker_name_map(tickers, price_data):
+    """Map each ticker to a set of strings (ticker + name tokens) used for
+    relevance matching in holdings-news filtering."""
+    out = {}
     for ticker in tickers:
         mkt = price_data.get(ticker, {})
-        price = mkt.get("price", 0) or 0
-        hi = mkt.get("52w_high", 0) or 0
-        lo = mkt.get("52w_low", 0) or 0
-        name = mkt.get("name", ticker)
-
-        if price <= 0 or hi <= 0:
-            continue
-
-        pct_from_hi = ((price - hi) / hi) * 100
-        pct_from_lo = ((price - lo) / lo) * 100 if lo > 0 else 999
-
-        if abs(pct_from_hi) <= threshold_pct:
-            alerts.append({
-                "type": "52w",
-                "severity": "positive",
-                "ticker": ticker,
-                "title": f"{ticker} near 52-week high (<span style='color:#569542'>{pct_from_hi:+.1f}%</span>)",
-                "detail": f"{name} — ${price:.2f} vs high ${hi:.2f}",
-                "value": pct_from_hi,
-                "sort_key": abs(pct_from_hi),
-            })
-        elif pct_from_lo <= threshold_pct:
-            alerts.append({
-                "type": "52w",
-                "severity": "warning",
-                "ticker": ticker,
-                "title": f"{ticker} near 52-week low (<span style='color:#c45454'>+{pct_from_lo:.1f}%</span> from low)",
-                "detail": f"{name} — ${price:.2f} vs low ${lo:.2f}",
-                "value": pct_from_lo,
-                "sort_key": pct_from_lo,
-            })
-
-    alerts.sort(key=lambda a: a["sort_key"])
-    return alerts
+        name = (mkt.get("name") or "").strip()
+        tokens = {ticker.upper()}
+        if name:
+            # First word of the company name, stripped of common suffixes
+            cleaned = name.replace(",", "").replace(".", "")
+            for suffix in (" Inc", " Corp", " Corporation", " Company", " Co",
+                           " Ltd", " LLC", " Holdings", " Group", " Plc",
+                           " The", "The "):
+                cleaned = cleaned.replace(suffix, "")
+            first = cleaned.strip().split(" ")[0]
+            if len(first) >= 3:
+                tokens.add(first.lower())
+        out[ticker] = tokens
+    return out
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -273,7 +250,6 @@ def _render_alert_row(alert):
         "price": "PRICE",
         "dividend": "DIVIDEND",
         "earnings": "EARNINGS",
-        "52w": "52-WEEK",
     }
     type_str = type_labels.get(atype, atype.upper())
 
@@ -322,22 +298,27 @@ def _render_alert_section(title, alerts):
 # NEWS HEADLINES (RSS + Holdings)
 # ══════════════════════════════════════════════════════════════════════════
 
-# RSS feed sources — free, no API keys, reliable
+# RSS feed sources — markets-focused, free, no API keys
 _NEWS_FEEDS = [
     {
-        "name": "MarketWatch",
-        "url": "https://feeds.marketwatch.com/marketwatch/topstories/",
-        "color": GREEN,
-    },
-    {
-        "name": "CNBC",
-        "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+        "name": "CNBC Markets",
+        "url": "https://www.cnbc.com/id/15839069/device/rss/rss.html",
         "color": BLUE,
     },
     {
-        "name": "CNBC Economy",
-        "url": "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+        "name": "MarketWatch Markets",
+        "url": "https://feeds.marketwatch.com/marketwatch/marketpulse/",
+        "color": GREEN,
+    },
+    {
+        "name": "Reuters Business",
+        "url": "https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best",
         "color": GOLD,
+    },
+    {
+        "name": "WSJ Markets",
+        "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+        "color": "#a06868",
     },
 ]
 
@@ -396,13 +377,65 @@ def _fetch_news_headlines(max_per_feed=5, max_total=12):
 
 
 @st.cache_data(ttl=900, show_spinner=False)
-def _fetch_holdings_news(tickers_tuple, max_total=15):
+def _fetch_holdings_news(tickers_tuple, ticker_tokens_tuple=(), max_total=15):
     """
     Fetch news for portfolio holdings via yfinance .news property.
-    Batches requests with short delays to avoid rate limits.
-    Cached 15 min. Returns list of dicts similar to RSS headlines.
+    Filters applied in order:
+      1. Title must mention the ticker symbol or company name token.
+      2. Listicle/clickbait patterns are dropped.
+      3. Junk publishers are dropped unless they are the only source for that ticker.
+
+    Args:
+        tickers_tuple: tuple of ticker symbols.
+        ticker_tokens_tuple: tuple of (ticker, frozenset(tokens)) for relevance matching.
+        max_total: max headlines to return.
     """
     import time as _time
+    import re
+
+    # Token map (ticker → set of strings the title must mention)
+    token_map = {t: set(toks) for t, toks in ticker_tokens_tuple} if ticker_tokens_tuple else {}
+
+    # Clickbait / listicle patterns — case-insensitive
+    listicle_patterns = [
+        r"\b\d+\s+(top|best|great|hot|cheap|safe|reliable|favorite|smart)\b",
+        r"\btop\s+\d+\b",
+        r"\bbest\s+(stocks?|dividend|growth|value|reits?)\b",
+        r"\bstocks?\s+to\s+buy\b",
+        r"\bstocks?\s+to\s+watch\b",
+        r"\bstocks?\s+to\s+own\b",
+        r"\bshould\s+you\s+buy\b",
+        r"\bwhy\s+(i'?m|i\s+am)\s+buying\b",
+        r"\bretirement\s+income\b",
+        r"\bdividend\s+(stocks?|picks?|champions?|kings?|aristocrats?)\s+(to|for)\b",
+        r"\bmaximize\s+(your\s+)?(retirement|income|wealth)\b",
+        r"\bpassive\s+income\b",
+        r"\b(buy|sell)\s+the\s+dip\b",
+        r"\bmillionaire(s|aire)?\b",
+        r"\b(could|will|can)\s+make\s+you\s+(rich|wealthy)\b",
+        r"\bunder\s+\$?\d+\s+(to\s+buy|right\s+now)\b",
+    ]
+    listicle_re = re.compile("|".join(listicle_patterns), re.IGNORECASE)
+
+    # Junk publishers — kept only if they're a holding's sole source
+    junk_publishers = {
+        "zacks", "zacks investment research", "marketbeat",
+        "the motley fool", "motley fool", "fool.com",
+        "investorplace", "benzinga", "gurufocus", "insider monkey",
+        "simply wall st", "simply wall street", "247 wall st",
+        "24/7 wall st", "smartasset", "investopedia",
+        "valuewalk", "talkmarkets", "tipranks",
+    }
+
+    # Quality publishers — always preferred when available
+    quality_publishers = {
+        "reuters", "bloomberg", "wall street journal", "wsj",
+        "financial times", "ft", "barron's", "barrons",
+        "seeking alpha", "cnbc", "marketwatch", "the new york times",
+        "new york times", "nyt", "associated press", "ap",
+        "bbc", "axios", "fortune", "forbes",
+    }
+
     headlines = []
     seen_titles = set()
 
@@ -412,17 +445,32 @@ def _fetch_holdings_news(tickers_tuple, max_total=15):
         return []
 
     for ticker in tickers_tuple:
+        tokens = token_map.get(ticker, {ticker.upper()})
+        # Lowercase variants for matching
+        tokens_lower = {t.lower() for t in tokens}
+
+        # Per-ticker pool so we can apply quality filter at the end
+        ticker_pool = []
+
         try:
             tk = yf.Ticker(ticker)
             news = tk.news
             if not news:
                 continue
-            for item in news[:3]:
+            for item in news[:5]:  # pull a few extra, we'll filter down
                 content = item.get("content", {})
                 title = content.get("title", "").strip()
                 if not title or title in seen_titles:
                     continue
-                seen_titles.add(title)
+
+                # ── Filter 1: Title-relevance ──────────────────────────────
+                title_lower = title.lower()
+                if not any(tok in title_lower for tok in tokens_lower):
+                    continue
+
+                # ── Filter 2: Listicle / clickbait blocklist ───────────────
+                if listicle_re.search(title):
+                    continue
 
                 # Parse publish time
                 pub_str = ""
@@ -444,9 +492,14 @@ def _fetch_holdings_news(tickers_tuple, max_total=15):
                         pass
 
                 provider = content.get("provider", {}).get("displayName", "")
+                provider_lower = provider.lower().strip()
                 link = content.get("canonicalUrl", {}).get("url", "")
 
-                headlines.append({
+                # Classify publisher
+                is_quality = any(qp in provider_lower for qp in quality_publishers)
+                is_junk = any(jp == provider_lower or jp in provider_lower for jp in junk_publishers)
+
+                ticker_pool.append({
                     "title": title,
                     "link": link,
                     "source": provider or "yfinance",
@@ -454,7 +507,26 @@ def _fetch_holdings_news(tickers_tuple, max_total=15):
                     "published": pub_str,
                     "sort_ts": sort_ts,
                     "ticker": ticker,
+                    "is_quality": is_quality,
+                    "is_junk": is_junk,
                 })
+
+            # ── Filter 3: Prefer quality; only fall back to junk if it's all we have
+            if ticker_pool:
+                quality_items = [x for x in ticker_pool if x["is_quality"]]
+                neutral_items = [x for x in ticker_pool if not x["is_quality"] and not x["is_junk"]]
+                junk_items = [x for x in ticker_pool if x["is_junk"]]
+
+                # Keep quality + neutral. Only use junk if there are no quality/neutral results.
+                kept = quality_items + neutral_items
+                if not kept and junk_items:
+                    kept = junk_items[:1]  # one junk item max as fallback
+
+                for item in kept:
+                    if item["title"] not in seen_titles:
+                        seen_titles.add(item["title"])
+                        headlines.append(item)
+
             _time.sleep(0.1)
         except Exception:
             continue
@@ -467,7 +539,7 @@ def _fetch_holdings_news(tickers_tuple, max_total=15):
     return headlines[:max_total]
 
 
-def _render_news_section(tickers=None):
+def _render_news_section(tickers=None, ticker_tokens_tuple=()):
     """Render the news headlines section: market news + holdings news."""
     headlines = _fetch_news_headlines()
 
@@ -520,7 +592,7 @@ def _render_news_section(tickers=None):
     # ── Holdings News ─────────────────────────────────────────────────────
     if tickers:
         with st.spinner("Fetching holdings news..."):
-            holdings_news = _fetch_holdings_news(tuple(tickers))
+            holdings_news = _fetch_holdings_news(tuple(tickers), ticker_tokens_tuple)
 
         st.markdown(
             f'<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);'
@@ -589,13 +661,7 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
         active_strategy: str, e.g. "QDVD"
     """
 
-    # ── News Headlines (top section) ─────────────────────────────────────
-    # Gather tickers first so we can use them for both news and alerts
     tickers = sorted(get_all_unique_tickers(tamarac_parsed))
-
-    _render_news_section(tickers=tickers)
-
-    # ── Portfolio Alerts (bottom section) ─────────────────────────────────
 
     # ── Fetch data ────────────────────────────────────────────────────────
     with st.spinner(f"Scanning {len(tickers)} holdings..."):
@@ -609,46 +675,47 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
     price_alerts = _price_mover_alerts(tickers, price_data)
     div_alerts = _dividend_alerts(tickers, price_data, div_data) if div_data else []
     earnings_alerts = _earnings_alerts(tickers, price_data)
-    proximity_alerts = _proximity_alerts(tickers, price_data)
 
-    all_alerts = price_alerts + div_alerts + earnings_alerts + proximity_alerts
+    all_alerts = price_alerts + div_alerts + earnings_alerts
 
-    # ── Section header with count ─────────────────────────────────────────
-    st.markdown(
-        f'<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);'
-        f'text-transform:uppercase;letter-spacing:0.08em;padding:0 0 8px;'
-        f'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:0">'
-        f'Portfolio Alerts'
-        f'<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.2);'
-        f'margin-left:8px;">{len(all_alerts)} across {len(tickers)} holdings</span>'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-
+    # ── Portfolio Alerts sections (top) ───────────────────────────────────
     if not all_alerts:
+        st.markdown(
+            '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);'
+            'text-transform:uppercase;letter-spacing:0.08em;padding:0 0 8px;'
+            'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:0">'
+            'Portfolio Alerts'
+            '</div>',
+            unsafe_allow_html=True,
+        )
         st.markdown(
             '<div style="padding:16px 0;font-size:13px;color:rgba(255,255,255,0.35);">'
             'No alerts — all holdings within normal ranges.'
             '</div>',
             unsafe_allow_html=True,
         )
-        return
+    else:
+        if price_alerts:
+            _render_alert_section("Price Movers", price_alerts)
+        if div_alerts:
+            _render_alert_section("Dividend Events", div_alerts)
+        if earnings_alerts:
+            _render_alert_section("Upcoming Earnings", earnings_alerts)
 
-    # ── Render sections ───────────────────────────────────────────────────
-    if price_alerts:
-        _render_alert_section("Price Movers", price_alerts)
+    # Spacer between alerts and news
+    st.markdown('<div style="height:24px;"></div>', unsafe_allow_html=True)
 
-    if div_alerts:
-        _render_alert_section("Dividend Events", div_alerts)
-
-    if earnings_alerts:
-        _render_alert_section("Upcoming Earnings", earnings_alerts)
-
-    if proximity_alerts:
-        _render_alert_section("52-Week Proximity", proximity_alerts)
+    # ── News (Market Headlines + Holdings News) at the bottom ─────────────
+    # Build the ticker→tokens map for relevance filtering, then pass as a
+    # hashable tuple so @st.cache_data on _fetch_holdings_news still works.
+    token_map = _build_ticker_name_map(tickers, price_data)
+    ticker_tokens_tuple = tuple(
+        (t, frozenset(toks)) for t, toks in sorted(token_map.items())
+    )
+    _render_news_section(tickers=tickers, ticker_tokens_tuple=ticker_tokens_tuple)
 
     # ── Footer ────────────────────────────────────────────────────────────
     st.caption(
-        f"News: RSS feeds (15-min cache) · Alerts: Supabase + yfinance · "
+        f"Alerts: Supabase + yfinance · News: RSS feeds (15-min cache) · "
         f"{datetime.now().strftime('%I:%M %p')}"
     )
