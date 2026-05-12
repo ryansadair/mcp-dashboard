@@ -603,11 +603,9 @@ def render_macro_tab(qdvd_yield=None):
                 border: 1px solid rgba(255,255,255,0.05);
                 border-radius: 8px;
                 padding: 4px 16px;
-                height: calc(100% - 40px);
-                min-height: 220px;
                 display: flex;
                 flex-direction: column;
-                justify-content: center;
+                justify-content: flex-start;
             }}
             @media (max-width: 640px) {{
                 .mcp-ctx-grid {{
@@ -617,7 +615,6 @@ def render_macro_tab(qdvd_yield=None):
                     grid-template-columns: 1fr;
                 }}
                 .mcp-sent-card {{
-                    height: auto;
                     padding: 8px 16px;
                 }}
             }}
