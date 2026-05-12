@@ -693,14 +693,15 @@ def g(key, default=""):
 # ══════════════════════════════════════════════════════════════════════════
 # 1. COMPANY PROFILE HEADER
 # ══════════════════════════════════════════════════════════════════════════
+# Sprint 25: The right-side price/1D-change block has been removed — the
+# Focus stats card under the Price Chart header (section 3) owns LAST and
+# 1D Chg with consistent styling to the Markets tab. Similarly, 52W High /
+# 52W Low have been dropped from the quick-stats row since the Focus card's
+# 52W range bar visualizes the same data. Quick stats now focuses on
+# fundamental context: Mkt Cap, Div Yield, Div Rate, P/E.
 company_name = g("longName") or g("shortName", ticker_input)
 sector = g("sector", "—")
 industry = g("industry", "—")
-price = g("currentPrice", 0) or g("regularMarketPrice", 0)
-prev_close = g("previousClose", 0)
-change = price - prev_close if price and prev_close else 0
-change_pct = (change / prev_close * 100) if prev_close else 0
-chg_color = GREEN if change >= 0 else "#c45454"
 
 # Market cap
 mc_raw = g("marketCap", 0)
@@ -713,29 +714,23 @@ elif mc_raw >= 1e6:
 else:
     mc_str = "—"
 
-# Dividend yield (safe)
+# Dividend yield (safe) — uses current price for the calc
+price = g("currentPrice", 0) or g("regularMarketPrice", 0)
 div_rate = g("dividendRate", 0) or 0
 div_yield = round((div_rate / price) * 100, 2) if div_rate > 0 and price > 0 and (div_rate / price * 100) <= 15 else 0
 
 st.markdown(
     f"<div style='padding:16px 20px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);"
     f"border-radius:12px;margin-bottom:16px;'>"
-    f"<div style='display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;'>"
-    f"<div>"
     f"<div style='font-size:24px;font-weight:700;color:{GOLD};letter-spacing:0.04em;font-family:DM Serif Display,serif;'>{ticker_input}</div>"
     f"<div style='font-size:16px;color:rgba(255,255,255,0.8);margin-top:2px;'>{company_name}</div>"
     f"<div style='font-size:12px;color:rgba(255,255,255,0.35);margin-top:4px;'>{sector} · {industry}</div>"
-    f"</div>"
-    f"<div style='text-align:right;'>"
-    f"<div style='font-size:28px;font-weight:700;color:rgba(255,255,255,0.95);font-family:DM Serif Display,serif;'>${price:.2f}</div>"
-    f"<div style='font-size:14px;color:{chg_color};font-weight:600;'>{change:+.2f} ({change_pct:+.2f}%)</div>"
-    f"</div>"
-    f"</div>"
     f"</div>",
     unsafe_allow_html=True,
 )
 
-# Quick stats row — responsive flex grid
+# Quick stats row — fundamental context (price stats live in the Focus
+# card under section 3 Price Chart)
 def _qs_card(label, value):
     return (
         f'<div style="flex:1 1 130px;min-width:100px;padding:8px 0;">'
@@ -748,8 +743,6 @@ def _qs_card(label, value):
 _qs_divyield = f"{div_yield:.2f}%" if div_yield > 0 else "—"
 _qs_divrate = f"${div_rate:.2f}" if div_rate > 0 else "—"
 _qs_pe = f"{g('trailingPE', 0):.1f}" if g("trailingPE", 0) else "—"
-_qs_52hi = f"${g('fiftyTwoWeekHigh', 0):.2f}" if g("fiftyTwoWeekHigh", 0) else "—"
-_qs_52lo = f"${g('fiftyTwoWeekLow', 0):.2f}" if g("fiftyTwoWeekLow", 0) else "—"
 
 st.markdown(
     f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
@@ -757,8 +750,6 @@ st.markdown(
     f'{_qs_card("Div Yield", _qs_divyield)}'
     f'{_qs_card("Div Rate", _qs_divrate)}'
     f'{_qs_card("P/E", _qs_pe)}'
-    f'{_qs_card("52W High", _qs_52hi)}'
-    f'{_qs_card("52W Low", _qs_52lo)}'
     f'</div>',
     unsafe_allow_html=True,
 )

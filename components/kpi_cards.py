@@ -34,8 +34,13 @@ def _kpi_card(label, value, color="rgba(255,255,255,0.95)", sub_text=None):
     )
 
 
-def render_kpi_cards(strategy: str, kpis: dict, bench_ytd: float):
-    """Render the 4 KPI metric cards for a strategy."""
+def render_kpi_cards(strategy: str, kpis: dict):
+    """Render the 4 KPI metric cards for a strategy.
+
+    Sprint 25: dropped the unused bench_ytd parameter (was passed in but
+    never read — alpha vs benchmark isn't shown on the KPI row, only
+    inside the Performance tab's period-return cards).
+    """
     s = STRATEGIES[strategy]
     daily_return = kpis.get("daily_return", 0)
     div_yield = kpis.get("div_yield", 0)

@@ -10,7 +10,6 @@ from utils.config import STRATEGIES, SECTOR_COLORS, BRAND, normalize_sector
 from components.header import render_header
 from components.market_ticker import render_market_ticker
 from components.kpi_cards import render_kpi_cards
-from data.performance import get_strategy_kpis, get_benchmark_ytd
 
 # ── Sprint 2 imports (graceful if not yet available) ──────────────────────
 try:
@@ -400,14 +399,16 @@ def _render_strategy_header(tab_key):
     """Render KPI cards inside a tab. The strategy selector itself lives
     once at the top of the page (above the tab row), so this now only
     emits the KPI row — the tab_key argument is retained for API compat."""
-    render_kpi_cards(active, kpis, bench_ytd)
+    render_kpi_cards(active, kpis)
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 # Pre-compute active strategy data (used by KPI cards and all tab content)
 active = st.session_state["active_strategy"]
 strat = STRATEGIES[active]
-kpis = get_strategy_kpis(active)
-bench_ytd = get_benchmark_ytd(strat["bench_ticker"])
+# Sprint 25: get_strategy_kpis removed (it always returned {"ytd": 0} —
+# the Strategy_Returns.xlsx it read no longer exists). KPIs now bootstrap
+# as an empty dict and get populated below from Tamarac + monthly_returns.
+kpis = {}
 
 # ── Override KPIs with real data when Sprint 2 is available ───────────────
 if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
@@ -415,7 +416,6 @@ if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
     cash_kpi = get_cash_weight(tamarac_parsed, active)
 
     if not tam_kpi.empty:
-        kpis = dict(kpis)
         kpis["holdings"] = len(tam_kpi)
 
         kpi_tickers = tuple(tam_kpi["symbol"].tolist())
@@ -446,7 +446,6 @@ if SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
 
 # Override YTD with official Tamarac monthly numbers when available
 if MONTHLY_RETURNS_AVAILABLE and active in STRATEGY_YTD:
-    kpis = dict(kpis) if not isinstance(kpis, dict) else kpis
     kpis["ytd"] = STRATEGY_YTD[active]
     kpis["ytd_as_of"] = AS_OF_DATE
 
