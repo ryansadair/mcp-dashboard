@@ -8,6 +8,14 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta
 
+# Sprint 25-3: live Fed Meeting Calendar from Kalshi prediction markets.
+# Graceful fallback (module missing → widget shows a placeholder).
+try:
+    from data.kalshi_fed import get_fed_cut_probabilities
+    _KALSHI_FED_AVAILABLE = True
+except ImportError:
+    _KALSHI_FED_AVAILABLE = False
+
 # ── FRED API ───────────────────────────────────────────────────────────────
 
 FRED_API_KEY = "984881b404269d00afe946250729a01a"
@@ -694,35 +702,89 @@ def render_macro_tab(qdvd_yield=None):
 
     with col_fed:
         st.markdown("**Fed Meeting Calendar**")
-        st.caption("CME FedWatch probabilities")
+        st.caption("Kalshi prediction-market implied · 15-min cache")
 
-        # Fed meeting dates — manually maintained (these change infrequently)
-        fed_meetings = [
-            {"date": "Mar 18-19", "expectation": "Hold", "prob": "92%"},
-            {"date": "May 6-7", "expectation": "Hold", "prob": "68%"},
-            {"date": "Jun 17-18", "expectation": "Cut 25bp", "prob": "54%"},
-            {"date": "Jul 29-30", "expectation": "Cut 25bp", "prob": "61%"},
-            {"date": "Sep 16-17", "expectation": "Cut 25bp", "prob": "58%"},
-            {"date": "Dec 16-17", "expectation": "Cut 25bp", "prob": "52%"},
-        ]
+        # Sprint 25-3: Live Kalshi data replaces the hardcoded calendar.
+        # Math: for each upcoming FOMC meeting, we read the Kalshi market
+        # whose strike is 25bp below the current Fed Funds upper bound
+        # (from FRED series DFEDTARU). YES at that strike = "rate stays
+        # above that level." So P(cut by meeting) = 1 - YES price.
+        # See data/kalshi_fed.py for full implementation.
+        fed_data = []
+        if _KALSHI_FED_AVAILABLE:
+            try:
+                fed_data = get_fed_cut_probabilities(max_events=6)
+            except Exception:
+                fed_data = []
 
-        fed_html = []
-        for m in fed_meetings:
-            is_cut = "Cut" in m["expectation"]
-            exp_color = "#569542" if is_cut else "rgba(255,255,255,0.4)"
-            prob_color = "#569542" if is_cut else "rgba(255,255,255,0.5)"
-            fed_html.append(f'''
-            <div style="display:flex;justify-content:space-between;align-items:center;
-                        padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
-                <div>
-                    <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.8)">{m["date"]}</div>
-                    <div style="font-size:11px;color:{exp_color};margin-top:2px">{m["expectation"]}</div>
-                </div>
-                <div style="font-size:14px;font-weight:700;font-family:'DM Serif Display',serif;
-                            color:{prob_color}">{m["prob"]}</div>
-            </div>
-            ''')
-        st.markdown("".join(fed_html), unsafe_allow_html=True)
+        if not fed_data:
+            # Graceful fallback — better than fake/stale numbers.
+            st.markdown(
+                '<div style="padding:14px;background:rgba(255,255,255,0.02);'
+                'border:1px solid rgba(255,255,255,0.05);border-radius:8px;'
+                'font-size:12px;color:rgba(255,255,255,0.4);line-height:1.6;">'
+                'Live FOMC probabilities unavailable.<br>'
+                '<a href="https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html" '
+                'target="_blank" rel="noopener" style="color:rgba(201,168,76,0.7);">'
+                'Check CME FedWatch ↗</a>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            fed_html = []
+            for m in fed_data:
+                # Color: probability above 50% reads as "market expects a
+                # cut" → green. Below 50% reads neutral. The threshold is
+                # purposely simple — we're showing prediction-market
+                # consensus, not making a forecast.
+                prob = m["prob_cut_pct"]
+                if prob >= 50:
+                    prob_color = "#569542"
+                    exp_label = "Cut likely"
+                    exp_color = "#569542"
+                elif prob >= 30:
+                    prob_color = "#C9A84C"
+                    exp_label = "Cut possible"
+                    exp_color = "rgba(201,168,76,0.8)"
+                else:
+                    prob_color = "rgba(255,255,255,0.6)"
+                    exp_label = "Hold likely"
+                    exp_color = "rgba(255,255,255,0.4)"
+
+                # Strike-disclosure suffix when we fell back to a non-exact
+                # strike (rare, but the user deserves to know).
+                strike_note = ""
+                if not m.get("exact_strike", True):
+                    strike_note = (
+                        f' <span style="font-size:9px;color:rgba(255,255,255,0.25);'
+                        f'margin-left:4px;" title="Exact 25bp-below strike unavailable; '
+                        f'using {m["strike_used"]:.2f}% strike instead">*</span>'
+                    )
+
+                fed_html.append(
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                    f'padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04)">'
+                    f'<div>'
+                    f'<div style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.8)">'
+                    f'{m["meeting_label"]}{strike_note}</div>'
+                    f'<div style="font-size:11px;color:{exp_color};margin-top:2px">{exp_label}</div>'
+                    f'</div>'
+                    f'<div style="font-size:14px;font-weight:700;font-family:\'DM Serif Display\',serif;'
+                    f'color:{prob_color}">{prob:.0f}%</div>'
+                    f'</div>'
+                )
+            st.markdown("".join(fed_html), unsafe_allow_html=True)
+
+            # Footnote: explain what the % means and how it's computed
+            current_ub = fed_data[0].get("current_upper_bound") if fed_data else None
+            ub_str = f"{current_ub:.2f}%" if current_ub is not None else "—"
+            st.markdown(
+                f'<div style="font-size:10px;color:rgba(255,255,255,0.3);margin-top:8px;line-height:1.5;">'
+                f'% shown = probability of ≥1 rate cut by each meeting.<br>'
+                f'Computed vs current Fed upper bound of {ub_str} (FRED).'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
     # ── Economic Indicators ────────────────────────────────────────────────
     st.markdown(
