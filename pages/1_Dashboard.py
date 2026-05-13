@@ -399,15 +399,14 @@ if tamarac_parsed:
     _ticker_universe.sort()
 
 def _on_ticker_search():
-    """When a ticker is chosen from the search box, navigate to Stock Detail.
-    Reset the selectbox value first so returning to the dashboard via the
-    Back button doesn't immediately re-fire navigation on rerun."""
+    """When a ticker is chosen from the search box, stash it and reset
+    the selectbox. The actual navigation happens in the main script body
+    below — st.switch_page can't be called from inside a callback because
+    it triggers st.rerun() internally, which is a no-op in callbacks."""
     chosen = st.session_state.get("ticker_search_main", "")
     if chosen and chosen != "—":
+        st.session_state["_pending_ticker_nav"] = chosen
         st.session_state["ticker_search_main"] = "—"  # reset so back-nav works
-        st.session_state["detail_ticker"] = chosen
-        st.query_params["ticker"] = chosen
-        st.switch_page("pages/2_Stock_Detail.py")
 
 # Render selector + ticker search side-by-side above the tab row.
 # Column ratio [1, 2, 1] keeps the strategy dropdown comfortably wide and
@@ -437,6 +436,14 @@ with _search_col:
             on_change=_on_ticker_search,
             placeholder="Search ticker...",
         )
+
+# Handle pending ticker navigation set by the search callback above.
+# This runs in the main script body where st.switch_page is allowed.
+_pending = st.session_state.pop("_pending_ticker_nav", None)
+if _pending:
+    st.session_state["detail_ticker"] = _pending
+    st.query_params["ticker"] = _pending
+    st.switch_page("pages/2_Stock_Detail.py")
 
 tab_overview, tab_holdings, tab_warbook, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
     "Overview", "Holdings", "Warbook", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "News & Alerts"
