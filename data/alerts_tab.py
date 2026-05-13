@@ -51,13 +51,6 @@ try:
 except ImportError:
     _DIV_AVAILABLE = False
 
-# Fish CCC data for authoritative streak/growth info
-try:
-    from data.dividend_streaks import get_fish_metrics, get_streak
-    _FISH_AVAILABLE = True
-except ImportError:
-    _FISH_AVAILABLE = False
-
 # Finviz earnings date is the primary source for the Earnings Calendar — it
 # returns "May 12 BMO" / "May 15 AMC" style strings with timing flags. yfinance
 # is the fallback for any ticker Finviz didn't return.
@@ -194,40 +187,6 @@ def _fetch_earnings_dates(tickers_tuple):
     except ImportError:
         pass
     return result
-
-
-def _earnings_alerts(tickers, price_data, days_ahead=14):
-    """
-    Flag holdings with earnings dates within the next N days.
-    Returns list of alert dicts.
-    """
-    alerts = []
-    today = datetime.now().date()
-
-    earnings_dates = _fetch_earnings_dates(tuple(tickers))
-
-    for ticker, date_str in earnings_dates.items():
-        try:
-            earn_date = datetime.strptime(date_str[:10], "%Y-%m-%d").date()
-            days_until = (earn_date - today).days
-            if 0 <= days_until <= days_ahead:
-                mkt = price_data.get(ticker, {})
-                name = mkt.get("name", ticker)
-                severity = "warning" if days_until <= 3 else "info"
-                alerts.append({
-                    "type": "earnings",
-                    "severity": severity,
-                    "ticker": ticker,
-                    "title": f"{ticker} earnings {earn_date.strftime('%b %d')}",
-                    "detail": f"{name} · {days_until}d away" if days_until > 0 else f"{name} · TODAY",
-                    "value": days_until,
-                    "sort_key": days_until,
-                })
-        except (ValueError, TypeError):
-            pass
-
-    alerts.sort(key=lambda a: a["sort_key"])
-    return alerts
 
 
 # ──────────────────────────────────────────────────────────────────────────

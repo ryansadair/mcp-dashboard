@@ -6,7 +6,7 @@ import numpy as np
 from datetime import datetime
 from utils.auth import check_password
 from utils.styles import inject_global_css
-from utils.config import STRATEGIES, SECTOR_COLORS, BRAND, normalize_sector
+from utils.config import STRATEGIES, SECTOR_COLORS, normalize_sector
 from components.header import render_header
 from components.market_ticker import render_market_ticker
 from components.kpi_cards import render_kpi_cards
@@ -17,7 +17,7 @@ try:
         parse_tamarac_excel, get_holdings_for_strategy, get_cash_weight,
         STRATEGY_NAMES, STRATEGY_COLORS as STRAT_COLORS, STRATEGY_BENCHMARKS,
     )
-    from data.market_data import fetch_batch_prices, fetch_price_history
+    from data.market_data import fetch_batch_prices
     from data.dividends import (
         get_batch_dividend_details, compute_strategy_income, compute_weighted_yield,
     )
@@ -449,10 +449,10 @@ tab_overview, tab_holdings, tab_warbook, tab_perf, tab_divs, tab_watchlist, tab_
     "Overview", "Holdings", "Warbook", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "News & Alerts"
 ])
 
-def _render_strategy_header(tab_key):
+def _render_strategy_header():
     """Render KPI cards inside a tab. The strategy selector itself lives
-    once at the top of the page (above the tab row), so this now only
-    emits the KPI row — the tab_key argument is retained for API compat."""
+    once at the top of the page (above the tab row), so this only emits
+    the KPI row."""
     render_kpi_cards(active, kpis)
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
@@ -539,7 +539,7 @@ _YAXIS = dict(gridcolor="rgba(255,255,255,0.04)", showline=False, tickfont=dict(
 # OVERVIEW
 # ══════════════════════════════════════════════════════════════════════════
 with tab_overview:
-    _render_strategy_header("overview")
+    _render_strategy_header()
 
     # ── Shared data for both columns ──────────────────────────────────────
     # Compute hm_df ONCE, before the columns split, so both the left column
@@ -990,7 +990,7 @@ with tab_overview:
 # HOLDINGS — Sprint 2 upgrade: real Tamarac + live yfinance
 # ══════════════════════════════════════════════════════════════════════════
 with tab_holdings:
-    _render_strategy_header("holdings")
+    _render_strategy_header()
 
     # ── Sub-tabs: Holdings Detail | Price Charts ──────────────────────────
     sub_detail, sub_charts = st.tabs(["Holdings Detail", "Price Charts"])
@@ -1456,7 +1456,7 @@ with tab_holdings:
 # DCP excluded — MCP doesn't maintain a warbook for that strategy.
 # ══════════════════════════════════════════════════════════════════════════
 with tab_warbook:
-    _render_strategy_header("warbook")
+    _render_strategy_header()
 
     if WARBOOK_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed:
         render_warbook_tab(tamarac_parsed, active, strat)
@@ -1473,7 +1473,7 @@ with tab_warbook:
 # DIVIDENDS — Sprint 4: full dividend intelligence with sub-tabs
 # ══════════════════════════════════════════════════════════════════════════
 with tab_divs:
-    _render_strategy_header("divs")
+    _render_strategy_header()
 
     if DIV_TAB_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed and active in tamarac_parsed:
         render_dividends_tab(tamarac_parsed, active, strat, kpis)
@@ -1572,7 +1572,7 @@ with tab_alerts:
 # means Dividends/Watchlist/Macro/Markets/Alerts all render before it.
 # ══════════════════════════════════════════════════════════════════════════
 with tab_perf:
-    _render_strategy_header("perf")
+    _render_strategy_header()
     if COMPOSITE_AVAILABLE:
         render_performance_tab(active)
     else:

@@ -31,7 +31,7 @@ from components.market_ticker import render_market_ticker
 
 # Fish CCC data (authoritative dividend history + streaks)
 try:
-    from data.dividend_streaks import get_all_fish_data, get_dividend_history as get_fish_history
+    from data.dividend_streaks import get_all_fish_data
     _FISH_AVAILABLE = True
 except ImportError:
     _FISH_AVAILABLE = False
