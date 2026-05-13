@@ -378,8 +378,42 @@ def _on_strategy_change():
     selected_label = st.session_state["strategy_select_main"]
     st.session_state["active_strategy"] = strat_keys[strat_labels.index(selected_label)]
 
-# Render the selector in a narrow column above the tab row
-_sel_col, _spacer_col = st.columns([1, 3])
+# ── Build deduplicated ticker universe from all 5 strategies ──────────────
+# Sprint 25-5: ticker search shortcut. Pulls from tamarac_parsed (already
+# loaded above) so no extra fetches. Falls back to empty universe if
+# Tamarac wasn't found — the search box will just not have options.
+_ticker_universe = []
+if tamarac_parsed:
+    _seen = set()
+    for _sk in strat_keys:
+        try:
+            _strat_holdings = get_holdings_for_strategy(tamarac_parsed, _sk)
+            if _strat_holdings is not None and not _strat_holdings.empty and "symbol" in _strat_holdings.columns:
+                for _t in _strat_holdings["symbol"].tolist():
+                    _t_clean = str(_t).strip().upper()
+                    if _t_clean and _t_clean not in _seen:
+                        _seen.add(_t_clean)
+                        _ticker_universe.append(_t_clean)
+        except Exception:
+            pass
+    _ticker_universe.sort()
+
+def _on_ticker_search():
+    """When a ticker is chosen from the search box, navigate to Stock Detail.
+    Reset the selectbox value first so returning to the dashboard via the
+    Back button doesn't immediately re-fire navigation on rerun."""
+    chosen = st.session_state.get("ticker_search_main", "")
+    if chosen and chosen != "—":
+        st.session_state["ticker_search_main"] = "—"  # reset so back-nav works
+        st.session_state["detail_ticker"] = chosen
+        st.query_params["ticker"] = chosen
+        st.switch_page("pages/2_Stock_Detail.py")
+
+# Render selector + ticker search side-by-side above the tab row.
+# Column ratio [1, 2, 1] keeps the strategy dropdown comfortably wide and
+# anchors the search box on the right. On mobile Streamlit stacks them
+# vertically — strategy selector ends up on top, search below.
+_sel_col, _spacer_col, _search_col = st.columns([1, 2, 1])
 with _sel_col:
     _current_idx = strat_keys.index(st.session_state["active_strategy"])
     st.selectbox(
@@ -390,6 +424,19 @@ with _sel_col:
         label_visibility="collapsed",
         on_change=_on_strategy_change,
     )
+with _search_col:
+    if _ticker_universe:
+        # "—" sentinel as the first option so the box renders empty/inert
+        # by default. Picking any ticker fires _on_ticker_search → nav.
+        st.selectbox(
+            "Ticker Search",
+            options=["—"] + _ticker_universe,
+            index=0,
+            key="ticker_search_main",
+            label_visibility="collapsed",
+            on_change=_on_ticker_search,
+            placeholder="Search ticker...",
+        )
 
 tab_overview, tab_holdings, tab_warbook, tab_perf, tab_divs, tab_watchlist, tab_macro, tab_markets, tab_alerts = st.tabs([
     "Overview", "Holdings", "Warbook", "Performance", "Dividends", "Watchlist", "Macro", "Markets", "News & Alerts"
