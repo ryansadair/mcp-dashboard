@@ -719,38 +719,22 @@ price = g("currentPrice", 0) or g("regularMarketPrice", 0)
 div_rate = g("dividendRate", 0) or 0
 div_yield = round((div_rate / price) * 100, 2) if div_rate > 0 and price > 0 and (div_rate / price * 100) <= 15 else 0
 
+# Sprint 25-4: removed quick-stats KPI row (Div Yield, Div Rate, P/E) —
+# these are surfaced further down on the page (Valuation, Dividends sections).
+# Market Cap retained here in the header card since it has no other home.
 st.markdown(
     f"<div style='padding:16px 20px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);"
-    f"border-radius:12px;margin-bottom:16px;'>"
+    f"border-radius:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px;'>"
+    f"<div style='min-width:0;'>"
     f"<div style='font-size:24px;font-weight:700;color:{GOLD};letter-spacing:0.04em;font-family:DM Serif Display,serif;'>{ticker_input}</div>"
     f"<div style='font-size:16px;color:rgba(255,255,255,0.8);margin-top:2px;'>{company_name}</div>"
     f"<div style='font-size:12px;color:rgba(255,255,255,0.35);margin-top:4px;'>{sector} · {industry}</div>"
+    f"</div>"
+    f"<div style='text-align:right;flex-shrink:0;'>"
+    f"<div style='font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;'>Mkt Cap</div>"
+    f"<div style='font-size:20px;font-weight:700;color:rgba(255,255,255,0.9);'>{mc_str}</div>"
+    f"</div>"
     f"</div>",
-    unsafe_allow_html=True,
-)
-
-# Quick stats row — fundamental context (price stats live in the Focus
-# card under section 3 Price Chart)
-def _qs_card(label, value):
-    return (
-        f'<div style="flex:1 1 130px;min-width:100px;padding:8px 0;">'
-        f'<div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;'
-        f'letter-spacing:0.06em;margin-bottom:4px;">{label}</div>'
-        f'<div style="font-size:18px;font-weight:700;color:rgba(255,255,255,0.9);">{value}</div>'
-        f'</div>'
-    )
-
-_qs_divyield = f"{div_yield:.2f}%" if div_yield > 0 else "—"
-_qs_divrate = f"${div_rate:.2f}" if div_rate > 0 else "—"
-_qs_pe = f"{g('trailingPE', 0):.1f}" if g("trailingPE", 0) else "—"
-
-st.markdown(
-    f'<div style="display:flex;flex-wrap:wrap;gap:4px 16px;">'
-    f'{_qs_card("Mkt Cap", mc_str)}'
-    f'{_qs_card("Div Yield", _qs_divyield)}'
-    f'{_qs_card("Div Rate", _qs_divrate)}'
-    f'{_qs_card("P/E", _qs_pe)}'
-    f'</div>',
     unsafe_allow_html=True,
 )
 
@@ -761,14 +745,21 @@ st.markdown(
 desc = g("longBusinessSummary", "")
 if desc:
     st.markdown("---")
-    with st.expander("Company Description", expanded=True):
-        st.markdown(f"<div style='font-size:13px;color:rgba(255,255,255,0.6);line-height:1.7;'>{desc}</div>",
-                    unsafe_allow_html=True)
-        ed1, ed2, ed3 = st.columns(3)
-        employees = g("fullTimeEmployees", 0)
-        ed1.metric("Employees", f"{employees:,}" if employees else "—")
-        ed2.metric("Country", g("country", "—"))
-        ed3.metric("Website", g("website", "—"))
+    st.markdown(
+        '<div style="font-size:15px;font-weight:700;color:rgba(255,255,255,0.8);'
+        'text-transform:uppercase;letter-spacing:0.08em;padding:4px 0 8px;">'
+        'Company Description</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"<div style='font-size:13px;color:rgba(255,255,255,0.6);line-height:1.7;'>{desc}</div>",
+        unsafe_allow_html=True,
+    )
+    ed1, ed2, ed3 = st.columns(3)
+    employees = g("fullTimeEmployees", 0)
+    ed1.metric("Employees", f"{employees:,}" if employees else "—")
+    ed2.metric("Country", g("country", "—"))
+    ed3.metric("Website", g("website", "—"))
 
 # ══════════════════════════════════════════════════════════════════════════
 # 2b. MCP INVESTMENT THESIS (from Notion Wiki)
