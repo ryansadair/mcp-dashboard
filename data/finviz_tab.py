@@ -14,11 +14,7 @@ import pandas as pd
 from datetime import datetime
 
 from utils.config import BRAND
-from data.finviz_data import (
-    fetch_finviz_batch,
-    upside_badge,
-    rsi_indicator,
-)
+from data.finviz_data import fetch_finviz_batch
 
 GREEN = BRAND["green"]
 GOLD  = BRAND["gold"]
@@ -106,102 +102,154 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
 
     df = pd.DataFrame(rows).sort_values("weight_pct", ascending=False)
 
-    # ── Main Table ────────────────────────────────────────────────────────
-    # Render as custom HTML for badge formatting
-    header_style = (
-        "padding:6px 8px;font-size:10px;font-weight:600;"
-        "color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.06em;"
-        "border-bottom:1px solid rgba(255,255,255,0.06)"
+    # ── Main Table (Sprint 25-7: sortable st.dataframe with color coding) ──
+    # Convert to a Styler so we can color cells based on their numeric value,
+    # then pass to st.dataframe for sortable column headers + row selection.
+    # The Holdings table above uses the same pattern.
+
+    # Build the display frame with friendly column names. The Symbol column
+    # stays in the frame so we can recover the ticker on row-click for
+    # drill-through to Stock Detail.
+    display_df = pd.DataFrame({
+        "Symbol":      df["symbol"],
+        "Company":     df["description"],
+        "Wt %":        df["weight_pct"],
+        "Price":       df["price"],
+        "MCP Target":  df["target"],
+        "Upside %":    df["upside"],
+        "RSI":         df["rsi"],
+        "SMA200 %":    df["sma200"],
+        "Short %":     df["short_float"],
+        "Insider %":   df["insider_trans"],
+        "YTD %":       df["perf_ytd"],
+    }).reset_index(drop=True)
+
+    # ── Cell color functions (return CSS strings for Styler.map) ──────────
+    # Each function takes a single cell value and returns a CSS declaration.
+    # Tier thresholds match the original badge logic in finviz_data.py.
+
+    def _color_upside(v):
+        try:
+            v = float(v)
+            if v >= 10:   return f"color: {GREEN}; font-weight: 600"
+            if v >= 0:    return "color: rgba(255,255,255,0.7)"
+            if v >= -10:  return f"color: {GOLD}"
+            return f"color: {RED}; font-weight: 600"
+        except (ValueError, TypeError):
+            return "color: rgba(255,255,255,0.3)"
+
+    def _color_rsi(v):
+        try:
+            v = float(v)
+            if v >= 70: return f"color: {RED}; font-weight: 600"
+            if v >= 60: return f"color: {GOLD}"
+            if v >= 40: return "color: rgba(255,255,255,0.7)"
+            if v >= 30: return f"color: {GOLD}"
+            return f"color: {GREEN}; font-weight: 600"
+        except (ValueError, TypeError):
+            return "color: rgba(255,255,255,0.3)"
+
+    def _color_sma200(v):
+        try:
+            v = float(v)
+            if v > 0:  return f"color: {GREEN}"
+            if v < 0:  return f"color: {RED}"
+            return "color: rgba(255,255,255,0.6)"
+        except (ValueError, TypeError):
+            return "color: rgba(255,255,255,0.3)"
+
+    def _color_short(v):
+        try:
+            v = float(v)
+            if v >= 5: return f"color: {RED}; font-weight: 600"
+            if v >= 3: return f"color: {GOLD}"
+            return "color: rgba(255,255,255,0.6)"
+        except (ValueError, TypeError):
+            return "color: rgba(255,255,255,0.3)"
+
+    def _color_insider(v):
+        try:
+            v = float(v)
+            if v >= 0.5:   return f"color: {GREEN}; font-weight: 600"
+            if v <= -0.5:  return f"color: {RED}; font-weight: 600"
+            return "color: rgba(255,255,255,0.5)"
+        except (ValueError, TypeError):
+            return "color: rgba(255,255,255,0.3)"
+
+    def _color_ytd(v):
+        try:
+            v = float(v)
+            return f"color: {GREEN}" if v >= 0 else f"color: {RED}"
+        except (ValueError, TypeError):
+            return "color: rgba(255,255,255,0.3)"
+
+    def _color_symbol(v):
+        return f"color: {GOLD}; font-weight: 600"
+
+    styled = (
+        display_df.style
+        .map(_color_symbol,  subset=["Symbol"])
+        .map(_color_upside,  subset=["Upside %"])
+        .map(_color_rsi,     subset=["RSI"])
+        .map(_color_sma200,  subset=["SMA200 %"])
+        .map(_color_short,   subset=["Short %"])
+        .map(_color_insider, subset=["Insider %"])
+        .map(_color_ytd,     subset=["YTD %"])
     )
 
-    html = (
-        '<table style="width:100%;border-collapse:collapse;table-layout:fixed">'
-        '<colgroup>'
-        '<col style="width:6%"><col style="width:20%"><col style="width:6%">'
-        '<col style="width:8%"><col style="width:11%"><col style="width:9%">'
-        '<col style="width:8%"><col style="width:8%"><col style="width:8%">'
-        '<col style="width:8%"><col style="width:8%">'
-        '</colgroup>'
-        f'<thead><tr>'
-        f'<th style="text-align:left;{header_style}">Sym</th>'
-        f'<th style="text-align:left;{header_style}">Company</th>'
-        f'<th style="text-align:right;{header_style}">Wt%</th>'
-        f'<th style="text-align:right;{header_style}">Price</th>'
-        f'<th style="text-align:right;{header_style}">MCP Target</th>'
-        f'<th style="text-align:right;{header_style}">Upside</th>'
-        f'<th style="text-align:right;{header_style}">RSI</th>'
-        f'<th style="text-align:right;{header_style}">SMA200</th>'
-        f'<th style="text-align:right;{header_style}">Short%</th>'
-        f'<th style="text-align:right;{header_style}" title="Net insider transactions over the last 6 months. Green = net buying, red = net selling.">Insider</th>'
-        f'<th style="text-align:right;{header_style}">YTD</th>'
-        f'</tr></thead><tbody>'
+    # Generous height to prevent internal scrollbar on mobile (matches
+    # Holdings tab pattern: 80px header + 40px per row, with a floor of
+    # 250 to avoid the scrollbar-threshold oscillation we hit earlier).
+    _df_height = max(250, min(80 + len(display_df) * 40, 2000))
+
+    event = st.dataframe(
+        styled,
+        width="stretch",
+        hide_index=True,
+        height=_df_height,
+        selection_mode="single-row",
+        on_select="rerun",
+        key="finviz_mcp_targets_table",
+        column_config={
+            "Symbol":      st.column_config.TextColumn("Sym", width="small"),
+            "Company":     st.column_config.TextColumn("Company", width="medium"),
+            "Wt %":        st.column_config.NumberColumn("Wt %", format="%.1f%%", width="small"),
+            "Price":       st.column_config.NumberColumn("Price", format="$%.2f", width="small"),
+            "MCP Target":  st.column_config.NumberColumn(
+                "MCP Target", format="$%.0f", width="small",
+                help="Martin Capital's internal price target (from Notion)",
+            ),
+            "Upside %":    st.column_config.NumberColumn(
+                "Upside", format="%+.1f%%", width="small",
+                help="% upside to MCP Target from current price",
+            ),
+            "RSI":         st.column_config.NumberColumn(
+                "RSI", format="%.0f", width="small",
+                help="14-day Relative Strength Index. >70 overbought, <30 oversold.",
+            ),
+            "SMA200 %":    st.column_config.NumberColumn(
+                "SMA200", format="%+.1f%%", width="small",
+                help="Distance from the 200-day simple moving average",
+            ),
+            "Short %":     st.column_config.NumberColumn(
+                "Short %", format="%.1f%%", width="small",
+                help="Short float — % of shares sold short",
+            ),
+            "Insider %":   st.column_config.NumberColumn(
+                "Insider", format="%+.1f%%", width="small",
+                help="Net insider transactions over last 6 months. Green = net buying, red = net selling.",
+            ),
+            "YTD %":       st.column_config.NumberColumn("YTD", format="%+.1f%%", width="small"),
+        },
     )
 
-    for _, r in df.iterrows():
-        up_html = upside_badge(r["upside"])
-        rsi_html = rsi_indicator(r["rsi"])
-
-        target_str = f"${r['target']:.0f}" if r["target"] else "—"
-        sma200_str = f"{r['sma200']:+.1f}%" if r["sma200"] is not None else "—"
-        sma200_color = GREEN if r.get("sma200") and r["sma200"] > 0 else RED if r.get("sma200") and r["sma200"] < 0 else "rgba(255,255,255,0.4)"
-        short_str = f"{r['short_float']:.1f}%" if r["short_float"] is not None else "—"
-        short_color = RED if r.get("short_float") and r["short_float"] > 5 else "rgba(255,255,255,0.6)"
-        ytd_str = f"{r['perf_ytd']:+.1f}%" if r["perf_ytd"] is not None else "—"
-        ytd_color = GREEN if r.get("perf_ytd") and r["perf_ytd"] >= 0 else RED
-
-        # Insider transactions — net % change in insider holdings over last 6 months.
-        # Positive = net buying (bullish), negative = net selling (bearish).
-        # Thresholds: |x| < 0.5% treated as noise/flat.
-        it = r.get("insider_trans")
-        if it is None:
-            insider_html = '<span style="color:rgba(255,255,255,0.25);">—</span>'
-        elif abs(it) < 0.5:
-            insider_html = (
-                f'<span style="font-size:11px;color:rgba(255,255,255,0.4);">'
-                f'{it:+.1f}%</span>'
-            )
-        elif it > 0:
-            # Net buying — green badge with up arrow
-            insider_html = (
-                f'<span style="font-size:11px;font-weight:600;color:{GREEN};'
-                f'background:rgba(86,149,66,0.10);padding:2px 6px;border-radius:3px;'
-                f'white-space:nowrap;">▲ {it:+.1f}%</span>'
-            )
-        else:
-            # Net selling — red badge with down arrow
-            insider_html = (
-                f'<span style="font-size:11px;font-weight:600;color:{RED};'
-                f'background:rgba(196,84,84,0.10);padding:2px 6px;border-radius:3px;'
-                f'white-space:nowrap;">▼ {it:+.1f}%</span>'
-            )
-
-        # Highlight row when MCP target shows big upside (analyst-driven highlight removed
-        # along with the Analyst column).
-        bg = ""
-        if r.get("upside") and r["upside"] >= 20:
-            bg = "background:rgba(86,149,66,0.04);"
-
-        html += (
-            f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03);{bg}">'
-            f'<td style="text-align:left;padding:8px;font-size:12px;font-weight:600;color:#C9A84C;">{r["symbol"]}</td>'
-            f'<td style="text-align:left;padding:8px;font-size:11px;color:rgba(255,255,255,0.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{r["description"]}</td>'
-            f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.6);">{r["weight_pct"]:.1f}%</td>'
-            f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.8);">${r["price"]:.2f}</td>'
-            f'<td style="text-align:right;padding:8px;font-size:12px;color:rgba(255,255,255,0.7);">{target_str}</td>'
-            f'<td style="text-align:right;padding:8px;">{up_html}</td>'
-            f'<td style="text-align:right;padding:8px;">{rsi_html}</td>'
-            f'<td style="text-align:right;padding:8px;font-size:12px;color:{sma200_color};">{sma200_str}</td>'
-            f'<td style="text-align:right;padding:8px;font-size:12px;color:{short_color};">{short_str}</td>'
-            f'<td style="text-align:right;padding:8px;">{insider_html}</td>'
-            f'<td style="text-align:right;padding:8px;font-size:12px;color:{ytd_color};">{ytd_str}</td>'
-            f'</tr>'
-        )
-
-    html += '</tbody></table>'
-
-    # Render row by row to avoid Streamlit HTML size limit
-    # Split into chunks of ~5 rows each
-    st.markdown(html, unsafe_allow_html=True)
+    # Navigate to Stock Detail on row selection (matches Holdings tab pattern)
+    if event and event.selection and event.selection.rows:
+        selected_idx = event.selection.rows[0]
+        selected_ticker = display_df.iloc[selected_idx]["Symbol"]
+        st.session_state["detail_ticker"] = selected_ticker
+        st.query_params["ticker"] = selected_ticker
+        st.switch_page("pages/2_Stock_Detail.py")
 
     # Sprint 25-6b: removed the three Technical Signals summary widgets that
     # used to live below the main table (RSI Extremes, Trend Position 200-SMA
