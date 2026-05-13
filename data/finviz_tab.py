@@ -117,10 +117,10 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
     html = (
         '<table style="width:100%;border-collapse:collapse;table-layout:fixed">'
         '<colgroup>'
-        '<col style="width:7%"><col style="width:23%"><col style="width:7%">'
-        '<col style="width:9%"><col style="width:12%"><col style="width:10%">'
+        '<col style="width:6%"><col style="width:20%"><col style="width:6%">'
+        '<col style="width:8%"><col style="width:11%"><col style="width:9%">'
         '<col style="width:8%"><col style="width:8%"><col style="width:8%">'
-        '<col style="width:8%">'
+        '<col style="width:8%"><col style="width:8%">'
         '</colgroup>'
         f'<thead><tr>'
         f'<th style="text-align:left;{header_style}">Sym</th>'
@@ -132,6 +132,7 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
         f'<th style="text-align:right;{header_style}">RSI</th>'
         f'<th style="text-align:right;{header_style}">SMA200</th>'
         f'<th style="text-align:right;{header_style}">Short%</th>'
+        f'<th style="text-align:right;{header_style}" title="Net insider transactions over the last 6 months. Green = net buying, red = net selling.">Insider</th>'
         f'<th style="text-align:right;{header_style}">YTD</th>'
         f'</tr></thead><tbody>'
     )
@@ -147,6 +148,32 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
         short_color = RED if r.get("short_float") and r["short_float"] > 5 else "rgba(255,255,255,0.6)"
         ytd_str = f"{r['perf_ytd']:+.1f}%" if r["perf_ytd"] is not None else "—"
         ytd_color = GREEN if r.get("perf_ytd") and r["perf_ytd"] >= 0 else RED
+
+        # Insider transactions — net % change in insider holdings over last 6 months.
+        # Positive = net buying (bullish), negative = net selling (bearish).
+        # Thresholds: |x| < 0.5% treated as noise/flat.
+        it = r.get("insider_trans")
+        if it is None:
+            insider_html = '<span style="color:rgba(255,255,255,0.25);">—</span>'
+        elif abs(it) < 0.5:
+            insider_html = (
+                f'<span style="font-size:11px;color:rgba(255,255,255,0.4);">'
+                f'{it:+.1f}%</span>'
+            )
+        elif it > 0:
+            # Net buying — green badge with up arrow
+            insider_html = (
+                f'<span style="font-size:11px;font-weight:600;color:{GREEN};'
+                f'background:rgba(86,149,66,0.10);padding:2px 6px;border-radius:3px;'
+                f'white-space:nowrap;">▲ {it:+.1f}%</span>'
+            )
+        else:
+            # Net selling — red badge with down arrow
+            insider_html = (
+                f'<span style="font-size:11px;font-weight:600;color:{RED};'
+                f'background:rgba(196,84,84,0.10);padding:2px 6px;border-radius:3px;'
+                f'white-space:nowrap;">▼ {it:+.1f}%</span>'
+            )
 
         # Highlight row when MCP target shows big upside (analyst-driven highlight removed
         # along with the Analyst column).
@@ -165,6 +192,7 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
             f'<td style="text-align:right;padding:8px;">{rsi_html}</td>'
             f'<td style="text-align:right;padding:8px;font-size:12px;color:{sma200_color};">{sma200_str}</td>'
             f'<td style="text-align:right;padding:8px;font-size:12px;color:{short_color};">{short_str}</td>'
+            f'<td style="text-align:right;padding:8px;">{insider_html}</td>'
             f'<td style="text-align:right;padding:8px;font-size:12px;color:{ytd_color};">{ytd_str}</td>'
             f'</tr>'
         )

@@ -3,11 +3,14 @@ Martin Capital Partners — News & Alerts Tab
 data/alerts_tab.py
 
 Section order (top to bottom):
-  1. Price Movers     — holdings with ±2% daily change
-  2. Dividend Events  — upcoming ex-dates within 14 days
-  3. Upcoming Earnings — holdings reporting within the next 14 days
-  4. Market Headlines — markets-focused RSS feeds
-  5. Holdings News    — filtered ticker-specific news (quality-sourced)
+  Row 1 (side-by-side on desktop, stacked on mobile):
+    Left:  Price Movers      — holdings with ±2% daily change
+    Left:  Dividend Events   — upcoming ex-dates within 14 days
+    Right: Earnings Calendar — holdings reporting in next 30 days,
+                               grouped by week, with BMO/AMC flag
+  Row 2 (full width):
+    Market Headlines — markets-focused RSS feeds
+    Holdings News    — filtered ticker-specific news (quality-sourced)
 
 News filtering:
   - Holdings news requires ticker symbol or company name in the title.
@@ -19,7 +22,14 @@ Data sources:
   - RSS feeds via feedparser (cached 15 min) — CNBC/MarketWatch/Reuters/WSJ Markets
   - Supabase prices table (change_1d_pct, price)
   - Supabase dividends table (ex_dividend_date, dividend_rate)
-  - yfinance earnings dates (cached 1 hr) and ticker news (cached 15 min)
+  - Finviz earnings_date field (cached 1 hr via finviz_data) — primary source,
+    includes BMO/AMC timing flag
+  - yfinance earnings dates (cached 1 hr) — fallback when Finviz misses
+  - yfinance ticker news (cached 15 min)
+
+Sprint 25-6: replaced standalone "Upcoming Earnings" alert section with a
+dedicated 30-day Earnings Calendar grouped by week. Side-by-side layout for
+desktop, native mobile stacking.
 """
 
 import streamlit as st
@@ -47,6 +57,15 @@ try:
     _FISH_AVAILABLE = True
 except ImportError:
     _FISH_AVAILABLE = False
+
+# Finviz earnings date is the primary source for the Earnings Calendar — it
+# returns "May 12 BMO" / "May 15 AMC" style strings with timing flags. yfinance
+# is the fallback for any ticker Finviz didn't return.
+try:
+    from data.finviz_data import fetch_finviz_batch
+    _FINVIZ_AVAILABLE = True
+except ImportError:
+    _FINVIZ_AVAILABLE = False
 
 # ── Colors ─────────────────────────────────────────────────────────────────
 GREEN = BRAND["green"]
@@ -209,6 +228,212 @@ def _earnings_alerts(tickers, price_data, days_ahead=14):
 
     alerts.sort(key=lambda a: a["sort_key"])
     return alerts
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# EARNINGS CALENDAR — 30-day view, BMO/AMC flag, grouped by week
+# ──────────────────────────────────────────────────────────────────────────
+
+# Map of common Finviz earnings_date formats to a parsed (date, timing) tuple.
+# Finviz returns strings like:
+#   "May 12 BMO"   — Before Market Open
+#   "May 15/AMC"   — After Market Close
+#   "Apr 25"       — no timing flag
+#   "May 12 BMO"   — sometimes with year if far out: "Dec 18 2026 BMO"
+# This function is forgiving: it returns (None, None) on anything it can't parse.
+
+def _parse_finviz_earnings_date(s):
+    """Parse a Finviz earnings_date string. Returns (date, timing_flag).
+    timing_flag is one of {'BMO', 'AMC', None}."""
+    if not s:
+        return None, None
+    s = str(s).strip().replace("/", " ")
+
+    # Pull off timing flag if present
+    timing = None
+    if " BMO" in s.upper():
+        timing = "BMO"
+        s = s.upper().replace(" BMO", "").strip()
+    elif " AMC" in s.upper():
+        timing = "AMC"
+        s = s.upper().replace(" AMC", "").strip()
+
+    # Try several date formats. Finviz dates have no year by default so
+    # we assume the current year and roll forward if the parsed date is
+    # in the past by more than 60 days (i.e. December → next January).
+    today = datetime.now().date()
+    parsed = None
+    for fmt in ("%b %d %Y", "%b %d", "%B %d %Y", "%B %d", "%Y-%m-%d"):
+        try:
+            dt = datetime.strptime(s.title() if "-" not in s else s, fmt).date()
+            if "%Y" not in fmt:
+                # Year was missing — assume current year, roll forward if needed
+                dt = dt.replace(year=today.year)
+                if (dt - today).days < -60:
+                    dt = dt.replace(year=today.year + 1)
+            parsed = dt
+            break
+        except (ValueError, TypeError):
+            continue
+    return parsed, timing
+
+
+def _build_earnings_calendar(tickers, price_data, finviz_data, days_ahead=30):
+    """
+    Build the earnings calendar from Finviz (primary) + yfinance (fallback).
+    Returns list of dicts: {ticker, name, date, timing, days_until, week_key, week_label}.
+    Sorted by date ascending.
+    """
+    today = datetime.now().date()
+    horizon = today + timedelta(days=days_ahead)
+    results = {}
+
+    # 1) Finviz pass — primary source
+    if finviz_data:
+        for ticker in tickers:
+            fv = finviz_data.get(ticker, {})
+            ed_str = fv.get("earnings_date")
+            if not ed_str:
+                continue
+            dt, timing = _parse_finviz_earnings_date(ed_str)
+            if dt and today <= dt <= horizon:
+                results[ticker] = (dt, timing)
+
+    # 2) yfinance fallback — only for tickers Finviz didn't return
+    missing = [t for t in tickers if t not in results]
+    if missing:
+        yf_dates = _fetch_earnings_dates(tuple(missing))
+        for ticker, date_str in yf_dates.items():
+            try:
+                dt = datetime.strptime(date_str[:10], "%Y-%m-%d").date()
+                if today <= dt <= horizon:
+                    results[ticker] = (dt, None)  # yfinance doesn't expose BMO/AMC
+            except (ValueError, TypeError):
+                pass
+
+    # 3) Build display rows with week grouping
+    rows = []
+    for ticker, (dt, timing) in results.items():
+        mkt = price_data.get(ticker, {})
+        name = mkt.get("name", ticker)
+        days_until = (dt - today).days
+
+        # Week key: Monday of that week. Label is e.g. "This week" / "Next week" / "May 26 – Jun 1"
+        monday = dt - timedelta(days=dt.weekday())
+        this_monday = today - timedelta(days=today.weekday())
+        weeks_out = (monday - this_monday).days // 7
+        if weeks_out == 0:
+            week_label = "This week"
+        elif weeks_out == 1:
+            week_label = "Next week"
+        else:
+            sunday = monday + timedelta(days=6)
+            week_label = f"{monday.strftime('%b %d')} – {sunday.strftime('%b %d')}"
+
+        rows.append({
+            "ticker": ticker,
+            "name": name,
+            "date": dt,
+            "timing": timing,
+            "days_until": days_until,
+            "week_key": monday,
+            "week_label": week_label,
+        })
+
+    rows.sort(key=lambda r: (r["date"], r["timing"] or "ZZZ", r["ticker"]))
+    return rows
+
+
+def _render_earnings_calendar(rows):
+    """Render the earnings calendar as a compact grouped-by-week list."""
+    st.markdown(
+        '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);'
+        'text-transform:uppercase;letter-spacing:0.08em;padding:0 0 8px;'
+        'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:0">'
+        'Earnings Calendar'
+        f'<span style="font-size:11px;font-weight:400;color:rgba(255,255,255,0.2);'
+        f'margin-left:8px;">{len(rows)}</span>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if not rows:
+        st.markdown(
+            '<div style="padding:16px 0;font-size:13px;color:rgba(255,255,255,0.35);">'
+            'No earnings in the next 30 days.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    # Group by week_key
+    current_week = None
+    html_parts = []
+    for r in rows:
+        if r["week_key"] != current_week:
+            # Close previous table if any
+            if current_week is not None:
+                html_parts.append("</tbody></table>")
+            # Open new week heading + table
+            html_parts.append(
+                f'<div style="font-size:10px;font-weight:600;color:rgba(255,255,255,0.4);'
+                f'text-transform:uppercase;letter-spacing:0.06em;padding:14px 0 6px;">'
+                f'{r["week_label"]}</div>'
+                f'<table style="width:100%;border-collapse:collapse;">'
+                f'<tbody>'
+            )
+            current_week = r["week_key"]
+
+        # Timing badge
+        if r["timing"] == "BMO":
+            timing_html = (
+                '<span style="font-size:9px;font-weight:600;color:rgba(201,168,76,0.85);'
+                'background:rgba(201,168,76,0.10);padding:2px 6px;border-radius:3px;'
+                'letter-spacing:0.04em;">BMO</span>'
+            )
+        elif r["timing"] == "AMC":
+            timing_html = (
+                '<span style="font-size:9px;font-weight:600;color:rgba(7,140,200,0.9);'
+                'background:rgba(7,65,90,0.20);padding:2px 6px;border-radius:3px;'
+                'letter-spacing:0.04em;">AMC</span>'
+            )
+        else:
+            timing_html = (
+                '<span style="font-size:9px;color:rgba(255,255,255,0.25);'
+                'letter-spacing:0.04em;">—</span>'
+            )
+
+        # Date display: "Mon May 12"
+        date_str = r["date"].strftime("%a %b %d")
+
+        # Highlight TODAY in gold; "in 1d" / "in 2d" hint below name
+        if r["days_until"] == 0:
+            days_hint = '<span style="color:#C9A84C;font-weight:600;">TODAY</span>'
+        elif r["days_until"] == 1:
+            days_hint = '<span style="color:rgba(201,168,76,0.7);">in 1 day</span>'
+        else:
+            days_hint = f'<span style="color:rgba(255,255,255,0.3);">in {r["days_until"]} days</span>'
+
+        html_parts.append(
+            f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">'
+            f'<td style="padding:8px 8px;font-size:12px;font-weight:600;color:#C9A84C;'
+            f'white-space:nowrap;vertical-align:top;width:50px;">{r["ticker"]}</td>'
+            f'<td style="padding:8px 6px;vertical-align:top;">'
+            f'<div style="font-size:12px;color:rgba(255,255,255,0.8);line-height:1.3;'
+            f'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0;width:100%;">'
+            f'{r["name"]}</div>'
+            f'<div style="font-size:10px;margin-top:2px;">{days_hint}</div>'
+            f'</td>'
+            f'<td style="padding:8px 6px;font-size:11px;color:rgba(255,255,255,0.55);'
+            f'white-space:nowrap;vertical-align:top;text-align:right;">{date_str}</td>'
+            f'<td style="padding:8px 6px;vertical-align:top;text-align:right;'
+            f'width:48px;">{timing_html}</td>'
+            f'</tr>'
+        )
+
+    # Close the final table
+    html_parts.append("</tbody></table>")
+    st.markdown("".join(html_parts), unsafe_allow_html=True)
 
 
 def _build_ticker_name_map(tickers, price_data):
@@ -659,6 +884,15 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
     Args:
         tamarac_parsed: dict from parse_tamarac_excel()
         active_strategy: str, e.g. "QDVD"
+
+    Sprint 25-6 layout:
+      Row 1 (st.columns([1, 1])):
+        Left  — Price Movers + Dividend Events stacked
+        Right — Earnings Calendar (30 days, grouped by week)
+      Row 2 (full width): Market Headlines + Holdings News
+
+    On mobile, Streamlit auto-stacks columns vertically:
+      Price Movers → Dividend Events → Earnings Calendar → News
     """
 
     tickers = sorted(get_all_unique_tickers(tamarac_parsed))
@@ -671,41 +905,54 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
         if _DIV_AVAILABLE:
             div_data = get_batch_dividend_details(tuple(tickers))
 
+        # Finviz batch — already cached 1hr by fetch_finviz_batch itself.
+        # We use this for the earnings_date field; yfinance is the fallback
+        # for any ticker Finviz didn't return.
+        finviz_data = {}
+        if _FINVIZ_AVAILABLE:
+            try:
+                finviz_data = fetch_finviz_batch(tuple(tickers))
+            except Exception:
+                finviz_data = {}
+
     # ── Generate alerts ───────────────────────────────────────────────────
     price_alerts = _price_mover_alerts(tickers, price_data)
     div_alerts = _dividend_alerts(tickers, price_data, div_data) if div_data else []
-    earnings_alerts = _earnings_alerts(tickers, price_data)
+    earnings_rows = _build_earnings_calendar(tickers, price_data, finviz_data, days_ahead=30)
 
-    all_alerts = price_alerts + div_alerts + earnings_alerts
+    # ── Row 1: Side-by-side alerts + earnings calendar ────────────────────
+    col_alerts, col_earnings = st.columns([1, 1])
 
-    # ── Portfolio Alerts sections (top) ───────────────────────────────────
-    if not all_alerts:
-        st.markdown(
-            '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);'
-            'text-transform:uppercase;letter-spacing:0.08em;padding:0 0 8px;'
-            'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:0">'
-            'Portfolio Alerts'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<div style="padding:16px 0;font-size:13px;color:rgba(255,255,255,0.35);">'
-            'No alerts — all holdings within normal ranges.'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        if price_alerts:
-            _render_alert_section("Price Movers", price_alerts)
-        if div_alerts:
-            _render_alert_section("Dividend Events", div_alerts)
-        if earnings_alerts:
-            _render_alert_section("Upcoming Earnings", earnings_alerts)
+    with col_alerts:
+        # If both alert lists are empty, show the empty-state header once
+        if not price_alerts and not div_alerts:
+            st.markdown(
+                '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);'
+                'text-transform:uppercase;letter-spacing:0.08em;padding:0 0 8px;'
+                'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:0">'
+                'Portfolio Alerts'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                '<div style="padding:16px 0;font-size:13px;color:rgba(255,255,255,0.35);">'
+                'No alerts — all holdings within normal ranges.'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            if price_alerts:
+                _render_alert_section("Price Movers", price_alerts)
+            if div_alerts:
+                _render_alert_section("Dividend Events", div_alerts)
 
-    # Spacer between alerts and news
+    with col_earnings:
+        _render_earnings_calendar(earnings_rows)
+
+    # Spacer between top row and news
     st.markdown('<div style="height:24px;"></div>', unsafe_allow_html=True)
 
-    # ── News (Market Headlines + Holdings News) at the bottom ─────────────
+    # ── Row 2: News (Market Headlines + Holdings News) full-width ─────────
     # Build the ticker→tokens map for relevance filtering, then pass as a
     # hashable tuple so @st.cache_data on _fetch_holdings_news still works.
     token_map = _build_ticker_name_map(tickers, price_data)
@@ -716,6 +963,7 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
 
     # ── Footer ────────────────────────────────────────────────────────────
     st.caption(
-        f"Alerts: Supabase + yfinance · News: RSS feeds (15-min cache) · "
+        f"Alerts: Supabase + yfinance · Earnings: Finviz + yfinance · "
+        f"News: RSS feeds (15-min cache) · "
         f"{datetime.now().strftime('%I:%M %p')}"
     )
