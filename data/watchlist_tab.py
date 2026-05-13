@@ -12,6 +12,13 @@ Holdings tab pattern. Sortable columns come for free. The custom red /
 gold / green tier coloring on "% From 52W Hi" is gone — Streamlit's
 NumberColumn doesn't support value-based color tiers. Sortability +
 drill-through is the better trade.
+
+Sprint 25-3: fixed vibration bug on short watchlists. Root cause was the
+dataframe height sitting on the scrollbar-threshold boundary, causing
+a layout reflow loop. Added a 250px minimum height floor. Also removed
+a redundant st.rerun() after the selectbox (selectbox triggers its own
+rerun on change) and gave the dataframe a per-watchlist key so selection
+state can't leak between lists.
 """
 
 import streamlit as st
@@ -76,9 +83,7 @@ def render_watchlist_tab():
             key="wl_list_selector",
             label_visibility="collapsed",
         )
-        if selected != st.session_state["wl_active_list"]:
-            st.session_state["wl_active_list"] = selected
-            st.rerun()
+        st.session_state["wl_active_list"] = selected
 
     with info_col:
         st.caption(
@@ -150,9 +155,12 @@ def render_watchlist_tab():
     kc4.metric("Avg Fwd P/E", f"{avg_fwd_pe:.1f}" if pd.notna(avg_fwd_pe) and avg_fwd_pe > 0 else "—")
 
     # ── Main Table — st.dataframe with single-row selection ────────────────
-    # Height calculation mirrors the Holdings tab — generous to prevent an
-    # internal scrollbar on mobile.
-    _df_height = min(80 + len(display_df) * 40, 2000)
+    # Height floor of 250px prevents short watchlists (QDVD A/B, SMID A/B) from
+    # oscillating on the scrollbar threshold. Without the floor, lists of 3-5
+    # tickers produced a height where Streamlit's layout engine flipped between
+    # "needs scrollbar" and "doesn't need scrollbar" on every render pass,
+    # causing the visible left-right vibration.
+    _df_height = max(250, min(80 + len(display_df) * 40, 2000))
 
     event = st.dataframe(
         display_df,
@@ -161,7 +169,7 @@ def render_watchlist_tab():
         height=_df_height,
         selection_mode="single-row",
         on_select="rerun",
-        key="watchlist_table",
+        key=f"watchlist_table_{active_list}",
         column_config={
             "Ticker": st.column_config.TextColumn("Ticker", width="small"),
             "Company": st.column_config.TextColumn("Company", width="medium"),
