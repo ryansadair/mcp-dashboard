@@ -19,6 +19,13 @@ a layout reflow loop. Added a 250px minimum height floor. Also removed
 a redundant st.rerun() after the selectbox (selectbox triggers its own
 rerun on change) and gave the dataframe a per-watchlist key so selection
 state can't leak between lists.
+
+Sprint 25-8: added back the value-based color tiers via pandas Styler.
+Same pattern as the MCP Targets table on the Holdings tab — sortable
+dataframe + per-cell colors driven by Styler.map callbacks. Tiers are
+tuned for a dividend-focused research watchlist: yields >7% flagged gold
+(possible trap), P/E <=15 green (cheap), beta <=1 green (defensive),
+% From 52W Hi <-25% red (deep weakness).
 """
 
 import streamlit as st
@@ -141,6 +148,71 @@ def render_watchlist_tab():
 
     display_df = pd.DataFrame(rows)
 
+    # ── Cell color functions (Sprint 25-8: Styler-based color tiers) ──────
+    # Match the MCP Targets table pattern on the Holdings tab. Each function
+    # returns a CSS declaration string; Styler.map applies it per cell.
+
+    def _color_ticker(v):
+        return f"color: {GOLD}; font-weight: 600"
+
+    def _color_yield(v):
+        # Dividend-focused watchlist: higher yield = more interesting, but
+        # very high yields (>7%) often signal yield traps, so they get gold
+        # instead of green to flag "investigate before buying."
+        try:
+            v = float(v)
+            if v >= 7:    return f"color: {GOLD}; font-weight: 600"  # possible trap
+            if v >= 4:    return f"color: {GREEN}; font-weight: 600"  # attractive
+            if v >= 2:    return f"color: {GOLD}"                      # moderate
+            return "color: rgba(255,255,255,0.6)"                      # low
+        except (ValueError, TypeError):
+            return "color: rgba(255,255,255,0.3)"
+
+    def _color_pe(v):
+        # Lower P/E = cheaper. Negative P/E means earnings are negative.
+        try:
+            v = float(v)
+            if v <= 0:    return f"color: {RED}"                       # losing money
+            if v <= 15:   return f"color: {GREEN}; font-weight: 600"   # cheap
+            if v <= 25:   return "color: rgba(255,255,255,0.7)"        # neutral
+            if v <= 35:   return f"color: {GOLD}"                      # rich
+            return f"color: {RED}; font-weight: 600"                   # very expensive
+        except (ValueError, TypeError):
+            return "color: rgba(255,255,255,0.3)"
+
+    def _color_beta(v):
+        # Beta interpretation for a dividend boutique: <1 is less volatile
+        # (good), 1-1.5 is moderate, >1.5 is high-volatility (caution).
+        try:
+            v = float(v)
+            if v <= 1.0:  return f"color: {GREEN}"                     # defensive
+            if v <= 1.5:  return f"color: {GOLD}"                      # moderate
+            return f"color: {RED}; font-weight: 600"                   # volatile
+        except (ValueError, TypeError):
+            return "color: rgba(255,255,255,0.3)"
+
+    def _color_from_hi(v):
+        # % From 52W High is always negative or near zero.
+        # Near highs = neutral, modest pullback = gold (opportunity-watching),
+        # deep pullback = red (broken or value, requires investigation).
+        try:
+            v = float(v)
+            if v >= -10:  return "color: rgba(255,255,255,0.6)"        # near highs
+            if v >= -25:  return f"color: {GOLD}"                      # pullback zone
+            return f"color: {RED}; font-weight: 600"                   # deep weakness
+        except (ValueError, TypeError):
+            return "color: rgba(255,255,255,0.3)"
+
+    styled = (
+        display_df.style
+        .map(_color_ticker,  subset=["Ticker"])
+        .map(_color_yield,   subset=["Div Yield"])
+        .map(_color_pe,      subset=["P/E"])
+        .map(_color_pe,      subset=["Fwd P/E"])
+        .map(_color_beta,    subset=["Beta"])
+        .map(_color_from_hi, subset=["% From 52W Hi"])
+    )
+
     # ── KPI Cards ──────────────────────────────────────────────────────────
     avg_yield = display_df["Div Yield"].dropna().mean() if not display_df.empty else 0
     pe_valid = display_df["P/E"].dropna()
@@ -163,7 +235,7 @@ def render_watchlist_tab():
     _df_height = max(250, min(80 + len(display_df) * 40, 2000))
 
     event = st.dataframe(
-        display_df,
+        styled,
         width="stretch",
         hide_index=True,
         height=_df_height,
