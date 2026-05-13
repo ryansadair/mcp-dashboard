@@ -203,98 +203,11 @@ def render_finviz_panel(tam_df, price_data, notion_data=None):
     # Split into chunks of ~5 rows each
     st.markdown(html, unsafe_allow_html=True)
 
-    # ── Technical Signals Summary ─────────────────────────────────────────
-    st.markdown(
-        '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
-        'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
-        'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
-        'Technical Signals</div>',
-        unsafe_allow_html=True,
-    )
-
-    col_rsi, col_sma = st.columns(2)
-
-    with col_rsi:
-        st.markdown("**RSI Extremes**")
-        overbought = df[df["rsi"].apply(lambda x: x is not None and x >= 70)]
-        oversold = df[df["rsi"].apply(lambda x: x is not None and x <= 30)]
-
-        if not overbought.empty:
-            for _, r in overbought.iterrows():
-                st.markdown(
-                    f'<div style="padding:6px 10px;margin-bottom:4px;border-radius:6px;'
-                    f'background:rgba(196,84,84,0.08);border-left:3px solid {RED};">'
-                    f'<span style="font-weight:600;color:rgba(255,255,255,0.8);">{r["symbol"]}</span>'
-                    f' <span style="color:rgba(255,255,255,0.4);">RSI {r["rsi"]:.0f}</span>'
-                    f' <span style="font-size:10px;color:{RED};">Overbought</span></div>',
-                    unsafe_allow_html=True,
-                )
-        if not oversold.empty:
-            for _, r in oversold.iterrows():
-                st.markdown(
-                    f'<div style="padding:6px 10px;margin-bottom:4px;border-radius:6px;'
-                    f'background:rgba(86,149,66,0.08);border-left:3px solid {GREEN};">'
-                    f'<span style="font-weight:600;color:rgba(255,255,255,0.8);">{r["symbol"]}</span>'
-                    f' <span style="color:rgba(255,255,255,0.4);">RSI {r["rsi"]:.0f}</span>'
-                    f' <span style="font-size:10px;color:{GREEN};">Oversold</span></div>',
-                    unsafe_allow_html=True,
-                )
-        if overbought.empty and oversold.empty:
-            st.caption("No holdings at RSI extremes (>70 or <30)")
-
-    with col_sma:
-        st.markdown("**Trend Position (200-SMA)**")
-        for _, r in df.sort_values("sma200", ascending=True, na_position="last").iterrows():
-            if r["sma200"] is None:
-                continue
-            dist = r["sma200"]
-            if dist < -10:
-                color = RED
-                bar_color = "rgba(196,84,84,0.6)"
-            elif dist < 0:
-                color = GOLD
-                bar_color = "rgba(201,168,76,0.5)"
-            else:
-                color = GREEN
-                bar_color = "rgba(86,149,66,0.5)"
-
-            # Normalize bar width: map -30% to +30% range onto 0-100%
-            bar_pct = max(0, min(100, (dist + 30) / 60 * 100))
-
-            st.markdown(
-                f'<div style="display:flex;align-items:center;margin-bottom:4px;gap:8px;">'
-                f'<span style="width:42px;font-size:11px;font-weight:600;color:#C9A84C;">{r["symbol"]}</span>'
-                f'<div style="flex:1;height:10px;background:rgba(255,255,255,0.04);border-radius:3px;position:relative;">'
-                f'<div style="position:absolute;left:50%;top:0;width:1px;height:10px;background:rgba(255,255,255,0.15);"></div>'
-                f'<div style="width:{bar_pct:.0f}%;height:10px;border-radius:3px;background:{bar_color};"></div>'
-                f'</div>'
-                f'<span style="width:48px;font-size:11px;text-align:right;color:{color};">{dist:+.1f}%</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
-    # ── Short Interest Watchlist ──────────────────────────────────────────
-    high_short = df[df["short_float"].apply(lambda x: x is not None and x >= 3.0)]
-    if not high_short.empty:
-        st.markdown(
-            '<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.6);'
-            'text-transform:uppercase;letter-spacing:0.06em;padding:16px 0 8px;'
-            'border-bottom:1px solid rgba(255,255,255,0.06);margin-bottom:10px">'
-            'Elevated Short Interest (≥3%)</div>',
-            unsafe_allow_html=True,
-        )
-        for _, r in high_short.sort_values("short_float", ascending=False).iterrows():
-            color = RED if r["short_float"] >= 5 else GOLD
-            st.markdown(
-                f'<div style="padding:8px 12px;margin-bottom:6px;border-radius:6px;'
-                f'background:rgba(201,168,76,0.05);border-left:3px solid {color};">'
-                f'<span style="font-weight:600;color:rgba(255,255,255,0.8);">{r["symbol"]}</span>'
-                f' — <span style="color:{color};font-weight:500;">{r["short_float"]:.1f}% short</span>'
-                f' <span style="color:rgba(255,255,255,0.35);font-size:11px;">'
-                f'· RSI {r["rsi"]:.0f}' if r["rsi"] else ''
-                f'</span></div>',
-                unsafe_allow_html=True,
-            )
+    # Sprint 25-6b: removed the three Technical Signals summary widgets that
+    # used to live below the main table (RSI Extremes, Trend Position 200-SMA
+    # bars, Elevated Short Interest). The same data already appears in the
+    # main MCP Targets & Technicals table above (RSI, SMA200, Short% columns
+    # with their own color coding), so the bottom widgets were redundant.
 
     st.caption(
         f"Source: Finviz (technicals) · Notion (MCP targets) · Cached 1 hour · "
