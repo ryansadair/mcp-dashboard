@@ -427,10 +427,14 @@ with _search_col:
     if _ticker_universe:
         # "—" sentinel as the first option so the box renders empty/inert
         # by default. Picking any ticker fires _on_ticker_search → nav.
+        # format_func lets us display a friendly label ("Select Ticker") for
+        # the sentinel while keeping the underlying value as "—" so the
+        # navigation callback's `chosen != "—"` guard still works.
         st.selectbox(
             "Ticker Search",
             options=["—"] + _ticker_universe,
             index=0,
+            format_func=lambda x: "Select Ticker" if x == "—" else x,
             key="ticker_search_main",
             label_visibility="collapsed",
             on_change=_on_ticker_search,
