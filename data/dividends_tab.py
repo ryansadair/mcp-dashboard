@@ -262,14 +262,27 @@ def _build_enriched_df(tam_df, price_data, div_data):
         streak_began   = fish.get("streak_began", None)
         recessions     = fish.get("recessions", 0)
 
-        # Sprint 25-13: when we've decided the growth data isn't trustworthy
-        # (typically ADRs like KOF where USD-converted dividends fluctuate
-        # with FX rates), null out the cells so they render as em dashes
-        # rather than showing misleading negative numbers. Same goes for
-        # streak_began/recessions/consec_years — Fish's streak fields are
-        # based on USD-converted dividend totals, so a "no streak" finding
-        # on an ADR could just be FX noise rather than a real cut.
-        _is_untrusted_adr = fish_has_any and not _fish_has_growth
+        # Sprint 25-13: when we've decided the growth data isn't trustworthy,
+        # null the cells so they render as em dashes rather than showing
+        # misleading negative numbers. This catches two ADR patterns:
+        #
+        #   (a) Fish CCC has the ticker but with negative growth and no real
+        #       streak (FX-noise pattern) — KOF is the canonical example.
+        #   (b) Fish doesn't carry the ticker at all, so growth fell back to
+        #       Supabase/yfinance which also reports USD-converted negatives
+        #       that may be pure FX. Same heuristic: significant negative
+        #       growth + no Fish streak = treat as untrusted.
+        #
+        # Same goes for streak_began/recessions/consec_years — Fish's streak
+        # fields are based on USD-converted dividend totals, so a "no streak"
+        # finding on an ADR could just be FX noise rather than a real cut.
+        _untrusted_from_fish = fish_has_any and not _fish_has_growth
+        _untrusted_from_yf = (
+            not fish_has_any                                 # no Fish data
+            and consec_years < 5                             # no real streak
+            and (growth_1y < 0 or growth_5y < 0)             # negative growth
+        )
+        _is_untrusted_adr = _untrusted_from_fish or _untrusted_from_yf
         if _is_untrusted_adr:
             growth_1y = None
             growth_3y = None
@@ -344,8 +357,8 @@ def _build_enriched_df(tam_df, price_data, div_data):
 # Tamarac file is updated, so the cache invalidates on its own.
 
 @st.cache_data(ttl=1800, show_spinner=False, max_entries=32)
-@disk_cached(namespace="div_enriched_v4", ttl=1800, version=3)
-def _enriched_df_for_strategy_v4(strategy, ticker_tuple, _tamarac_parsed):
+@disk_cached(namespace="div_enriched_v5", ttl=1800, version=4)
+def _enriched_df_for_strategy_v5(strategy, ticker_tuple, _tamarac_parsed):
     """Cached enrichment keyed on (strategy, ticker_tuple).
 
     Fetches price + dividend data from already-cached helpers, runs
@@ -363,9 +376,14 @@ def _enriched_df_for_strategy_v4(strategy, ticker_tuple, _tamarac_parsed):
     each row (from Notion). The old cached frames don't have the column,
     which made the new Paid display column read None for every ticker.
 
-    Sprint 25-13: bumped v3 -> v4 after nulling growth/streak fields for
+    Sprint 25-13a: bumped v3 -> v4 after nulling growth/streak fields for
     untrusted ADRs (KOF, etc.). Old cached frames have negative growth
     values that should now be None.
+
+    Sprint 25-13b: bumped v4 -> v5 after extending the trust check to also
+    catch ADRs where Fish has no data at all but Supabase is reporting
+    FX-noise negatives (the actual KOF pattern — turned out it isn't in
+    Fish, so the original v4 null-out didn't fire).
     """
     tam_df = get_holdings_for_strategy(_tamarac_parsed, strategy)
     price_data = fetch_batch_prices(ticker_tuple)
@@ -400,7 +418,7 @@ def _enrich_for_strategy(tamarac_parsed, active_strategy):
 
     # The cached helper does the expensive work on cache misses. On hits,
     # this returns instantly.
-    edf = _enriched_df_for_strategy_v4(active_strategy, ticker_tuple, tamarac_parsed)
+    edf = _enriched_df_for_strategy_v5(active_strategy, ticker_tuple, tamarac_parsed)
 
     # We still return price_data and div_data for callers that need them
     # (income dashboard uses them directly). These are cached, so cheap.
