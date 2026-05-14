@@ -305,7 +305,7 @@ ECON_SERIES = {
     "Core CPI (YoY)": {"id": "CPILFESL", "transform": "yoy", "freq": "monthly"},
     "Unemployment Rate": {"id": "UNRATE", "transform": "level", "freq": "monthly"},
     "GDP Growth (QoQ Ann.)": {"id": "A191RL1Q225SBEA", "transform": "level", "freq": "quarterly"},
-    "ISM Manufacturing": {"id": "MANEMP", "transform": "level", "freq": "monthly"},
+    "Philly Fed Mfg": {"id": "GACDFSA066MSFRBPHI", "transform": "level", "freq": "monthly"},
     "Consumer Confidence": {"id": "UMCSENT", "transform": "level", "freq": "monthly"},
     "PCE (YoY)": {"id": "PCEPI", "transform": "yoy", "freq": "monthly"},
     "Initial Jobless Claims": {"id": "ICSA", "transform": "level", "freq": "weekly"},
@@ -357,7 +357,7 @@ def _fmt_econ_val(name, val):
         return f"{val / 1000:.0f}K" if val > 100 else f"{val:.0f}K"
     if "Unemployment" in name or "CPI" in name or "PCE" in name or "GDP" in name:
         return f"{val:.2f}%"
-    if "ISM" in name or "Confidence" in name:
+    if "Philly Fed" in name or "Confidence" in name:
         return f"{val:.1f}"
     return f"{val:.2f}"
 
@@ -372,8 +372,10 @@ def _signal_for_econ(name, val, prev):
         return "positive" if val <= prev else "watch"
     if "GDP" in name:
         return "positive" if val >= 2.0 else "watch" if val >= 0 else "alert"
-    if "ISM" in name:
-        return "positive" if val >= 50 else "watch"
+    if "Philly Fed" in name:
+        # Diffusion index: positive = expansion, negative = contraction.
+        # >5 is clearly positive, 0-5 is mild, <0 is contraction.
+        return "positive" if val >= 5 else "watch" if val >= 0 else "alert"
     if "Claims" in name:
         return "positive" if val < prev else "watch"
     if "Confidence" in name:
