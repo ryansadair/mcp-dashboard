@@ -262,6 +262,23 @@ def _build_enriched_df(tam_df, price_data, div_data):
         streak_began   = fish.get("streak_began", None)
         recessions     = fish.get("recessions", 0)
 
+        # Sprint 25-13: when we've decided the growth data isn't trustworthy
+        # (typically ADRs like KOF where USD-converted dividends fluctuate
+        # with FX rates), null out the cells so they render as em dashes
+        # rather than showing misleading negative numbers. Same goes for
+        # streak_began/recessions/consec_years — Fish's streak fields are
+        # based on USD-converted dividend totals, so a "no streak" finding
+        # on an ADR could just be FX noise rather than a real cut.
+        _is_untrusted_adr = fish_has_any and not _fish_has_growth
+        if _is_untrusted_adr:
+            growth_1y = None
+            growth_3y = None
+            growth_5y = None
+            growth_10y = None
+            streak_began = None
+            recessions = 0
+            consec_years = 0
+
         # Paid Since — manually curated in Notion (more reliable than Fish
         # Historical, which floors at 1999 and would produce misleading
         # values like "1999" for JNJ — real answer is 1944). Same source
@@ -298,10 +315,10 @@ def _build_enriched_df(tam_df, price_data, div_data):
             "annual_income": round(annual_inc, 2),
             "payout_ratio":  round(payout_ratio, 1),
             "consec_years":  int(consec_years),
-            "growth_1y":     round(growth_1y, 1),
-            "growth_3y":     round(growth_3y, 1),
-            "growth_5y":     round(growth_5y, 1),
-            "growth_10y":    round(growth_10y, 1),
+            "growth_1y":     round(growth_1y, 1) if growth_1y is not None else None,
+            "growth_3y":     round(growth_3y, 1) if growth_3y is not None else None,
+            "growth_5y":     round(growth_5y, 1) if growth_5y is not None else None,
+            "growth_10y":    round(growth_10y, 1) if growth_10y is not None else None,
             "ex_date":       ex_date,
             # Fish-only fields
             "chowder":       round(chowder, 1),
@@ -327,8 +344,8 @@ def _build_enriched_df(tam_df, price_data, div_data):
 # Tamarac file is updated, so the cache invalidates on its own.
 
 @st.cache_data(ttl=1800, show_spinner=False, max_entries=32)
-@disk_cached(namespace="div_enriched_v3", ttl=1800, version=2)
-def _enriched_df_for_strategy_v3(strategy, ticker_tuple, _tamarac_parsed):
+@disk_cached(namespace="div_enriched_v4", ttl=1800, version=3)
+def _enriched_df_for_strategy_v4(strategy, ticker_tuple, _tamarac_parsed):
     """Cached enrichment keyed on (strategy, ticker_tuple).
 
     Fetches price + dividend data from already-cached helpers, runs
@@ -345,6 +362,10 @@ def _enriched_df_for_strategy_v3(strategy, ticker_tuple, _tamarac_parsed):
     Sprint 25-12: bumped v2 -> v3 after adding the paid_since column to
     each row (from Notion). The old cached frames don't have the column,
     which made the new Paid display column read None for every ticker.
+
+    Sprint 25-13: bumped v3 -> v4 after nulling growth/streak fields for
+    untrusted ADRs (KOF, etc.). Old cached frames have negative growth
+    values that should now be None.
     """
     tam_df = get_holdings_for_strategy(_tamarac_parsed, strategy)
     price_data = fetch_batch_prices(ticker_tuple)
@@ -379,7 +400,7 @@ def _enrich_for_strategy(tamarac_parsed, active_strategy):
 
     # The cached helper does the expensive work on cache misses. On hits,
     # this returns instantly.
-    edf = _enriched_df_for_strategy_v3(active_strategy, ticker_tuple, tamarac_parsed)
+    edf = _enriched_df_for_strategy_v4(active_strategy, ticker_tuple, tamarac_parsed)
 
     # We still return price_data and div_data for callers that need them
     # (income dashboard uses them directly). These are cached, so cheap.
@@ -395,6 +416,11 @@ def _safety_grade(payout, growth_5y, consec, fish_sourced=False):
     growth as neutral since yfinance lumps FX effects and specials into totals.
     Returns letter grade string.
     """
+    # Sprint 25-13: growth_5y may be None for untrusted ADR rows where Fish's
+    # USD-converted values were nulled out. Treat None as neutral (no data).
+    if growth_5y is None:
+        growth_5y = 0
+
     score = 0
     # Payout ratio component (lower is safer)
     if payout <= 0:
@@ -470,6 +496,9 @@ def _safety_grade(payout, growth_5y, consec, fish_sourced=False):
 def _growth_tier(growth_5y, fish_sourced=False):
     """Classify a holding into dividend growth tiers.
     For non-Fish tickers, moderate negative growth is labeled as uncertain."""
+    # Sprint 25-13: untrusted ADR rows have None — label them explicitly.
+    if growth_5y is None:
+        return "No CCC data"
     if growth_5y >= 10:
         return "Elite (10%+)"
     elif growth_5y >= 5:
