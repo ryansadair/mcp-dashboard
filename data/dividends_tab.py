@@ -62,6 +62,15 @@ try:
 except ImportError:
     _STREAKS_AVAILABLE = False
 
+# Notion metrics — for "Paid Since" (manually curated, more reliable than
+# Fish Historical which floors at 1999). Sprint 25-12: replaces the old
+# Streak/Began column pair with Paid/Raised to match the Warbook QDG view.
+try:
+    from data.notion_metrics import fetch_notion_metrics
+    _NOTION_AVAILABLE = True
+except ImportError:
+    _NOTION_AVAILABLE = False
+
 # ── Plotly theme (matches 1_Dashboard.py) ──────────────────────────────────
 PLOTLY_DARK = dict(
     paper_bgcolor="rgba(255,255,255,0.02)",
@@ -127,11 +136,22 @@ def _build_enriched_df(tam_df, price_data, div_data):
     Merge Tamarac holdings with live price + dividend data into a single DF.
     Returns a DataFrame with one row per holding, sorted by weight descending.
     """
+    # Sprint 25-12: pull Notion metrics for paid_since (manually curated year
+    # the company first paid a dividend). Matches the warbook QDG view's Paid
+    # column. Notion's own fetch is cached so this is cheap on repeat calls.
+    notion_data = {}
+    if _NOTION_AVAILABLE:
+        try:
+            notion_data = fetch_notion_metrics()
+        except Exception:
+            pass
+
     rows = []
     for _, h in tam_df.iterrows():
         sym = h["symbol"]
         mkt = price_data.get(sym, {})
         dd  = div_data.get(sym, {})
+        nm  = notion_data.get(sym, {})
 
         # Quantity from Tamarac (pulled early because annual_income derives from it,
         # and annual_income + cost_basis are used in the YoC fallback below)
@@ -242,6 +262,18 @@ def _build_enriched_df(tam_df, price_data, div_data):
         streak_began   = fish.get("streak_began", None)
         recessions     = fish.get("recessions", 0)
 
+        # Paid Since — manually curated in Notion (more reliable than Fish
+        # Historical, which floors at 1999 and would produce misleading
+        # values like "1999" for JNJ — real answer is 1944). Same source
+        # the Warbook QDG Characteristics view uses.
+        paid_since_raw = nm.get("paid_since")
+        paid_since = None
+        if paid_since_raw is not None:
+            try:
+                paid_since = int(float(str(paid_since_raw)))
+            except (ValueError, TypeError):
+                pass
+
         # Market data
         price  = mkt.get("price", 0) or 0
         sector = normalize_sector(mkt.get("sector", ""))
@@ -274,6 +306,7 @@ def _build_enriched_df(tam_df, price_data, div_data):
             # Fish-only fields
             "chowder":       round(chowder, 1),
             "streak_began":  streak_began,
+            "paid_since":    paid_since,
             "recessions":    int(recessions),
             "div_history":   div_hist,
             "fish_sourced":  _fish_has_growth,
@@ -587,11 +620,22 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
     # Build display columns
     detail_rows = []
     for _, r in edf.iterrows():
-        began = r.get("streak_began", None)
+        # Sprint 25-12: Streak/Began columns retired in favor of Paid/Raised
+        # to match the Warbook QDG Characteristics view.
+        #   - Paid   = year company first paid a dividend (from Notion)
+        #   - Raised = year current annual-increase streak began (from Fish)
+        paid_raw = r.get("paid_since", None)
         try:
-            began_str = str(int(float(str(began)))) if began and str(began).strip() not in ("", "0", "None", "nan") else "N/A"
+            paid_str = str(int(float(str(paid_raw)))) if paid_raw and str(paid_raw).strip() not in ("", "0", "None", "nan") else "—"
         except (ValueError, TypeError):
-            began_str = "N/A"
+            paid_str = "—"
+
+        raised_raw = r.get("streak_began", None)
+        try:
+            raised_str = str(int(float(str(raised_raw)))) if raised_raw and str(raised_raw).strip() not in ("", "0", "None", "nan") else "—"
+        except (ValueError, TypeError):
+            raised_str = "—"
+
         detail_rows.append({
             "Symbol":         r["symbol"],
             "Company":        r["description"],
@@ -603,8 +647,8 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "3Y Growth":      r["growth_3y"],
             "5Y Growth":      r["growth_5y"],
             "10Y Growth":     r["growth_10y"],
-            "Streak":         r["consec_years"] if r["consec_years"] > 0 else "N/A",
-            "Began":          began_str,
+            "Paid":           paid_str,
+            "Raised":         raised_str,
             "Recessions":     r["recessions"] if r["consec_years"] > 0 else "N/A",
             "Payout %":       r["payout_ratio"],
             "Safety":         r["safety"],
@@ -662,7 +706,6 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "3Y Growth":      "{:+.2f}%",
             "5Y Growth":      "{:+.2f}%",
             "10Y Growth":     lambda v: f"{v:+.2f}%" if isinstance(v, (int, float)) and v != 0 else "N/A",
-            "Streak":         lambda v: f"{v:.0f}y" if isinstance(v, (int, float)) else str(v),
             "Recessions":     lambda v: str(v) if isinstance(v, (int, float)) else str(v),
             "Payout %":       "{:.0f}%",
         })
@@ -686,8 +729,8 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "3Y Growth":     st.column_config.NumberColumn("3Y Gr", format="%+.2f%%"),
             "5Y Growth":     st.column_config.NumberColumn("5Y Gr", format="%+.2f%%"),
             "10Y Growth":    st.column_config.TextColumn("10Y Gr", width="small"),
-            "Streak":        st.column_config.TextColumn("Streak", width="small"),
-            "Began":         st.column_config.TextColumn("Began", width="small"),
+            "Paid":          st.column_config.TextColumn("Paid", width="small", help="Year the company first paid a dividend (from Notion)"),
+            "Raised":        st.column_config.TextColumn("Raised", width="small", help="Year the current annual increase streak began (from Fish CCC)"),
             "Recessions":    st.column_config.TextColumn("Recess.", width="small"),
             "Payout %":      st.column_config.NumberColumn("Payout", format="%.0f%%"),
             "Safety":        st.column_config.TextColumn("Safety", width="small"),
