@@ -10,3 +10,4 @@ finvizfinance
 xlrd
 feedparser
 beautifulsoup4
+fear-greed

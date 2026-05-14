@@ -161,38 +161,72 @@ def _yf_sp500_metrics():
 
 # ── Fear & Greed Composite ────────────────────────────────────────────────
 
+# Friendly labels for CNN's 7 indicator keys.
+_CNN_FG_INDICATOR_LABELS = {
+    "market_momentum_sp500": "Momentum",
+    "stock_price_strength":  "52W Strength",
+    "stock_price_breadth":   "Breadth",
+    "put_call_options":      "Put/Call",
+    "market_volatility_vix": "VIX",
+    "junk_bond_demand":      "Junk Bonds",
+    "safe_haven_demand":     "Safe Haven",
+}
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def _compute_fear_greed():
     """
-    Compute a 0-100 Fear & Greed composite from available data.
-    0 = Extreme Fear, 50 = Neutral, 100 = Extreme Greed.
+    Fetch CNN's Fear & Greed Index from CNN's public JSON API via the
+    `fear-greed` PyPI package. This is the same number displayed on
+    https://www.cnn.com/markets/fear-and-greed — the canonical Fear &
+    Greed reference.
 
-    Components (equally weighted):
-      1. VIX level           — <12 = 100, >35 = 0
-      2. Market momentum     — S&P 500 vs 125-day MA
-      3. UMich Sentiment     — <50 = 0, >100 = 100
-      4. S&P 500 breadth     — RSP (equal-wt) vs SPY ratio as proxy
+    Returns (composite_score, [(component_name, score), ...]).
+
+    Sprint 25-10: replaced the homegrown 4-signal composite (VIX +
+    momentum + UMich + RSP/SPY breadth proxy) with the real CNN index.
+    The homegrown version silently dropped failed components and often
+    converged on ~44, which didn't match anyone's actual market read.
+
+    Falls back to the homegrown logic if the package or CNN endpoint
+    is unavailable, so the gauge never goes blank.
     """
+    # 1) Primary path — CNN's official Fear & Greed Index
+    try:
+        import fear_greed
+        data = fear_greed.get()
+        if data and "score" in data:
+            score = round(float(data["score"]))
+            indicators = data.get("indicators", {}) or {}
+            components = []
+            for key, label in _CNN_FG_INDICATOR_LABELS.items():
+                ind = indicators.get(key)
+                if ind and "score" in ind:
+                    components.append((label, round(float(ind["score"]))))
+            return score, components
+    except Exception:
+        pass
+
+    # 2) Fallback — homegrown composite. Only runs if the CNN endpoint
+    # is unreachable. Keeps the gauge alive when CNN is down.
     scores = []
 
-    # 1. VIX — inverse scale
+    # VIX — inverse scale
     try:
         import yfinance as yf
         vix = yf.Ticker("^VIX")
         vix_price = getattr(vix.fast_info, "last_price", None)
         if vix_price:
-            # Map VIX 10-40 to score 100-0 (clamped)
             s = max(0, min(100, (40 - vix_price) / 30 * 100))
-            scores.append(("VIX", round(s)))
+            scores.append(("VIX (fallback)", round(s)))
     except Exception:
         pass
 
-    # 2. Market momentum — SPY price vs 125-day SMA
+    # Market momentum — SPY vs 125-day SMA
     try:
         import yfinance as yf
         spy = yf.download("SPY", period="7mo", interval="1d", progress=False)
         if spy is not None and len(spy) >= 125:
-            # Handle both single and multi-level columns
             close = spy["Close"]
             if hasattr(close, "columns"):
                 close = close.iloc[:, 0]
@@ -200,23 +234,22 @@ def _compute_fear_greed():
             sma_125 = float(close.tail(125).mean())
             if sma_125 > 0:
                 pct_above = ((current / sma_125) - 1) * 100
-                # Map -10% to +10% → 0 to 100
                 s = max(0, min(100, (pct_above + 10) / 20 * 100))
-                scores.append(("Momentum", round(s)))
+                scores.append(("Momentum (fallback)", round(s)))
     except Exception:
         pass
 
-    # 3. UMich Sentiment — scale 50-100 to 0-100
+    # UMich sentiment
     try:
         obs = _fred("UMCSENT", limit=3)
         if obs:
             um_val = float(obs[0]["value"])
             s = max(0, min(100, (um_val - 50) / 50 * 100))
-            scores.append(("Sentiment", round(s)))
+            scores.append(("Sentiment (fallback)", round(s)))
     except Exception:
         pass
 
-    # 4. Breadth proxy — RSP/SPY ratio trend (equal-weight vs cap-weight)
+    # Breadth proxy — RSP/SPY
     try:
         import yfinance as yf
         data = yf.download("RSP SPY", period="3mo", interval="1d", progress=False, group_by="ticker")
@@ -234,9 +267,8 @@ def _compute_fear_greed():
                 avg_ratio = float(ratio.tail(60).mean())
                 if avg_ratio > 0:
                     pct_diff = ((current_ratio / avg_ratio) - 1) * 100
-                    # Map -3% to +3% → 0 to 100
                     s = max(0, min(100, (pct_diff + 3) / 6 * 100))
-                    scores.append(("Breadth", round(s)))
+                    scores.append(("Breadth (fallback)", round(s)))
     except Exception:
         pass
 
