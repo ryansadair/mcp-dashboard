@@ -160,8 +160,8 @@ def _yf_sp500_metrics():
 # ── Sprint 27: Sentiment context helpers ───────────────────────────────────
 # Adds plain-language labels + position-on-range bars next to VIX and UMich
 # so the user can read at a glance how bad/good a value is without having
-# to remember thresholds. Yield Curve is left alone — "Normal (+48bp)" is
-# already self-explanatory.
+# to remember thresholds. Yield Curve was removed from the Sentiment card —
+# it's already shown as the 2s10s Spread card in the Rates & Yields strip.
 
 @st.cache_data(ttl=3600)
 def _vix_range_1y():
@@ -689,9 +689,9 @@ def render_macro_tab(qdvd_yield=None):
 
     # ── Sentiment items with context (Sprint 27) ──────────────────────────
     # Each item is a dict with optional bar + caption so VIX and UMich can
-    # show "where are we vs history" context. Yield Curve stays simple —
-    # "Normal (+48bp)" is already self-explanatory and adding a bar there
-    # would clutter the card without adding information.
+    # show "where are we vs history" context. Yield Curve was removed from
+    # this section — it's already displayed as the 2s10s Spread card in the
+    # Rates & Yields strip above the panel, so showing it here was redundant.
     sentiment_items = []
 
     # VIX
@@ -744,21 +744,10 @@ def render_macro_tab(qdvd_yield=None):
             "label": None, "bar_pct": None, "caption": None,
         })
 
-    # Yield curve signal — no bar (intentional; "Normal/Inverted" is enough)
-    if spread_bp is not None:
-        curve_label_s = "Normal" if spread_bp > 0 else "Inverted"
-        curve_color_s = "#569542" if spread_bp > 0 else "#c45454"
-        sentiment_items.append({
-            "name": "Yield Curve",
-            "value": f"{curve_label_s} ({spread_bp:+d}bp)",
-            "color": curve_color_s,
-            "label": None, "bar_pct": None, "caption": None,
-        })
-    else:
-        sentiment_items.append({
-            "name": "Yield Curve", "value": "—", "color": "rgba(255,255,255,0.3)",
-            "label": None, "bar_pct": None, "caption": None,
-        })
+    # Sprint 27: Yield Curve removed from this section — already covered by
+    # the 2s10s Spread card in the Rates & Yields strip above. Sentiment
+    # card now shows just VIX + UMich, which balances better against the
+    # taller left column.
 
     # Build sentiment rows HTML
     # Each row keeps the same 16px top/bottom padding as before so the card's
@@ -786,7 +775,7 @@ def render_macro_tab(qdvd_yield=None):
                 f'</div>'
             )
         else:
-            # Yield Curve and missing-data rows: no descriptive label, just the value
+            # Missing-data rows (None values): no descriptive label, just dash
             value_block = (
                 f'<span style="font-size:16px;font-weight:700;'
                 f'font-family:\'DM Serif Display\',serif;color:{color};">{val}</span>'
