@@ -157,6 +157,120 @@ def _yf_sp500_metrics():
     return result
 
 
+# ── Sprint 27: Sentiment context helpers ───────────────────────────────────
+# Adds plain-language labels + position-on-range bars next to VIX and UMich
+# so the user can read at a glance how bad/good a value is without having
+# to remember thresholds. Yield Curve is left alone — "Normal (+48bp)" is
+# already self-explanatory.
+
+@st.cache_data(ttl=3600)
+def _vix_range_1y():
+    """Fetch trailing 1-year min/max for ^VIX.
+
+    Used to anchor the position bar to recent reality rather than just the
+    fixed 0-40 scale. Cached 1 hour. Returns (min, max) or (None, None) on
+    failure — callers must handle the None case.
+    """
+    try:
+        import yfinance as yf
+        hist = yf.Ticker("^VIX").history(period="1y", interval="1d")
+        if hist is None or hist.empty:
+            return None, None
+        return float(hist["Close"].min()), float(hist["Close"].max())
+    except Exception:
+        return None, None
+
+
+def _vix_band(value):
+    """Map a VIX value to (label, color, fixed_scale_pct).
+
+    Bands chosen to match how the market actually reads VIX:
+      <12  Complacent   green   (post-2017 lows territory)
+      12-16 Calm         green
+      16-20 Normal       gold    (long-run average ~19)
+      20-25 Elevated     gold
+      25-35 Stress       red
+      >35   Panic        red    (COVID/GFC territory)
+
+    fixed_scale_pct: position on a 0-40 scale (0=floor, 100=panic).
+    """
+    if value is None:
+        return ("—", "rgba(255,255,255,0.3)", 0)
+    if value < 12:
+        label, color = "Complacent", "#569542"
+    elif value < 16:
+        label, color = "Calm", "#569542"
+    elif value < 20:
+        label, color = "Normal", "#C9A84C"
+    elif value < 25:
+        label, color = "Elevated", "#C9A84C"
+    elif value < 35:
+        label, color = "Stress", "#c45454"
+    else:
+        label, color = "Panic", "#c45454"
+    pct = max(0, min(100, (value / 40.0) * 100))
+    return (label, color, pct)
+
+
+def _umich_band(value, hist_min=None, hist_max=None):
+    """Map UMich Consumer Sentiment to (label, color, position_pct).
+
+    Reference: long-run average ≈ 85. Index hit all-time low of ~50 in 2022.
+    Healthy economy historically runs 90+.
+
+      <60  Depressed   red    (recession territory)
+      60-75 Subdued     gold
+      75-90 Neutral     gold
+      90-100 Healthy    green
+      >100  Strong      green  (rare; late-cycle peaks)
+
+    Bar position uses the trailing 10Y range when provided so the user sees
+    "where are we vs the last decade" — much more honest than a fixed scale.
+    Falls back to a fixed 40-110 scale if history isn't available.
+    """
+    if value is None:
+        return ("—", "rgba(255,255,255,0.3)", 0, "")
+    if value < 60:
+        label, color = "Depressed", "#c45454"
+    elif value < 75:
+        label, color = "Subdued", "#C9A84C"
+    elif value < 90:
+        label, color = "Neutral", "#C9A84C"
+    elif value < 100:
+        label, color = "Healthy", "#569542"
+    else:
+        label, color = "Strong", "#569542"
+
+    if hist_min is not None and hist_max is not None and hist_max > hist_min:
+        pct = max(0, min(100, ((value - hist_min) / (hist_max - hist_min)) * 100))
+        caption = f"10Y range: {hist_min:.1f} – {hist_max:.1f} · Hist avg ~85"
+    else:
+        # Fall back to a fixed 40-110 scale anchored on historical extremes
+        pct = max(0, min(100, ((value - 40) / 70) * 100))
+        caption = "Hist avg ~85 · recession lows ~50"
+    return (label, color, pct, caption)
+
+
+def _render_sentiment_bar(pct, color):
+    """Render a thin gradient bar with a needle marker.
+
+    Visual matches the Fear & Greed gauge style already in this file
+    (single-row mini version). The gradient is fixed red→gold→green; the
+    needle sits at the given pct (0-100) and uses the caller's color so
+    it stands out against the gradient.
+    """
+    return (
+        f'<div style="position:relative;height:6px;border-radius:3px;'
+        f'background:linear-gradient(to right,#c45454 0%,#C9A84C 40%,#C9A84C 60%,#569542 100%);'
+        f'margin-top:8px;opacity:0.55;">'
+        f'<div style="position:absolute;top:-3px;left:{pct:.1f}%;'
+        f'transform:translateX(-50%);width:3px;height:12px;'
+        f'background:rgba(255,255,255,0.95);border-radius:1.5px;'
+        f'box-shadow:0 0 3px rgba(0,0,0,0.5);"></div>'
+        f'</div>'
+    )
+
+
 # ── FRED Series IDs ────────────────────────────────────────────────────────
 
 # ── Fear & Greed Composite ────────────────────────────────────────────────
@@ -573,42 +687,129 @@ def render_macro_tab(qdvd_yield=None):
         ig_spread_color = "#569542" if ig_oas < 1.0 else "#C9A84C" if ig_oas < 1.8 else "#c45454"
         ig_spread_note = "Investment grade OAS · Hist avg ~120bp"
 
+    # ── Sentiment items with context (Sprint 27) ──────────────────────────
+    # Each item is a dict with optional bar + caption so VIX and UMich can
+    # show "where are we vs history" context. Yield Curve stays simple —
+    # "Normal (+48bp)" is already self-explanatory and adding a bar there
+    # would clutter the card without adding information.
+    sentiment_items = []
+
     # VIX
     vix_data = _yf_quote("^VIX")
     vix_price = vix_data.get("price")
-    sentiment_items = []
     if vix_price:
-        vix_color = "#569542" if vix_price < 16 else "#C9A84C" if vix_price < 25 else "#c45454"
-        sentiment_items.append(("VIX", f"{vix_price:.2f}", vix_color))
+        vix_label, vix_color, vix_pct = _vix_band(vix_price)
+        # Pull 1Y range for the bar caption — gives "where are we vs last
+        # year" context. Falls back to fixed scale if yfinance fails.
+        _vix_lo, _vix_hi = _vix_range_1y()
+        if _vix_lo is not None and _vix_hi is not None:
+            vix_caption = f"1Y range: {_vix_lo:.1f} – {_vix_hi:.1f} · Hist avg ~19"
+        else:
+            vix_caption = "Low <12 · Hist avg ~19 · Stress >25"
+        sentiment_items.append({
+            "name": "VIX",
+            "value": f"{vix_price:.2f}",
+            "color": vix_color,
+            "label": vix_label,
+            "bar_pct": vix_pct,
+            "caption": vix_caption,
+        })
     else:
-        sentiment_items.append(("VIX", "—", "rgba(255,255,255,0.3)"))
+        sentiment_items.append({
+            "name": "VIX", "value": "—", "color": "rgba(255,255,255,0.3)",
+            "label": None, "bar_pct": None, "caption": None,
+        })
 
-    # UMich Sentiment
+    # UMich Sentiment — pull 10Y history for data-driven bar position
     um_latest, um_prev, _ = _fred_latest("UMCSENT")
     if um_latest:
-        um_color = "#569542" if um_latest > 80 else "#C9A84C" if um_latest > 60 else "#c45454"
-        sentiment_items.append(("UMich Sentiment", f"{um_latest:.1f}", um_color))
+        _um_hist = _fred_history("UMCSENT", months=120)
+        if _um_hist:
+            _um_values = [v for _, v in _um_hist]
+            _um_min, _um_max = min(_um_values), max(_um_values)
+        else:
+            _um_min, _um_max = None, None
+        um_label, um_color, um_pct, um_caption = _umich_band(um_latest, _um_min, _um_max)
+        sentiment_items.append({
+            "name": "UMich Sentiment",
+            "value": f"{um_latest:.1f}",
+            "color": um_color,
+            "label": um_label,
+            "bar_pct": um_pct,
+            "caption": um_caption,
+        })
     else:
-        sentiment_items.append(("UMich Sentiment", "—", "rgba(255,255,255,0.3)"))
+        sentiment_items.append({
+            "name": "UMich Sentiment", "value": "—", "color": "rgba(255,255,255,0.3)",
+            "label": None, "bar_pct": None, "caption": None,
+        })
 
-    # Yield curve signal
+    # Yield curve signal — no bar (intentional; "Normal/Inverted" is enough)
     if spread_bp is not None:
         curve_label_s = "Normal" if spread_bp > 0 else "Inverted"
         curve_color_s = "#569542" if spread_bp > 0 else "#c45454"
-        sentiment_items.append(("Yield Curve", f"{curve_label_s} ({spread_bp:+d}bp)", curve_color_s))
+        sentiment_items.append({
+            "name": "Yield Curve",
+            "value": f"{curve_label_s} ({spread_bp:+d}bp)",
+            "color": curve_color_s,
+            "label": None, "bar_pct": None, "caption": None,
+        })
     else:
-        sentiment_items.append(("Yield Curve", "—", "rgba(255,255,255,0.3)"))
+        sentiment_items.append({
+            "name": "Yield Curve", "value": "—", "color": "rgba(255,255,255,0.3)",
+            "label": None, "bar_pct": None, "caption": None,
+        })
 
     # Build sentiment rows HTML
+    # Each row keeps the same 16px top/bottom padding as before so the card's
+    # overall vertical rhythm matches the surrounding "Dividend Strategy
+    # Context" cards. The bar + caption nest INSIDE the row container, not
+    # below it, so the row borders still divide cleanly between metrics.
     sent_rows_html = ""
-    for i, (name, val, color) in enumerate(sentiment_items):
+    for i, item in enumerate(sentiment_items):
         border = "border-bottom:1px solid rgba(255,255,255,0.04);" if i < len(sentiment_items) - 1 else ""
+        name = item["name"]
+        val = item["value"]
+        color = item["color"]
+        label = item.get("label")
+        bar_pct = item.get("bar_pct")
+        caption = item.get("caption")
+
+        # Top line: metric name on the left, descriptive label + value on the right
+        if label:
+            value_block = (
+                f'<div style="display:flex;align-items:baseline;gap:8px;">'
+                f'<span style="font-size:11px;font-weight:600;color:{color};'
+                f'opacity:0.85;letter-spacing:0.02em;">{label}</span>'
+                f'<span style="font-size:16px;font-weight:700;'
+                f'font-family:\'DM Serif Display\',serif;color:{color};">{val}</span>'
+                f'</div>'
+            )
+        else:
+            # Yield Curve and missing-data rows: no descriptive label, just the value
+            value_block = (
+                f'<span style="font-size:16px;font-weight:700;'
+                f'font-family:\'DM Serif Display\',serif;color:{color};">{val}</span>'
+            )
+
+        # Bar + caption (only when we have context for them)
+        bar_html = ""
+        if bar_pct is not None:
+            bar_html += _render_sentiment_bar(bar_pct, color)
+        if caption:
+            bar_html += (
+                f'<div style="font-size:10px;color:rgba(255,255,255,0.30);'
+                f'margin-top:6px;line-height:1.4;">{caption}</div>'
+            )
+
         sent_rows_html += (
+            f'<div style="padding:16px 0;{border}">'
             f'<div style="display:flex;justify-content:space-between;align-items:center;'
-            f'padding:16px 0;{border}">'
-            f'<span style="font-size:13px;color:rgba(255,255,255,0.6)">{name}</span>'
-            f'<span style="font-size:16px;font-weight:700;font-family:\'DM Serif Display\',serif;'
-            f'color:{color}">{val}</span>'
+            f'gap:12px;flex-wrap:wrap;">'
+            f'<span style="font-size:13px;color:rgba(255,255,255,0.6);">{name}</span>'
+            f'{value_block}'
+            f'</div>'
+            f'{bar_html}'
             f'</div>'
         )
 
