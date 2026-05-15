@@ -194,10 +194,15 @@ try:
                 _status_dot = "#c45454"
                 _age_str = f"{_age_min // 60}h ago"
 
+            # Sprint 26: wrap dot + text in inline-flex so they stay
+            # together as a single wrap unit when the status strip wraps
+            # to a second line on phone (no orphaned dot).
             _status_parts.append(
+                f'<span style="display:inline-flex;align-items:center;gap:6px;">'
                 f'<span style="width:6px;height:6px;border-radius:50%;background:{_status_dot};'
-                f'display:inline-block;"></span>'
+                f'display:inline-block;flex-shrink:0;"></span>'
                 f'<span>Data refreshed {_time_str} PT ({_age_str})</span>'
+                f'</span>'
             )
         except Exception:
             pass
@@ -218,11 +223,14 @@ if DETECTOR_AVAILABLE:
                 _tam_date_str = f' · as-of {_tam_status["as_of_date"].strftime("%b %d")}'
             # Sprint 26: filename wrapped in .mcp-tamarac-filename so the
             # phone media query in mobile_css.py can hide it on narrow
-            # viewports. Desktop renders the full string unchanged.
+            # viewports. Outer inline-flex span keeps the dot bound to its
+            # text label when the status strip wraps on phone.
             _status_parts.append(
+                f'<span style="display:inline-flex;align-items:center;gap:6px;">'
                 f'<span style="width:6px;height:6px;border-radius:50%;background:{_tam_dot};'
-                f'display:inline-block;"></span>'
+                f'display:inline-block;flex-shrink:0;"></span>'
                 f'<span>Tamarac: <span class="mcp-tamarac-filename">{_tam_status["filename"]}</span>{_tam_date_str} · {_tam_age_str}</span>'
+                f'</span>'
             )
     except Exception:
         pass
