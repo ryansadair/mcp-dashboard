@@ -216,19 +216,25 @@ if DETECTOR_AVAILABLE:
             _tam_date_str = ""
             if _tam_status.get("as_of_date"):
                 _tam_date_str = f' · as-of {_tam_status["as_of_date"].strftime("%b %d")}'
+            # Sprint 26: filename wrapped in .mcp-tamarac-filename so the
+            # phone media query in mobile_css.py can hide it on narrow
+            # viewports. Desktop renders the full string unchanged.
             _status_parts.append(
                 f'<span style="width:6px;height:6px;border-radius:50%;background:{_tam_dot};'
                 f'display:inline-block;"></span>'
-                f'<span>Tamarac: {_tam_status["filename"]}{_tam_date_str} · {_tam_age_str}</span>'
+                f'<span>Tamarac: <span class="mcp-tamarac-filename">{_tam_status["filename"]}</span>{_tam_date_str} · {_tam_age_str}</span>'
             )
     except Exception:
         pass
 
 if _status_parts:
     _divider = '<span style="opacity:0.2;margin:0 6px;">|</span>'
+    # Sprint 26: flex-wrap:wrap lets the status strip break to a second line
+    # on phone instead of overflowing the viewport.
     st.markdown(
         f'<div style="display:flex;align-items:center;justify-content:flex-end;'
-        f'padding:4px 28px 2px;gap:6px;font-size:10px;color:rgba(255,255,255,0.30);">'
+        f'flex-wrap:wrap;padding:4px 28px 2px;gap:6px;font-size:10px;'
+        f'color:rgba(255,255,255,0.30);">'
         f'{_divider.join(_status_parts)}'
         f'</div>',
         unsafe_allow_html=True,
@@ -1596,6 +1602,11 @@ st.markdown(
     unsafe_allow_html=True
 )
 # Documentation link — centered below footer
+# Sprint 26: wrapped in 3 columns so the button stays ~33% width on
+# desktop and stacks to full-width on phone (after mobile_css collapses
+# columns to 100%) — avoids the previous look of a full-viewport CTA.
 st.markdown("<div style='margin-top:-16px'></div>", unsafe_allow_html=True)
-if st.button("Documentation", key="footer_docs_btn", width="stretch"):
-    st.switch_page("pages/3_Documentation.py")
+_doc_l, _doc_c, _doc_r = st.columns([1, 2, 1])
+with _doc_c:
+    if st.button("Documentation", key="footer_docs_btn", width="stretch"):
+        st.switch_page("pages/3_Documentation.py")

@@ -28,6 +28,10 @@ def render_header():
     status_color = "#569542" if is_open else "#C9A84C"
     logo_b64 = get_logo_b64()
 
+    # Sprint 26: dropped white-space:nowrap from .mcp-firm-name so phone media
+    # query can break the long firm name to a second line if the viewport is
+    # narrow enough. Desktop keeps it on one line because the container has
+    # plenty of horizontal room.
     st.markdown(f"""
     <div class="mcp-header" style="display:flex;justify-content:space-between;align-items:center;
         padding:14px 28px;border-bottom:1px solid rgba(255,255,255,0.06);
@@ -35,11 +39,11 @@ def render_header():
         <div style="display:flex;align-items:center;gap:14px;min-width:0;">
             <img class="mcp-logo" src="data:image/png;base64,{logo_b64}" style="width:40px;height:40px;border-radius:8px;object-fit:contain;flex-shrink:0;"/>
             <div style="min-width:0;">
-                <div class="mcp-firm-name" style="font-size:16px;font-weight:700;letter-spacing:0.12em;color:#fff;white-space:nowrap;">MARTIN CAPITAL PARTNERS</div>
+                <div class="mcp-firm-name" style="font-size:16px;font-weight:700;letter-spacing:0.12em;color:#fff;">MARTIN CAPITAL PARTNERS</div>
                 <div class="mcp-firm-sub" style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:0.06em;margin-top:1px;">Portfolio Dashboard</div>
             </div>
         </div>
-        <div class="mcp-header-right" style="text-align:right;">
+        <div class="mcp-header-right" style="text-align:right;min-width:0;">
             <div style="font-size:13px;color:rgba(255,255,255,0.6);">
                 {date_str}<span style="opacity:0.4;margin-left:10px;">{time_str}</span>
                 <span style="margin-left:10px;color:rgba(255,255,255,0.15);font-size:12px;"

@@ -20,6 +20,11 @@ Key adaptations:
   8. Sidebar content → hidden on mobile (tab-based nav only)
   9. Font sizes → slightly reduced for density
   10. Touch targets → minimum 44px tap targets
+
+Sprint 26 — Mobile Polish additions:
+  • Firm name wraps to two lines on phone (no more nowrap overflow)
+  • Tamarac filename hidden on phone to keep status strip readable
+  • Right-edge scroll-fade hint on custom HTML tables (markets/calendar)
 """
 
 import streamlit as st
@@ -156,10 +161,24 @@ def inject_mobile_css():
         -webkit-overflow-scrolling: touch;
         white-space: nowrap;
     }
-    /* HTML table containers: scroll support */
+    /* HTML table containers: scroll support + right-edge fade hint
+       (Sprint 26 polish) — same fade pattern as dataframes so it's
+       visually obvious that markets/calendar tables scroll horizontally. */
     .stMarkdown div:has(> table) {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        position: relative;
+    }
+    .stMarkdown div:has(> table)::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 24px;
+        height: 100%;
+        background: linear-gradient(to left, rgba(12,17,23,0.6), transparent);
+        pointer-events: none;
+        z-index: 1;
     }
 
     /* Footer: wrap instead of flex */
@@ -190,9 +209,14 @@ def inject_mobile_css():
         width: 36px !important;
         height: 36px !important;
     }
+    /* Sprint 26: allow firm name to wrap to a second line on phone instead
+       of overflowing. header.py drops the inline white-space:nowrap; this
+       rule tightens spacing so "MARTIN CAPITAL PARTNERS" fits cleanly. */
     .mcp-firm-name {
         font-size: 13px !important;
-        letter-spacing: 0.06em !important;
+        letter-spacing: 0.04em !important;
+        white-space: normal !important;
+        line-height: 1.2 !important;
     }
     .mcp-firm-sub {
         font-size: 9px !important;
@@ -204,6 +228,13 @@ def inject_mobile_css():
     }
     .mcp-header-right div:first-child {
         font-size: 11px !important;
+    }
+
+    /* Sprint 26: hide the Tamarac filename on phone so the status strip
+       stays readable. The freshness dot, "as-of <date>", and "<n>d ago"
+       remain — those are the parts that change. The filename never does. */
+    .mcp-tamarac-filename {
+        display: none !important;
     }
 
     /* Strategy selector: compact */
