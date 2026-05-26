@@ -67,7 +67,10 @@ def _parse_sheet_rows(rows):
         record = {}
         for j, val in enumerate(row):
             col = headers[j] if j < len(headers) else f"col_{j}"
-            if col == "as_of_date":
+            if col in ("as_of_date", "open_date"):
+                # Tamarac stores these as datetime cells. Keep them as
+                # datetime objects (or None) rather than stringifying via
+                # clean_tamarac_value, so downstream date formatting works.
                 record[col] = val if isinstance(val, datetime) else None
             elif col == "weight":
                 try:
@@ -121,6 +124,7 @@ def _parse_sheet_rows(rows):
 # Per-ticker cost/yield fields that the manual file provides and the
 # auto-pulled API export does not. Merged by (strategy_code, symbol).
 _MANUAL_MERGE_FIELDS = [
+    "open_date",
     "unit_cost",
     "cost_basis",
     "annual_income",
@@ -175,11 +179,12 @@ def _apply_manual_lookup(df, strategy_code, lookup):
     if df.empty or not lookup:
         return df
 
-    # Ensure all target columns exist so downstream .get() calls see real
-    # floats (0.0) rather than KeyError / NaN surprises.
+    # Ensure all target columns exist so downstream .get() calls see a
+    # sensible default rather than KeyError / NaN surprises. open_date is a
+    # date field so it defaults to None; the numeric fields default to 0.0.
     for field in _MANUAL_MERGE_FIELDS:
         if field not in df.columns:
-            df[field] = 0.0
+            df[field] = None if field == "open_date" else 0.0
 
     def _fill(row):
         sym = str(row.get("symbol") or "").strip().upper()
@@ -187,9 +192,16 @@ def _apply_manual_lookup(df, strategy_code, lookup):
         if not manual:
             return row
         for field, val in manual.items():
-            # Only overwrite when the manual value is meaningful (non-zero).
-            # Lets the auto-pull win in the rare case it actually provides
-            # one of these fields and the manual file has it as 0.
+            # open_date: copy any real datetime straight through (the
+            # auto-pulled file never provides it, so there's nothing to
+            # lose a race against).
+            if field == "open_date":
+                if isinstance(val, datetime):
+                    row[field] = val
+                continue
+            # Numeric fields: only overwrite when the manual value is
+            # meaningful (non-zero). Lets the auto-pull win in the rare
+            # case it actually provides one and the manual file has 0.
             if val is not None and val != 0:
                 row[field] = val
         return row
