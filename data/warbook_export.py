@@ -268,7 +268,8 @@ def _build_qdg_rows(tam_df, price_data, notion_data, warbook_data, fish_data, fi
             if years_with_div:
                 paid_since = years_with_div[0]
 
-        raised_since_raw = fm.get("streak_began")
+        # Sprint 24-6: Raised Since now from Notion (was Fish streak_began).
+        raised_since_raw = nm.get("raised_since")
         raised_since = None
         if raised_since_raw is not None:
             try:
@@ -289,12 +290,17 @@ def _build_qdg_rows(tam_df, price_data, notion_data, warbook_data, fish_data, fi
                 if latest_v and prior_v and prior_v > 0:
                     last_bump = round((latest_v / prior_v - 1) * 100, 1)
 
-        dgr_1y = fm.get("dgr_1y")
-        dgr_3y = fm.get("dgr_3y")
-        dgr_5y = fm.get("dgr_5y")
-        if dgr_1y == 0: dgr_1y = None
-        if dgr_3y == 0: dgr_3y = None
-        if dgr_5y == 0: dgr_5y = None
+        # Sprint 24-6: DG Notion-first, Fish-fallback (mirrors warbook_tab).
+        def _dgr_with_fallback(notion_v, fish_v):
+            if notion_v is not None:
+                return notion_v
+            if fish_v == 0:
+                return None
+            return fish_v
+
+        dgr_1y = _dgr_with_fallback(nm.get("dgr_1y"), fm.get("dgr_1y"))
+        dgr_3y = _dgr_with_fallback(nm.get("dgr_3y"), fm.get("dgr_3y"))
+        dgr_5y = _dgr_with_fallback(nm.get("dgr_5y"), fm.get("dgr_5y"))
 
         payout = fm.get("payout_ratio")
         if payout == 0:
@@ -313,7 +319,7 @@ def _build_qdg_rows(tam_df, price_data, notion_data, warbook_data, fish_data, fi
             "Qual (S&P)":    nm.get("sp_quality") or "",
             "Paid Since":    paid_since,
             "Raised Since":  raised_since,
-            "Timing":        wm.get("timing_of_raise") or "",
+            "Timing":        nm.get("timing_of_raise") or "",
             "Freq":          wm.get("dividend_frequency") or "",
             "Payout %":      payout,
             "Last Bump %":   last_bump,

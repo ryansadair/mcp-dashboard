@@ -124,6 +124,21 @@ def _extract_select(prop):
     return None
 
 
+def _extract_text(prop):
+    """
+    Extract plain text from a Notion rich_text property.
+    Returns None for empty/missing values (so callers can distinguish blank
+    cells from genuine empty strings via `or "" if needed`).
+    """
+    if not prop or prop.get("type") != "rich_text":
+        return None
+    parts = prop.get("rich_text", [])
+    if not parts:
+        return None
+    text = "".join(p.get("plain_text", "") for p in parts).strip()
+    return text if text else None
+
+
 def _extract_multi_select(prop):
     """Extract list of names from a Notion multi_select property."""
     if not prop or prop.get("type") != "multi_select":
@@ -226,6 +241,25 @@ def fetch_notion_metrics():
             # dividendinvestor.com because Fish's Historical sheet floors at
             # 1999 and yfinance has no first-payment field.
             "paid_since":           _extract_number(props.get("Paid Since", {})),
+
+            # Sprint 24-6: warbook "Raised Since" and "Timing of Raise" —
+            # now manually curated in Notion (was previously sourced from
+            # Fish CCC). Fish has these for U.S. names but doesn't carry the
+            # ADRs (ASML, UL, NVO, KOF, TTE). Moving to Notion gives a single
+            # source of truth across the entire book and lets us populate the
+            # ADR rows that were previously blank.
+            "raised_since":         _extract_number(props.get("Raised Since", {})),
+            "timing_of_raise":      _extract_text(props.get("Timing of Raise", {})),
+
+            # Sprint 24-6: 1Y/3Y/5Y dividend growth — manually curated in
+            # Notion for the ADRs only (Fish doesn't cover them and yfinance-
+            # derived growth carries FX/cadence noise). For U.S. names these
+            # stay blank in Notion and the warbook falls back to Fish CCC's
+            # dgr_1y / dgr_3y / dgr_5y. Stored as raw percent (e.g. 8 = 8%).
+            # Note the property name "5YR DG" — the other two are "1Y" / "3Y".
+            "dgr_1y":               _extract_number(props.get("1Y DG", {})),
+            "dgr_3y":               _extract_number(props.get("3Y DG", {})),
+            "dgr_5y":               _extract_number(props.get("5YR DG", {})),
         }
 
     return result

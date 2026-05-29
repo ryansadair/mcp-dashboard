@@ -673,9 +673,11 @@ def _render_qdg_characteristics(
             except (ValueError, TypeError):
                 pass
 
-        # Raised Since — directly from Fish streak_began (more reliable than
-        # back-computing from the Historical sheet)
-        raised_since_raw = fm.get("streak_began")
+        # Raised Since — Sprint 24-6: now manually curated in Notion (was
+        # previously fm.get("streak_began") from Fish). Notion is now source
+        # of truth across the entire book, including ADRs that Fish doesn't
+        # carry. Blank → em dash, same pattern as paid_since.
+        raised_since_raw = nm.get("raised_since")
         raised_since = None
         if raised_since_raw is not None:
             try:
@@ -709,18 +711,24 @@ def _render_qdg_characteristics(
                 if latest_v and prior_v and prior_v > 0:
                     last_bump = round((latest_v / prior_v - 1) * 100, 1)
 
-        # Dividend growth — prefer Fish (Supabase) over yfinance fallback.
-        dgr_1y = fm.get("dgr_1y")
-        dgr_3y = fm.get("dgr_3y")
-        dgr_5y = fm.get("dgr_5y")
-        # Fish stores 0.0 when data is missing; treat 0 as missing for display
-        # unless we have evidence of an actual zero (very rare for grow names)
-        if dgr_1y == 0:
-            dgr_1y = None
-        if dgr_3y == 0:
-            dgr_3y = None
-        if dgr_5y == 0:
-            dgr_5y = None
+        # Dividend growth — Sprint 24-6: Notion-first, Fish-fallback.
+        # Notion carries manually curated values for the ADRs (ASML, UL, NVO,
+        # KOF, TTE) where Fish has no coverage and yfinance-derived growth
+        # carries FX/cadence noise. For U.S. names Notion is typically blank
+        # and we fall through to Fish (which already handles them well).
+        # Fish stores 0.0 when data is missing — treat 0 as missing for the
+        # Fish path only. Notion 0 is taken at face value (rare, but if Ryan
+        # ever enters 0 for a flat-dividend year we want to show it).
+        def _dgr_with_fallback(notion_v, fish_v):
+            if notion_v is not None:
+                return notion_v
+            if fish_v == 0:
+                return None
+            return fish_v
+
+        dgr_1y = _dgr_with_fallback(nm.get("dgr_1y"), fm.get("dgr_1y"))
+        dgr_3y = _dgr_with_fallback(nm.get("dgr_3y"), fm.get("dgr_3y"))
+        dgr_5y = _dgr_with_fallback(nm.get("dgr_5y"), fm.get("dgr_5y"))
 
         # Payout ratio — prefer Fish (curated). Stored as percentage (e.g. 45.0)
         payout = fm.get("payout_ratio")
@@ -740,14 +748,13 @@ def _render_qdg_characteristics(
             "Qual (S&P)":         nm.get("sp_quality") or "",
             "Paid Since":         paid_since,
             "Raised Since":       raised_since,
-            # Sprint 24-5: Timing now reads from Fish's "Last Increased on:
-            # Pay" date (month component) instead of the yfinance modal-month
-            # heuristic. Fish is the authoritative source — it stores the
-            # actual most-recent raise's pay date rather than guessing from
-            # historical dividend dates. Falls back to None (em dash) when
-            # Fish doesn't carry the ticker, since the yfinance heuristic
-            # was unreliable enough not to be worth a silent fallback.
-            "Timing":             fm.get("last_increased_pay_month"),
+            # Sprint 24-6: Timing now reads from Notion "Timing of Raise"
+            # (manually curated 3-letter month abbreviation, e.g. "Feb").
+            # Was previously fm.get("last_increased_pay_month") from Fish.
+            # Notion format ("Feb") matches Fish format ("Apr") so direct
+            # passthrough — no conversion needed. Blank → em dash via
+            # downstream numeric/dash formatting.
+            "Timing":             nm.get("timing_of_raise"),
             "Freq":               wm.get("dividend_frequency") or "",
             "Payout %":           payout,
             "Last Bump %":        last_bump,
@@ -833,8 +840,9 @@ def _render_qdg_characteristics(
         "<div style='font-size:10px;color:rgba(255,255,255,0.3);"
         "margin-top:14px;text-align:right;'>"
         "Source: Tamarac (positions) · yfinance (yield, market cap, ROE, "
-        "leverage, FCF yield, frequency) · Fish CCC (raised since, "
-        "payout, DGR, timing, last bump) · Notion (S&amp;P quality, paid since)"
+        "leverage, FCF yield, frequency) · Fish CCC (payout, last bump, "
+        "DGR fallback) · Notion (S&amp;P quality, paid since, raised since, "
+        "timing, DGR for ADRs)"
         "</div>",
         unsafe_allow_html=True,
     )
