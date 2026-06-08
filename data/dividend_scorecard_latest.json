@@ -1,76 +1,4758 @@
 {
   "as_of_date": "2026-06-08",
   "summary": {
-    "total_scored": 47,
-    "mcp_count": 1,
+    "total_scored": 1929,
+    "mcp_count": 178,
     "mcp_by_bucket": {
-      "Strong": 1
+      "Green": 139,
+      "Strong": 33,
+      "Yellow": 6
     },
-    "mcp_flagged": []
+    "mcp_flagged": [
+      {
+        "ticker": "O",
+        "company": "Realty Income",
+        "composite": -2.0,
+        "bucket": "Yellow",
+        "trajectory_pattern": "Growing",
+        "primary_concern": "Yield 6.6% on no-moat stock \u2014 absolute distress zone"
+      },
+      {
+        "ticker": "SWK",
+        "company": "Stanley Black & Decker",
+        "composite": -2.0,
+        "bucket": "Yellow",
+        "trajectory_pattern": "Decelerating",
+        "primary_concern": "Interest coverage 1.4x \u2014 crisis level"
+      },
+      {
+        "ticker": "NOVO B",
+        "company": "Novo Nordisk",
+        "composite": 0.0,
+        "bucket": "Yellow",
+        "trajectory_pattern": "Growing",
+        "primary_concern": "Yield 3.3% is 1.8x 5Y avg, stock -47% from high \u2014 classic yield trap"
+      },
+      {
+        "ticker": "NKE",
+        "company": "Nike",
+        "composite": 0.0,
+        "bucket": "Yellow",
+        "trajectory_pattern": "Growing",
+        "primary_concern": "Yield 3.7% is 2.3x 5Y avg, stock -46% from high \u2014 classic yield trap"
+      },
+      {
+        "ticker": "MKC",
+        "company": "McCormick & Company",
+        "composite": 1.0,
+        "bucket": "Yellow",
+        "trajectory_pattern": "Growing",
+        "primary_concern": "Yield 4.8% is 2.3x 5Y avg, stock -40% from high \u2014 classic yield trap"
+      },
+      {
+        "ticker": "NYS:KOF",
+        "company": "Coca-Cola FEMSA",
+        "composite": 3.0,
+        "bucket": "Yellow",
+        "trajectory_pattern": "Recently Cut",
+        "primary_concern": "Local-currency DGR 1Y -53.3% \u2014 dividend declined"
+      }
+    ]
   },
   "mcp_rows": [
+    {
+      "ticker": "O",
+      "company": "Realty Income",
+      "sector": "Real Estate",
+      "yield": 0.06595989480604865,
+      "composite": -2.0,
+      "bucket": "Yellow",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 6.6% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "SWK",
+      "company": "Stanley Black & Decker",
+      "sector": "Industrials",
+      "yield": 0.042048929663608556,
+      "composite": -2.0,
+      "bucket": "Yellow",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Interest coverage 1.4x \u2014 crisis level"
+    },
+    {
+      "ticker": "CNP",
+      "company": "CenterPoint Energy",
+      "sector": "Utilities",
+      "yield": 0.018973998594518624,
+      "composite": 0.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Post-Cut Recovery",
+      "key_signal": "Interest coverage 2.4x \u2014 thin"
+    },
+    {
+      "ticker": "EMN",
+      "company": "Eastman Chemical",
+      "sector": "Basic Materials",
+      "yield": 0.06945991091314031,
+      "composite": 0.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 6.9% on narrow-moat stock \u2014 elevated absolute level"
+    },
+    {
+      "ticker": "NOVO B",
+      "company": "Novo Nordisk",
+      "sector": "Healthcare",
+      "yield": 0.03264737781808326,
+      "composite": 0.0,
+      "bucket": "Yellow",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 3.3% is 1.8x 5Y avg, stock -47% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "VZ",
+      "company": "Verizon Communications",
+      "sector": "Communication Services",
+      "yield": 0.060282124752038806,
+      "composite": 0.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 6.0% on narrow-moat stock \u2014 elevated absolute level"
+    },
+    {
+      "ticker": "PFE",
+      "company": "Pfizer (Pharmaceuticals)",
+      "sector": "Healthcare",
+      "yield": 0.06451612903225806,
+      "composite": 0.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 6.5% on narrow-moat stock \u2014 elevated absolute level"
+    },
+    {
+      "ticker": "NKE",
+      "company": "Nike",
+      "sector": "Consumer Cyclical",
+      "yield": 0.03652861796184273,
+      "composite": 0.0,
+      "bucket": "Yellow",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 3.7% is 2.3x 5Y avg, stock -46% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "DOX",
+      "company": "Amdocs",
+      "sector": "Technology",
+      "yield": 0.03428191046763188,
+      "composite": 0.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 3.4% is 1.6x 5Y avg, stock -37% from high"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "BKH",
+      "company": "Black Hills",
+      "sector": "Utilities",
+      "yield": 0.03709810387469085,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 2.6x \u2014 thin"
+    },
+    {
+      "ticker": "CLX",
+      "company": "The Clorox Company",
+      "sector": "Consumer Defensive",
+      "yield": 0.05183768854896962,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Yield 5.2% is 1.5x 5Y avg, stock -29% from high"
+    },
+    {
+      "ticker": "HRL",
+      "company": "Hormel Foods",
+      "sector": "Consumer Defensive",
+      "yield": 0.04911092294665537,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 4.9% is 1.5x 5Y avg, stock -26% from high"
+    },
+    {
+      "ticker": "MKC",
+      "company": "McCormick & Company",
+      "sector": "Consumer Defensive",
+      "yield": 0.04826418289585098,
+      "composite": 1.0,
+      "bucket": "Yellow",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 4.8% is 2.3x 5Y avg, stock -40% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "POR",
+      "company": "Portland General Electric",
+      "sector": "Utilities",
+      "yield": 0.04106471403126856,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 2.2x \u2014 thin"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
+      "sector": "Utilities",
+      "yield": 0.03170608958228485,
+      "composite": 1.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 3.5x"
+    },
+    {
+      "ticker": "TROW",
+      "company": "T. Rowe Price Group",
+      "sector": "Financial Services",
+      "yield": 0.04792904991036891,
+      "composite": 1.2,
+      "bucket": "Green",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Short interest 11.7% \u2014 elevated"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "ETR",
+      "company": "Entergy",
+      "sector": "Utilities",
+      "yield": 0.016254289326350008,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 2.3x \u2014 thin"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "AWR",
+      "company": "American States Water",
+      "sector": "Utilities",
+      "yield": 0.02474161031006763,
+      "composite": 2.0,
+      "bucket": "Green",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 4.6x"
+    },
+    {
+      "ticker": "PFG",
+      "company": "Principal Financial Group",
+      "sector": "Financial Services",
+      "yield": 0.029272001520623456,
+      "composite": 2.5,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Low ROIC 2.6%"
+    },
+    {
+      "ticker": "MDT",
+      "company": "Medtronic",
+      "sector": "Healthcare",
+      "yield": 0.03428431492592139,
+      "composite": 3.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Narrow moat; Standard capital allocation; ROIC 6.8%"
+    },
+    {
+      "ticker": "UNP",
+      "company": "Union Pacific",
+      "sector": "Industrials",
+      "yield": 0.0199764982373678,
+      "composite": 3.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "DGR decelerating \u2014 recent growth well below historical pace"
+    },
+    {
+      "ticker": "MSM",
+      "company": "MSC Industrial Direct",
+      "sector": "Industrials",
+      "yield": 0.04415202147000259,
+      "composite": 3.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Narrow moat; Standard capital allocation; ROIC 11.4%"
+    },
+    {
+      "ticker": "RGA",
+      "company": "Reinsurance Group of America",
+      "sector": "Financial Services",
+      "yield": 0.017759562841530054,
+      "composite": 3.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 5.2x"
+    },
+    {
+      "ticker": "PAYX",
+      "company": "Paychex",
+      "sector": "Technology",
+      "yield": 0.039984085935945886,
+      "composite": 3.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 4.0% is 1.4x 5Y avg \u2014 stretched"
+    },
+    {
+      "ticker": "JKHY",
+      "company": "Jack Henry & Associates",
+      "sector": "Technology",
+      "yield": 0.01736457933154053,
+      "composite": 3.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 1.7% is 1.4x 5Y avg \u2014 stretched"
+    },
+    {
+      "ticker": "NYS:KOF",
+      "company": "Coca-Cola FEMSA",
+      "sector": "Consumer Defensive",
+      "yield": 0.023550812435427823,
+      "composite": 3.0,
+      "bucket": "Yellow",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Local-currency DGR 1Y -53.3% \u2014 dividend declined"
+    },
+    {
+      "ticker": "PEP",
+      "company": "Pepsico",
+      "sector": "Consumer Defensive",
+      "yield": 0.03961739007891771,
+      "composite": 4.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 4.0% is 1.3x 5Y avg"
+    },
+    {
+      "ticker": "AMGN",
+      "company": "Amgen",
+      "sector": "Healthcare",
+      "yield": 0.04124949939927913,
+      "composite": 4.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 4.1% is 1.3x 5Y avg"
+    },
+    {
+      "ticker": "INGR",
+      "company": "Ingredion",
+      "sector": "Consumer Defensive",
+      "yield": 0.032406481296259254,
+      "composite": 4.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Short interest 5.1%; At/near 52W low"
+    },
+    {
+      "ticker": "DGX",
+      "company": "Quest Diagnostics",
+      "sector": "Healthcare",
+      "yield": 0.01597683359129263,
+      "composite": 4.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Narrow moat; Standard capital allocation; ROIC 9.2%"
+    },
+    {
+      "ticker": "HII",
+      "company": "Huntington Ingalls Industries",
+      "sector": "Industrials",
+      "yield": 0.018529797979797976,
+      "composite": 4.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Short interest 2.3%; Stock -36% from high"
+    },
+    {
+      "ticker": "UL",
+      "company": "Unilever",
+      "sector": "Consumer Defensive",
+      "yield": 0.022111248236953457,
+      "composite": 4.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Short interest 0.2%; At/near 52W low"
+    },
+    {
+      "ticker": "PSX",
+      "company": "Phillips 66",
+      "sector": "Energy",
+      "yield": 0.025944942101813414,
+      "composite": 4.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 5.2x"
+    },
+    {
+      "ticker": "SNA",
+      "company": "Snap-on",
+      "sector": "Industrials",
+      "yield": 0.0233299102088106,
+      "composite": 4.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Narrow moat; Standard capital allocation; ROIC 14.7%"
+    },
     {
       "ticker": "CME",
       "company": "CME Group",
       "sector": "Financial Services",
-      "yield": 0.028943278943278947,
+      "yield": 0.037490287490287495,
       "composite": 4.2,
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
       "key_signal": "FCF payout 81% \u2014 thin coverage"
+    },
+    {
+      "ticker": "ALSN",
+      "company": "Allison Transmission Holdings",
+      "sector": "Consumer Cyclical",
+      "yield": 0.009330453563714904,
+      "composite": 5.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Narrow moat; Standard capital allocation; ROIC 13.8%"
+    },
+    {
+      "ticker": "NYS:CFR",
+      "company": "Cullen/Frost Bankers",
+      "sector": "Financial Services",
+      "yield": 0.02818207762557078,
+      "composite": 5.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "No concerns"
+    },
+    {
+      "ticker": "HD",
+      "company": "The Home Depot",
+      "sector": "Consumer Cyclical",
+      "yield": 0.028959392496299637,
+      "composite": 5.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Short interest 1.2%; Within 15% of 52W low"
+    },
+    {
+      "ticker": "TTE",
+      "company": "TotalEnergies",
+      "sector": "Energy",
+      "yield": 0.03745999698490033,
+      "composite": 5.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Standard capital allocation; ROIC 9.0%"
+    },
+    {
+      "ticker": "DVN",
+      "company": "Devon Energy",
+      "sector": "Energy",
+      "yield": 0.03274616079494128,
+      "composite": 5.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Variable dividend policy (amplitude 21.5x, 2 direction changes)"
+    },
+    {
+      "ticker": "COR",
+      "company": "Cencora",
+      "sector": "Healthcare",
+      "yield": 0.007998836532867946,
+      "composite": 5.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Short interest 2.7%; Within 15% of 52W low"
+    },
+    {
+      "ticker": "CSCO",
+      "company": "Cisco Systems",
+      "sector": "Technology",
+      "yield": 0.013317987504110491,
+      "composite": 6.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Short interest 1.5%; Near 52W high; 1-star (overvalued per MS)"
+    },
+    {
+      "ticker": "CVX",
+      "company": "Chevron",
+      "sector": "Energy",
+      "yield": 0.03651700389728258,
+      "composite": 6.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "No concerns"
+    },
+    {
+      "ticker": "LECO",
+      "company": "The Lincoln Electric Company",
+      "sector": "Industrials",
+      "yield": 0.011597741492446207,
+      "composite": 6.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "No concerns"
+    },
+    {
+      "ticker": "PG",
+      "company": "Procter & Gamble",
+      "sector": "Consumer Defensive",
+      "yield": 0.027816978299440426,
+      "composite": 6.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Short interest 1.2%; Within 15% of 52W low"
+    },
+    {
+      "ticker": "XOM",
+      "company": "Exxon Mobil",
+      "sector": "Energy",
+      "yield": 0.026680896478121666,
+      "composite": 7.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "No concerns"
+    },
+    {
+      "ticker": "GD",
+      "company": "General Dynamics",
+      "sector": "Industrials",
+      "yield": 0.017319016279875303,
+      "composite": 7.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "No concerns"
+    },
+    {
+      "ticker": "MSFT",
+      "company": "Microsoft",
+      "sector": "Technology",
+      "yield": 0.007967936256509947,
+      "composite": 7.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "No concerns"
+    },
+    {
+      "ticker": "JPM",
+      "company": "JP Morgan Chase",
+      "sector": "Financial Services",
+      "yield": 0.018567724173256077,
+      "composite": 7.5,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "No concerns"
+    },
+    {
+      "ticker": "ASML",
+      "company": "ASML Holding",
+      "sector": "Technology",
+      "yield": 0.0039952275091955725,
+      "composite": 7.5,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "No concerns"
+    },
+    {
+      "ticker": "TXN",
+      "company": "Texas Instruments",
+      "sector": "Technology",
+      "yield": 0.019294183680628643,
+      "composite": 8.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "No concerns"
+    },
+    {
+      "ticker": "JNJ",
+      "company": "Johnson & Johnson",
+      "sector": "Healthcare",
+      "yield": 0.02208188340421876,
+      "composite": 8.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "No concerns"
     }
   ],
   "universe_flagged": [
     {
+      "ticker": "XRX",
+      "company": "Xerox",
+      "sector": "Industrials",
+      "yield": 0.06006006006006006,
+      "composite": -8.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 6.0% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "BKD",
+      "company": "Brookdale Senior Living",
+      "sector": "Healthcare",
+      "yield": 0.15802269043760128,
+      "composite": -8.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 15.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "MPT",
+      "company": "Medical Properties Trust",
+      "sector": "Real Estate",
+      "yield": 0.06626506024096385,
+      "composite": -8.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 6.6% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "DEI",
+      "company": "Douglas Emmett",
+      "sector": "Real Estate",
+      "yield": 0.06229508196721312,
+      "composite": -8.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 6.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "TRIP",
+      "company": "TripAdvisor",
+      "sector": "Consumer Cyclical",
+      "yield": 0.29510961214165266,
+      "composite": -7.5,
+      "bucket": "Critical",
+      "trajectory_pattern": null,
+      "key_signal": "Yield 29.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "ALT",
+      "company": "Altimmune",
+      "sector": "Healthcare",
+      "yield": 323.336566699,
+      "composite": -7.5,
+      "bucket": "Critical",
+      "trajectory_pattern": null,
+      "key_signal": "Yield 32333.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "LUMN",
+      "company": "Lumen Technologies",
+      "sector": "Communication Services",
+      "yield": 0.1122334455667789,
+      "composite": -7.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 11.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "ATO",
+      "company": "Atos Origin",
+      "sector": "Technology",
+      "yield": 1.1133836252416522,
+      "composite": -7.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 111.3% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "PRGO",
+      "company": "Perrigo Company",
+      "sector": "Healthcare",
+      "yield": 0.10064635272391506,
+      "composite": -7.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Yield 10.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "NOG",
+      "company": "Northern Oil & Gas",
+      "sector": "Energy",
+      "yield": 0.07816968541468065,
+      "composite": -7.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Stagnant",
+      "key_signal": "Yield 7.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "SLG",
+      "company": "SL Green Realty",
+      "sector": "Real Estate",
+      "yield": 0.06462471252352081,
+      "composite": -7.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 6.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "COTY",
+      "company": "Coty",
+      "sector": "Consumer Defensive",
+      "yield": 0.25510204081632654,
+      "composite": -7.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 25.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "NWL",
+      "company": "Newell Brands",
+      "sector": "Consumer Defensive",
+      "yield": 0.11320754716981134,
+      "composite": -7.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 11.3% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "MNRO",
+      "company": "Monro",
+      "sector": "Consumer Cyclical",
+      "yield": 0.07708189951823814,
+      "composite": -7.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 7.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "FMC",
+      "company": "FMC",
+      "sector": "Basic Materials",
+      "yield": 0.15635738831615117,
+      "composite": -7.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Yield 15.6% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "WNC",
+      "company": "Wabash National",
+      "sector": "Industrials",
+      "yield": 0.043596730245231606,
+      "composite": -7.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 4.4% is 2.0x 5Y avg, stock -43% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "BXMT",
+      "company": "Blackstone Mortgage Trust",
+      "sector": "Real Estate",
+      "yield": 0.10245231607629426,
+      "composite": -6.2,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 10.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "UWMC",
+      "company": "UWM Holdings",
+      "sector": "Financial Services",
+      "yield": 0.07722007722007723,
+      "composite": -6.2,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 7.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "BUR",
+      "company": "Burford Capital",
+      "sector": "Financial Services",
+      "yield": 0.028089887640449437,
+      "composite": -6.2,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 2.8% is 2.2x 5Y avg, stock -71% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "LOMA",
+      "company": "Loma Negra Cia Industrial Argentina",
+      "sector": "Basic Materials",
+      "yield": 0.11446137680412392,
+      "composite": -6.2,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 11.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "STWD",
+      "company": "Starwood Property Trust",
+      "sector": "Real Estate",
+      "yield": 0.0844574780058651,
+      "composite": -6.2,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 8.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
       "ticker": "MCHB",
       "company": "Mechanics Bank",
       "sector": "Financial Services",
-      "yield": 0.08739159439626418,
+      "yield": 0.44763175450300197,
       "composite": -6.2,
       "bucket": "Critical",
       "trajectory_pattern": null,
-      "key_signal": "Yield 8.7% on no-moat stock \u2014 absolute distress zone"
+      "key_signal": "Yield 44.8% on no-moat stock \u2014 absolute distress zone"
     },
     {
-      "ticker": "PPERY",
-      "company": "Bank Mandiri",
+      "ticker": "AGNC",
+      "company": "AGNC Investment",
+      "sector": "Real Estate",
+      "yield": 0.1415929203539823,
+      "composite": -6.2,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 14.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "REFI",
+      "company": "Chicago Atlantic Real Estate Finance",
+      "sector": "Real Estate",
+      "yield": 0.16681307175623997,
+      "composite": -6.2,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 16.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "NAVI",
+      "company": "Navient",
       "sector": "Financial Services",
-      "yield": 0.09739537037037037,
-      "composite": -2.5,
+      "yield": 0.08194622279129322,
+      "composite": -6.2,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 8.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "ORC",
+      "company": "Orchid Island Capital",
+      "sector": "Real Estate",
+      "yield": 0.2706766917293233,
+      "composite": -6.2,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 27.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "BDN",
+      "company": "Brandywine Realty Trust",
+      "sector": "Real Estate",
+      "yield": 0.1419558359621451,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 14.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "CODI",
+      "company": "Compass Diversified",
+      "sector": "Industrials",
+      "yield": 0.09398496240601503,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 9.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "SBRA",
+      "company": "Sabra Health Care REIT",
+      "sector": "Real Estate",
+      "yield": 0.06500541711809317,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 6.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "UTZ",
+      "company": "Utz Brands",
+      "sector": "Consumer Defensive",
+      "yield": 0.03818953323903819,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Initiating",
+      "key_signal": "Yield 3.8% is 2.4x 5Y avg, stock -52% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "SBGI",
+      "company": "Sinclair Broadcast Group",
+      "sector": "Communication Services",
+      "yield": 0.07215007215007216,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 7.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "CTRA",
+      "company": "Ciputra Development",
+      "sector": "Real Estate",
+      "yield": 27.49443237744357,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 2749.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "DEA",
+      "company": "Easterly Government Properties",
+      "sector": "Real Estate",
+      "yield": 0.08410041841004186,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 8.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "PRGS",
+      "company": "Progress Software",
+      "sector": "Technology",
+      "yield": 0.022328548644338114,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 2.2% is 1.8x 5Y avg, stock -52% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "GT",
+      "company": "The Goodyear Tire & Rubber",
+      "sector": "Consumer Cyclical",
+      "yield": 0.11208406304728546,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Yield 11.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "HE",
+      "company": "Hawaiian Electric Industries",
+      "sector": "Utilities",
+      "yield": 0.103397341211226,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 10.3% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "KOS",
+      "company": "Kosmos Energy",
+      "sector": "Energy",
+      "yield": 0.06434163701067615,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 6.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "LEU",
+      "company": "Centrus Energy",
+      "sector": "Energy",
+      "yield": 0.9268480304907899,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 92.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "NG",
+      "company": "Novagold Resources",
+      "sector": "Basic Materials",
+      "yield": 0.12432294391507469,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 12.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "OI",
+      "company": "O-I Glass",
+      "sector": "Consumer Cyclical",
+      "yield": 0.025284450063211127,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 0.6x \u2014 crisis level"
+    },
+    {
+      "ticker": "COLD",
+      "company": "AmeriCold Logistics",
+      "sector": "Real Estate",
+      "yield": 0.059823249490142755,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 0.1x \u2014 crisis level"
+    },
+    {
+      "ticker": "CMCO",
+      "company": "Columbus McKinnon",
+      "sector": "Industrials",
+      "yield": 0.021739130434782608,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 2.2% is 2.2x 5Y avg, stock -47% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "MATV",
+      "company": "Mativ Holdings",
+      "sector": "Basic Materials",
+      "yield": 0.13440860215053763,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 13.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "RIG",
+      "company": "Transocean",
+      "sector": "Energy",
+      "yield": 0.4722689075630252,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 47.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "SSTK",
+      "company": "Shutterstock",
+      "sector": "Communication Services",
+      "yield": 0.10185185185185185,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Post-Cut Recovery",
+      "key_signal": "Yield 10.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "QXO",
+      "company": "QXO",
+      "sector": "Industrials",
+      "yield": 1.6598984771573604,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 166.0% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "WU",
+      "company": "Western Union",
+      "sector": "Financial Services",
+      "yield": 0.09425133689839571,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 9.4% on Narrow stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "EMBC",
+      "company": "Embecta",
+      "sector": "Healthcare",
+      "yield": 0.17751479289940827,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 17.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "SBS",
+      "company": "Stratec",
+      "sector": "Healthcare",
+      "yield": 0.03575735421014549,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 3.6% is 2.1x 5Y avg, stock -50% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "OLN",
+      "company": "Olin",
+      "sector": "Basic Materials",
+      "yield": 0.032599837000815,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-0.6x)"
+    },
+    {
+      "ticker": "NCMI",
+      "company": "National CineMedia",
+      "sector": "Communication Services",
+      "yield": 0.5633802816901409,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 56.3% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "PLAY",
+      "company": "Dave & Buster's",
+      "sector": "Communication Services",
+      "yield": 0.05540661304736372,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 0.5x \u2014 crisis level"
+    },
+    {
+      "ticker": "CAL",
+      "company": "Caleres",
+      "sector": "Consumer Cyclical",
+      "yield": 0.022635408245755866,
+      "composite": -6.0,
+      "bucket": "Critical",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 0.3x \u2014 crisis level"
+    },
+    {
+      "ticker": "MTN",
+      "company": "Vail Resorts",
+      "sector": "Consumer Cyclical",
+      "yield": 0.065597990692177,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 6.6% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "OXM",
+      "company": "Oxford Industries",
+      "sector": "Consumer Cyclical",
+      "yield": 0.06074342701722576,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 6.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "ESNT",
+      "company": "Essentra",
+      "sector": "Basic Materials",
+      "yield": 0.101225085332643,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 10.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "GPGI",
+      "company": "CompoSecure",
+      "sector": "Industrials",
+      "yield": 0.025231286795626574,
+      "composite": -5.0,
       "bucket": "Red",
       "trajectory_pattern": null,
+      "key_signal": "Interest coverage NEGATIVE (-199.9x)"
+    },
+    {
+      "ticker": "EVTC",
+      "company": "Evertec",
+      "sector": "Technology",
+      "yield": 0.008952551477170995,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Dividend frozen for 6 years \u2014 warning signal"
+    },
+    {
+      "ticker": "PLTK",
+      "company": "Playtika Holding",
+      "sector": "Communication Services",
+      "yield": 0.12924071082390953,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Yield 12.9% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "KSS",
+      "company": "Kohl's",
+      "sector": "Consumer Cyclical",
+      "yield": 0.09702457956015523,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
       "key_signal": "Yield 9.7% on no-moat stock \u2014 absolute distress zone"
     },
     {
-      "ticker": "EC",
-      "company": "TotalEnergies EP Gabon",
+      "ticker": "MLKN",
+      "company": "MillerKnoll",
+      "sector": "Consumer Cyclical",
+      "yield": 0.05077860528097495,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Dividend frozen for 3 years \u2014 warning signal"
+    },
+    {
+      "ticker": "VRTS",
+      "company": "Virtus Investment Partners",
+      "sector": "Financial Services",
+      "yield": 0.06242750904004913,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Yield 6.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "NX",
+      "company": "Quanex Building Products",
+      "sector": "Industrials",
+      "yield": 0.020752269779507133,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-3.8x)"
+    },
+    {
+      "ticker": "JBGS",
+      "company": "JBG Smith Properties",
+      "sector": "Real Estate",
+      "yield": 0.05876427132303559,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage NEGATIVE (-0.1x)"
+    },
+    {
+      "ticker": "DCH",
+      "company": "Dauch Corporation",
+      "sector": "Consumer Cyclical",
+      "yield": 0.053797468354430375,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 0.3x \u2014 crisis level"
+    },
+    {
+      "ticker": "OLED",
+      "company": "Universal Display",
+      "sector": "Technology",
+      "yield": 0.020903495528974567,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Yield 2.1% is 2.2x 5Y avg, stock -47% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "KRC",
+      "company": "Kilroy Realty",
+      "sector": "Real Estate",
+      "yield": 0.08749662435862814,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 8.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "CSAN",
+      "company": "Cosan",
       "sector": "Energy",
-      "yield": 0.08504532177777777,
-      "composite": -1.7,
+      "yield": 1.0333880423512545,
+      "composite": -5.0,
       "bucket": "Red",
       "trajectory_pattern": "Variable",
+      "key_signal": "Yield 103.3% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "CRGY",
+      "company": "Crescent Energy",
+      "sector": "Energy",
+      "yield": 0.010398613518197574,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 0.1x \u2014 crisis level"
+    },
+    {
+      "ticker": "ARI",
+      "company": "Apollo Commercial Real Estate Finance",
+      "sector": "Real Estate",
+      "yield": 0.09107468123861566,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 9.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "GPRE",
+      "company": "Green Plains",
+      "sector": "Basic Materials",
+      "yield": 0.03206412825651302,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 0.5x \u2014 crisis level"
+    },
+    {
+      "ticker": "CIM",
+      "company": "Chimera Investment",
+      "sector": "Real Estate",
+      "yield": 0.11178247734138973,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 11.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "JKS",
+      "company": "JinkoSolar Holding",
+      "sector": "Technology",
+      "yield": 0.07477567298105683,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Yield 7.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "ADTN",
+      "company": "ADTRAN Holdings",
+      "sector": "Technology",
+      "yield": 0.023452768729641693,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage NEGATIVE (-0.1x)"
+    },
+    {
+      "ticker": "MAT",
+      "company": "Mattel",
+      "sector": "Consumer Cyclical",
+      "yield": 0.1078779276082328,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 10.8% on Narrow stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "SAFE",
+      "company": "Safehold",
+      "sector": "Real Estate",
+      "yield": 0.0686046511627907,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 6.9% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "FA",
+      "company": "First Advantage",
+      "sector": "Industrials",
+      "yield": 0.09433962264150943,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Yield 9.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "ESRT",
+      "company": "Empire State Realty Trust",
+      "sector": "Real Estate",
+      "yield": 0.026565464895635677,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Dividend frozen for 3 years \u2014 warning signal"
+    },
+    {
+      "ticker": "UPBD",
+      "company": "Upbound Group",
+      "sector": "Technology",
+      "yield": 0.08543263964950712,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Decelerating",
       "key_signal": "Yield 8.5% on no-moat stock \u2014 absolute distress zone"
     },
     {
-      "ticker": "NTTYY",
-      "company": "Nippon Telegraph & Telephone",
+      "ticker": "NSP",
+      "company": "Insperity",
+      "sector": "Industrials",
+      "yield": 0.06783493499152063,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 6.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "RITM",
+      "company": "Rithm Capital",
+      "sector": "Real Estate",
+      "yield": 0.10952902519167579,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 11.0% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "SD",
+      "company": "SandRidge Energy",
+      "sector": "Energy",
+      "yield": 0.13099257258609048,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 13.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "VTS",
+      "company": "Vitesse Energy",
+      "sector": "Energy",
+      "yield": 0.19154370034052212,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Initiating",
+      "key_signal": "Yield 19.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "FUJHY",
+      "company": "Subaru (Tokyo)",
+      "sector": "Consumer Cyclical",
+      "yield": 0.04669155495978553,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Stock -36% from high; At/near 52W low"
+    },
+    {
+      "ticker": "RWT",
+      "company": "Redwood Trust",
+      "sector": "Real Estate",
+      "yield": 0.14446529080675422,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 14.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "BLMN",
+      "company": "Bloomin' Brands",
+      "sector": "Consumer Cyclical",
+      "yield": 0.06185567010309277,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 6.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "AAL",
+      "company": "American Airlines Group",
+      "sector": "Industrials",
+      "yield": 0.02962962962962963,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 1.0x \u2014 crisis level"
+    },
+    {
+      "ticker": "RIOT",
+      "company": "Riot Platforms",
+      "sector": "Financial Services",
+      "yield": 0.04056795131845842,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Interest coverage NEGATIVE (-35.0x)"
+    },
+    {
+      "ticker": "LYB",
+      "company": "LyondellBasell Industries",
+      "sector": "Basic Materials",
+      "yield": 0.08449612403100776,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 8.4% on Narrow stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "MEI",
+      "company": "Methode Electronics",
+      "sector": "Technology",
+      "yield": 0.049252418645558495,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-1.4x)"
+    },
+    {
+      "ticker": "VIV",
+      "company": "Vivendi",
       "sector": "Communication Services",
-      "yield": 0.018185764499121265,
-      "composite": -0.8,
+      "yield": 0.2577303542522017,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 25.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "TEF",
+      "company": "Telef\u00f3nica",
+      "sector": "Communication Services",
+      "yield": 0.0713346405546809,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 7.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "COHU",
+      "company": "Cohu",
+      "sector": "Technology",
+      "yield": 0.004822182037371911,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-15.0x)"
+    },
+    {
+      "ticker": "KHC",
+      "company": "The Kraft Heinz",
+      "sector": "Consumer Defensive",
+      "yield": 0.070859167404783,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-4.9x)"
+    },
+    {
+      "ticker": "SPOK",
+      "company": "Spok Holdings",
+      "sector": "Healthcare",
+      "yield": 0.11671335200746964,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 11.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "CNA",
+      "company": "Centrica",
+      "sector": "Utilities",
+      "yield": 0.06946735762167336,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 6.9% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "EFC",
+      "company": "Ellington Financial",
+      "sector": "Real Estate",
+      "yield": 0.11512915129151291,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 11.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "FLNG",
+      "company": "Flex LNG",
+      "sector": "Energy",
+      "yield": 0.07557944239166947,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Stagnant",
+      "key_signal": "Yield 7.6% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "PRKS",
+      "company": "United Parks & Resorts",
+      "sector": "Consumer Cyclical",
+      "yield": 0.020603384841795434,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Short interest 15.9% \u2014 heavy"
+    },
+    {
+      "ticker": "GNL",
+      "company": "Global Net Lease",
+      "sector": "Real Estate",
+      "yield": 0.14004259850905218,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 14.0% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "KMPR",
+      "company": "Kemper (Multiline Insurance)",
+      "sector": "Financial Services",
+      "yield": 0.05171717171717172,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Yield 5.2% is 2.1x 5Y avg, stock -62% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "AMBP",
+      "company": "Ardagh Metal Packaging",
+      "sector": "Consumer Cyclical",
+      "yield": 0.10152284263959392,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 10.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "WHR",
+      "company": "Whirlpool",
+      "sector": "Consumer Cyclical",
+      "yield": 0.13427919939194324,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 13.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "QFIN",
+      "company": "Qfin Holdings",
+      "sector": "Financial Services",
+      "yield": 0.08121128699242945,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 8.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "RGP",
+      "company": "Resources Connection",
+      "sector": "Industrials",
+      "yield": 0.10816777041942606,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 10.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "HIW",
+      "company": "Highwoods Properties",
+      "sector": "Real Estate",
+      "yield": 0.07173601147776183,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 7.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "LMNR",
+      "company": "Limoneira",
+      "sector": "Consumer Defensive",
+      "yield": 0.025337837837837836,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-12.3x)"
+    },
+    {
+      "ticker": "NLY",
+      "company": "Annaly Capital Management",
+      "sector": "Real Estate",
+      "yield": 0.09896324222431667,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 9.9% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "MGPI",
+      "company": "MGP Ingredients",
+      "sector": "Consumer Defensive",
+      "yield": 0.02909090909090909,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 2.9% is 3.0x 5Y avg, stock -51% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "KREF",
+      "company": "KKR Real Estate Finance Trust",
+      "sector": "Real Estate",
+      "yield": 0.14450867052023122,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 14.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "ACCO",
+      "company": "ACCO Brands",
+      "sector": "Industrials",
+      "yield": 0.07853403141361257,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 7.9% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "BMPSY",
+      "company": "Banca Monte dei Paschi di Siena",
+      "sector": "Financial Services",
+      "yield": 0.09818891176262876,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Yield 9.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "ACT",
+      "company": "Aduro Clean Technologies",
+      "sector": "Industrials",
+      "yield": 0.09233094472082824,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 9.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "FIS",
+      "company": "Fidelity National Information Services",
+      "sector": "Technology",
+      "yield": 0.05763125763125762,
+      "composite": -5.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 5.8% is 2.4x 5Y avg, stock -51% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "BRKR",
+      "company": "Bruker",
+      "sector": "Healthcare",
+      "yield": 0.0035467281432878172,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 1.0x \u2014 crisis level"
+    },
+    {
+      "ticker": "AHRT",
+      "company": "AH Realty Trust",
+      "sector": "Real Estate",
+      "yield": 0.08333333333333334,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 8.3% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "STM",
+      "company": "Stabilus",
+      "sector": "Industrials",
+      "yield": 0.06424920777893417,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 6.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "DIN",
+      "company": "Dine Brands Global",
+      "sector": "Consumer Cyclical",
+      "yield": 0.05842391304347826,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Interest coverage 1.3x \u2014 crisis level"
+    },
+    {
+      "ticker": "CE",
+      "company": "Celanese",
+      "sector": "Basic Materials",
+      "yield": 0.05486968449931413,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Interest coverage NEGATIVE (-0.6x)"
+    },
+    {
+      "ticker": "FLR",
+      "company": "Fluor",
+      "sector": "Industrials",
+      "yield": 0.015349032800672834,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage NEGATIVE (-9.2x)"
+    },
+    {
+      "ticker": "DOW",
+      "company": "Dow (Midland)",
+      "sector": "Basic Materials",
+      "yield": 0.07212246099499559,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-2.1x)"
+    },
+    {
+      "ticker": "CLB",
+      "company": "Core Laboratories",
+      "sector": "Energy",
+      "yield": 0.0030935808197989174,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Dividend frozen for 4 years \u2014 warning signal"
+    },
+    {
+      "ticker": "OLP",
+      "company": "One Liberty Properties",
+      "sector": "Real Estate",
+      "yield": 0.07484407484407485,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 7.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "BYD",
+      "company": "Boyd Group Services (Automotive)",
+      "sector": "Consumer Cyclical",
+      "yield": 0.004252291094845656,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 1.3x \u2014 crisis level"
+    },
+    {
+      "ticker": "BRSP",
+      "company": "BrightSpire Capital",
+      "sector": "Real Estate",
+      "yield": 0.11531531531531532,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 11.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "CCOI",
+      "company": "Cogent Communications",
+      "sector": "Communication Services",
+      "yield": 0.18122400475341652,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 18.1% on Narrow stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "FBIN",
+      "company": "Fortune Brands Innovations",
+      "sector": "Industrials",
+      "yield": 0.024577572964669735,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2023"
+    },
+    {
+      "ticker": "ALK",
+      "company": "Alaska Airlines",
+      "sector": "Industrials",
+      "yield": 0.032695002335357305,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Interest coverage 0.9x \u2014 crisis level"
+    },
+    {
+      "ticker": "CAR",
+      "company": "Avis Budget Group",
+      "sector": "Industrials",
+      "yield": 0.056564285310255105,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Interest coverage NEGATIVE (-0.4x)"
+    },
+    {
+      "ticker": "EPC",
+      "company": "Edgewell Personal Care",
+      "sector": "Consumer Defensive",
+      "yield": 0.015098137896326119,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 0.4x \u2014 crisis level"
+    },
+    {
+      "ticker": "GRNT",
+      "company": "Granite Ridge Resources",
+      "sector": "Energy",
+      "yield": 0.09147609147609148,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 9.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "JBS",
+      "company": "JBS (Food Products)",
+      "sector": "Consumer Defensive",
+      "yield": 0.08683218954248366,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 8.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "DNUT",
+      "company": "Krispy Kreme Doughnuts",
+      "sector": "Consumer Defensive",
+      "yield": 0.01,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-7.1x)"
+    },
+    {
+      "ticker": "RYAM",
+      "company": "Rayonier Advanced Materials",
+      "sector": "Basic Materials",
+      "yield": 0.034567901234567905,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-0.5x)"
+    },
+    {
+      "ticker": "AAP",
+      "company": "Advance Auto Parts",
+      "sector": "Consumer Cyclical",
+      "yield": 0.022003168456257702,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 1.4x \u2014 crisis level"
+    },
+    {
+      "ticker": "BTU",
+      "company": "Peabody Energy",
+      "sector": "Energy",
+      "yield": 0.008007117437722418,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Post-Cut Recovery",
+      "key_signal": "Interest coverage NEGATIVE (-3.6x)"
+    },
+    {
+      "ticker": "XRAY",
+      "company": "Dentsply Sirona",
+      "sector": "Healthcare",
+      "yield": 0.04797601199400299,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 4.8% is 2.0x 5Y avg, stock -41% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "GPK",
+      "company": "Graphic Packaging Holding",
+      "sector": "Consumer Cyclical",
+      "yield": 0.037950664136622396,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 3.8% is 2.1x 5Y avg, stock -56% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "BRSL",
+      "company": "Brightstar Lottery",
+      "sector": "Consumer Cyclical",
+      "yield": 0.10854092526690391,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Stagnant",
+      "key_signal": "Yield 10.9% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "VRE",
+      "company": "Vincom Retail",
+      "sector": "Real Estate",
+      "yield": 0.22207310189678348,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 22.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "LTC",
+      "company": "LTC Properties",
+      "sector": "Real Estate",
+      "yield": 0.06324549237170596,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 6.3% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "FUN",
+      "company": "Six Flags Entertainment",
+      "sector": "Consumer Cyclical",
+      "yield": 0.05791505791505792,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Interest coverage NEGATIVE (-3.7x)"
+    },
+    {
+      "ticker": "CECO",
+      "company": "CECO Environmental",
+      "sector": "Industrials",
+      "yield": 0.0033850493653032445,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2018"
+    },
+    {
+      "ticker": "IP",
+      "company": "International Paper",
+      "sector": "Consumer Cyclical",
+      "yield": 0.05504314192204701,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-3.3x)"
+    },
+    {
+      "ticker": "OHI",
+      "company": "Omega Healthcare Investors",
+      "sector": "Real Estate",
+      "yield": 0.0602653474252305,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 6.0% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "RICK",
+      "company": "RCI Hospitality Holdings",
+      "sector": "Consumer Cyclical",
+      "yield": 0.00932684509326845,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 0.9% is 1.9x 5Y avg, stock -43% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "DOC",
+      "company": "Healthpeak Properties",
+      "sector": "Real Estate",
+      "yield": 0.061647296614451744,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Post-Cut Recovery",
+      "key_signal": "Yield 6.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "TAP",
+      "company": "Molson Coors Beverage Company",
+      "sector": "Consumer Defensive",
+      "yield": 0.012288786482334868,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Interest coverage NEGATIVE (-9.9x)"
+    },
+    {
+      "ticker": "PK",
+      "company": "Park Hotels & Resorts",
+      "sector": "Real Estate",
+      "yield": 0.07117437722419928,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 7.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "FLO",
+      "company": "Flowers Foods",
+      "sector": "Consumer Defensive",
+      "yield": 0.09826203208556149,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 9.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "WEN",
+      "company": "The Wendy's",
+      "sector": "Consumer Cyclical",
+      "yield": 0.09985096870342773,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 10.0% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "ECVT",
+      "company": "Ecovyst",
+      "sector": "Basic Materials",
+      "yield": 0.24902723735408563,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 24.9% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "TV",
+      "company": "Televisa",
+      "sector": "Communication Services",
+      "yield": 0.2059689138576779,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 20.6% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "DXC",
+      "company": "DXC Technology",
+      "sector": "Technology",
+      "yield": 0.0932297447280799,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 9.3% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "METC",
+      "company": "Ramaco Resources",
+      "sector": "Basic Materials",
+      "yield": 0.03515500159795462,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Initiating",
+      "key_signal": "Interest coverage NEGATIVE (-11.3x)"
+    },
+    {
+      "ticker": "CNMD",
+      "company": "Conmed",
+      "sector": "Healthcare",
+      "yield": 0.017064846416382257,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Dividend frozen for 9 years \u2014 warning signal"
+    },
+    {
+      "ticker": "HP",
+      "company": "Helmerich & Payne",
+      "sector": "Energy",
+      "yield": 0.0400427122263748,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage NEGATIVE (-2.1x)"
+    },
+    {
+      "ticker": "CALM",
+      "company": "Cal-Maine Foods",
+      "sector": "Consumer Defensive",
+      "yield": 0.10996827075621364,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 11.0% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "CNXC",
+      "company": "Concentrix (IT Services & Consulting)",
+      "sector": "Technology",
+      "yield": 0.04458123652048886,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Initiating",
+      "key_signal": "Interest coverage NEGATIVE (-3.3x)"
+    },
+    {
+      "ticker": "RYAN",
+      "company": "Ryan Specialty Holdings",
+      "sector": "Financial Services",
+      "yield": 0.00737100737100737,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2025"
+    },
+    {
+      "ticker": "AXGN",
+      "company": "Axogen",
+      "sector": "Healthcare",
+      "yield": 0.023364485981308414,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage NEGATIVE (-4.1x)"
+    },
+    {
+      "ticker": "BHR",
+      "company": "Braemar Hotels & Resorts",
+      "sector": "Real Estate",
+      "yield": 0.08,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 8.0% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "CVI",
+      "company": "CVR Energy",
+      "sector": "Energy",
+      "yield": 0.13574660633484165,
+      "composite": -4.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 13.6% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "NXDT",
+      "company": "NexPoint Diversified Real Estate Trust",
+      "sector": "Real Estate",
+      "yield": 0.1450676982591876,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 14.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "RC",
+      "company": "Ready Capital",
+      "sector": "Real Estate",
+      "yield": 0.3713450292397661,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 37.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "FRHC",
+      "company": "Freedom Holding",
+      "sector": "Financial Services",
+      "yield": 2.2370235812560972,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Yield 223.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "BBCA",
+      "company": "Bank Central Asia",
+      "sector": "Financial Services",
+      "yield": 0.06342113072120491,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 6.3% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "YOU",
+      "company": "Clear Secure",
+      "sector": "Technology",
+      "yield": 0.0027512839325018338,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2024"
+    },
+    {
+      "ticker": "BZH",
+      "company": "Beazer Homes USA",
+      "sector": "Consumer Cyclical",
+      "yield": 0.07704160246533127,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Stagnant",
+      "key_signal": "Yield 7.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "TRTX",
+      "company": "TPG RE Finance Trust",
+      "sector": "Real Estate",
+      "yield": 0.11294117647058823,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 11.3% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "WASH",
+      "company": "The Washington Trust Company of Westerly",
+      "sector": "Financial Services",
+      "yield": 0.06708595387840671,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 6.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "AZTA",
+      "company": "Azenta Life Sciences",
+      "sector": "Healthcare",
+      "yield": 0.01762891141472014,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Dividend frozen for 6 years \u2014 warning signal"
+    },
+    {
+      "ticker": "WSC",
+      "company": "WillScot Mobile Mini Holdings",
+      "sector": "Industrials",
+      "yield": 0.00267175572519084,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Interest coverage 0.7x \u2014 crisis level"
+    },
+    {
+      "ticker": "NEWT",
+      "company": "NewtekOne",
+      "sector": "Financial Services",
+      "yield": 0.0718608169440242,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 7.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "AMSF",
+      "company": "Amerisafe",
+      "sector": "Financial Services",
+      "yield": 0.04921135646687697,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2025"
+    },
+    {
+      "ticker": "CNNE",
+      "company": "Cannae Holdings",
+      "sector": "Consumer Cyclical",
+      "yield": 0.024930747922437674,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Interest coverage NEGATIVE (-19.6x)"
+    },
+    {
+      "ticker": "PRMB",
+      "company": "Primo Brands",
+      "sector": "Consumer Defensive",
+      "yield": 0.013071895424836603,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Interest coverage 1.4x \u2014 crisis level"
+    },
+    {
+      "ticker": "MZTI",
+      "company": "The Marzetti",
+      "sector": "Consumer Defensive",
+      "yield": 0.034919452462985376,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Post-Cut Recovery",
+      "key_signal": "Yield 3.5% is 1.7x 5Y avg, stock -44% from high"
+    },
+    {
+      "ticker": "RHI",
+      "company": "Robert Half",
+      "sector": "Industrials",
+      "yield": 0.07549584133077414,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 7.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "DX",
+      "company": "Dynex Capital",
+      "sector": "Real Estate",
+      "yield": 0.135975135975136,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Post-Cut Recovery",
+      "key_signal": "Yield 13.6% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "IMMR",
+      "company": "Immersion (US)",
+      "sector": "Technology",
+      "yield": 0.02119309262166405,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Interest coverage 1.4x \u2014 crisis level"
+    },
+    {
+      "ticker": "ACRE",
+      "company": "Ares Commercial Real Estate",
+      "sector": "Real Estate",
+      "yield": 0.12024048096192384,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 12.0% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "IVR",
+      "company": "Invesco Mortgage Capital",
+      "sector": "Real Estate",
+      "yield": 0.17669654289372602,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 17.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "PWP",
+      "company": "Perella Weinberg Partners",
+      "sector": "Financial Services",
+      "yield": 0.013565891472868219,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Dividend frozen for 3 years \u2014 warning signal"
+    },
+    {
+      "ticker": "BCBP",
+      "company": "BCB Bancorp",
+      "sector": "Financial Services",
+      "yield": 0.08533333333333334,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 8.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "WD",
+      "company": "Walker & Dunlop",
+      "sector": "Financial Services",
+      "yield": 0.05229268292682927,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Yield 5.2% is 1.8x 5Y avg, stock -43% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "ARR",
+      "company": "ARMOUR Residential REIT",
+      "sector": "Real Estate",
+      "yield": 0.16832261835184104,
+      "composite": -3.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 16.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "TSEM",
+      "company": "Tower Semiconductor",
+      "sector": "Technology",
+      "yield": 0.05692613572272375,
+      "composite": -3.3,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 1998"
+    },
+    {
+      "ticker": "GGAL",
+      "company": "Grupo Financiero Galicia",
+      "sector": "Financial Services",
+      "yield": 0.0771580867653944,
+      "composite": -3.3,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 7.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "PEO",
+      "company": "Bank Polska Kasa Opieki Sp\u00f3\u0142ka Akcyjna",
+      "sector": "Financial Services",
+      "yield": 0.07595644688179085,
+      "composite": -3.3,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 7.6% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "IPI",
+      "company": "Intrepid Potash",
+      "sector": "Basic Materials",
+      "yield": 0.2145308924485126,
+      "composite": -3.3,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Yield 21.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "HDB",
+      "company": "Ho Chi Minh City Development",
+      "sector": "Financial Services",
+      "yield": 0.026225278288402275,
+      "composite": -3.3,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2022"
+    },
+    {
+      "ticker": "BMA",
+      "company": "Banco Macro",
+      "sector": "Financial Services",
+      "yield": 0.10030672040046688,
+      "composite": -3.3,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 10.0% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "BBAR",
+      "company": "Banco BBVA Argentina",
+      "sector": "Financial Services",
+      "yield": 0.13264290970917245,
+      "composite": -3.3,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 13.3% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "CRBG",
+      "company": "Corebridge Financial",
+      "sector": "Financial Services",
+      "yield": 0.009307520476545048,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2024"
+    },
+    {
+      "ticker": "HAS",
+      "company": "Hasbro",
+      "sector": "Consumer Cyclical",
+      "yield": 0.03326205749584224,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 0.9x \u2014 crisis level"
+    },
+    {
+      "ticker": "GPC",
+      "company": "Genuine Parts",
+      "sector": "Consumer Cyclical",
+      "yield": 0.041976566479877735,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage 1.3x \u2014 crisis level"
+    },
+    {
+      "ticker": "AMCR",
+      "company": "Amcor",
+      "sector": "Consumer Cyclical",
+      "yield": 0.0665486493574613,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Stagnant",
+      "key_signal": "Yield 6.7% on narrow-moat stock \u2014 elevated absolute level"
+    },
+    {
+      "ticker": "DD",
+      "company": "DuPont de Nemours",
+      "sector": "Basic Materials",
+      "yield": 0.030522945570971183,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Post-Cut Recovery",
+      "key_signal": "Interest coverage 1.0x \u2014 crisis level"
+    },
+    {
+      "ticker": "PSKY",
+      "company": "Paramount Skydance",
+      "sector": "Communication Services",
+      "yield": 0.009784735812133072,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 1.4x \u2014 crisis level"
+    },
+    {
+      "ticker": "CAG",
+      "company": "Conagra Brands",
+      "sector": "Consumer Defensive",
+      "yield": 0.053804765564950036,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Interest coverage 1.4x \u2014 crisis level"
+    },
+    {
+      "ticker": "MOS",
+      "company": "The Mosaic Company",
+      "sector": "Basic Materials",
+      "yield": 0.03956834532374101,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 4.0% is 1.9x 5Y avg, stock -42% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "AESI",
+      "company": "Atlas Energy Solutions",
+      "sector": "Energy",
+      "yield": 0.0539568345323741,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Initiating",
+      "key_signal": "Interest coverage NEGATIVE (-0.9x)"
+    },
+    {
+      "ticker": "CLMT",
+      "company": "Calumet (US)",
+      "sector": "Basic Materials",
+      "yield": 0.07790730736423088,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 7.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "APAM",
+      "company": "Artisan Partners Asset Management",
+      "sector": "Financial Services",
+      "yield": 0.09760688357085238,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 9.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "ROG",
+      "company": "Rogers",
+      "sector": "Technology",
+      "yield": 0.00021791239921551536,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-28.2x)"
+    },
+    {
+      "ticker": "CNK",
+      "company": "Cinemark Holdings",
+      "sector": "Communication Services",
+      "yield": 0.002881844380403458,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2024"
+    },
+    {
+      "ticker": "AMR",
+      "company": "Alpha Metallurgical Resources",
+      "sector": "Basic Materials",
+      "yield": 0.00010524755400167878,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Initiating",
+      "key_signal": "Interest coverage NEGATIVE (-22.9x)"
+    },
+    {
+      "ticker": "LPG",
+      "company": "Dorian LPG",
+      "sector": "Energy",
+      "yield": 0.13949013949013953,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 13.9% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "NTST",
+      "company": "NETSTREIT",
+      "sector": "Real Estate",
+      "yield": 0.09504752376188094,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 9.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "KNTK",
+      "company": "Kinetik Holdings",
+      "sector": "Energy",
+      "yield": 0.06837795972560301,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Stagnant",
+      "key_signal": "Yield 6.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "BLKB",
+      "company": "Blackbaud",
+      "sector": "Technology",
+      "yield": 0.016907361747094046,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Dividend frozen for 8 years \u2014 warning signal"
+    },
+    {
+      "ticker": "IIPR",
+      "company": "Innovative Industrial Properties",
+      "sector": "Real Estate",
+      "yield": 0.12841530054644806,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Yield 12.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "NVRI",
+      "company": "Enviri",
+      "sector": "Industrials",
+      "yield": 0.042487046632124346,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-0.8x)"
+    },
+    {
+      "ticker": "WLFC",
+      "company": "Willis Lease Finance",
+      "sector": "Industrials",
+      "yield": 0.006260888501742159,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2025"
+    },
+    {
+      "ticker": "VVV",
+      "company": "Valvoline",
+      "sector": "Consumer Cyclical",
+      "yield": 0.01399384270920795,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Stagnant",
+      "key_signal": "Interest coverage 2.8x \u2014 thin"
+    },
+    {
+      "ticker": "WPP",
+      "company": "WPP",
+      "sector": "Communication Services",
+      "yield": 0.05460357550968044,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Interest coverage 1.4x \u2014 crisis level"
+    },
+    {
+      "ticker": "CC",
+      "company": "Chemours",
+      "sector": "Basic Materials",
+      "yield": 0.04878048780487805,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-0.1x)"
+    },
+    {
+      "ticker": "TRS",
+      "company": "TriMas",
+      "sector": "Consumer Cyclical",
+      "yield": 0.0030635690579525142,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 1.5x \u2014 thin"
+    },
+    {
+      "ticker": "RLJ",
+      "company": "RLJ Lodging Trust",
+      "sector": "Real Estate",
+      "yield": 0.05660377358490566,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Post-Cut Recovery",
+      "key_signal": "Interest coverage 1.1x \u2014 crisis level"
+    },
+    {
+      "ticker": "PII",
+      "company": "Polaris (Automotive)",
+      "sector": "Consumer Cyclical",
+      "yield": 0.06085376930063579,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Interest coverage NEGATIVE (-3.1x)"
+    },
+    {
+      "ticker": "ABG",
+      "company": "Asbury Automotive Group",
+      "sector": "Consumer Cyclical",
+      "yield": 0.004450727824903132,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2008"
+    },
+    {
+      "ticker": "CMP",
+      "company": "Compass Minerals International",
+      "sector": "Basic Materials",
+      "yield": 0.020249746878164023,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 1.4x \u2014 crisis level"
+    },
+    {
+      "ticker": "UMH",
+      "company": "Umh Properties",
+      "sector": "Real Estate",
+      "yield": 0.08781127129750983,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 8.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "UVV",
+      "company": "Universal (Tobacco Company)",
+      "sector": "Consumer Defensive",
+      "yield": 0.06026785714285715,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 6.0% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "PRG",
+      "company": "PROG Holdings",
+      "sector": "Industrials",
+      "yield": 0.011063829787234043,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2021"
+    },
+    {
+      "ticker": "TFX",
+      "company": "Teleflex",
+      "sector": "Healthcare",
+      "yield": 0.007855822550831794,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 0.1x \u2014 crisis level"
+    },
+    {
+      "ticker": "OEC",
+      "company": "Orion (Senningerberg)",
+      "sector": "Basic Materials",
+      "yield": 0.011904761904761906,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 0.1x \u2014 crisis level"
+    },
+    {
+      "ticker": "GOOD",
+      "company": "Garudafood Putra Putri Jaya",
+      "sector": "Consumer Defensive",
+      "yield": 0.032886180630314996,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 3.3% is 1.9x 5Y avg, stock -37% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "BRX",
+      "company": "Brixmor Property Group",
+      "sector": "Real Estate",
+      "yield": 0.06560684312459653,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 6.6% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "DSGR",
+      "company": "Distribution Solutions Group",
+      "sector": "Industrials",
+      "yield": 0.008703278321780372,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 1.3x \u2014 crisis level"
+    },
+    {
+      "ticker": "MAN",
+      "company": "ManpowerGroup",
+      "sector": "Industrials",
+      "yield": 0.0953560371517028,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 9.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "TDAY",
+      "company": "Gannett Co",
+      "sector": "Communication Services",
+      "yield": 0.18650306748466258,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 18.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "ICFI",
+      "company": "ICF International",
+      "sector": "Industrials",
+      "yield": 0.008012591214766062,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Dividend frozen for 7 years \u2014 warning signal"
+    },
+    {
+      "ticker": "KOF",
+      "company": "Kaufman & Broad",
+      "sector": "Consumer Cyclical",
+      "yield": 0.0920332111456547,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 9.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "LAZ",
+      "company": "Lazard",
+      "sector": "Financial Services",
+      "yield": 0.06471095772217429,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 6.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "EPR",
+      "company": "EPR Properties",
+      "sector": "Real Estate",
+      "yield": 0.060843793584379365,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Stagnant",
+      "key_signal": "Yield 6.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "STEP",
+      "company": "StepStone Group",
+      "sector": "Financial Services",
+      "yield": 0.01869366863246912,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Stagnant",
+      "key_signal": "Interest coverage NEGATIVE (-47.8x)"
+    },
+    {
+      "ticker": "MTUS",
+      "company": "Metallus",
+      "sector": "Basic Materials",
+      "yield": 0.021363173957273655,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2016"
+    },
+    {
+      "ticker": "CUZ",
+      "company": "Cousins Properties",
+      "sector": "Real Estate",
+      "yield": 0.04622607439508848,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 1.0x \u2014 crisis level"
+    },
+    {
+      "ticker": "HPP",
+      "company": "Hudson Pacific Properties",
+      "sector": "Real Estate",
+      "yield": 0.05094614263464338,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage NEGATIVE (-2.5x)"
+    },
+    {
+      "ticker": "WTI",
+      "company": "W&T Offshore",
+      "sector": "Energy",
+      "yield": 0.013513513513513514,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Interest coverage NEGATIVE (-1.3x)"
+    },
+    {
+      "ticker": "CLF",
+      "company": "Cleveland-Cliffs",
+      "sector": "Basic Materials",
+      "yield": 0.019955654101995568,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Interest coverage NEGATIVE (-1.8x)"
+    },
+    {
+      "ticker": "OWL",
+      "company": "Blue Owl Capital",
+      "sector": "Financial Services",
+      "yield": 0.08724489795918366,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 8.7% on Narrow stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "CHCT",
+      "company": "Community Healthcare Trust",
+      "sector": "Real Estate",
+      "yield": 0.10777587192681533,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 10.8% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "FIP",
+      "company": "FTAI Infrastructure",
+      "sector": "Industrials",
+      "yield": 0.007220216606498194,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Initiating",
+      "key_signal": "Interest coverage NEGATIVE (-0.2x)"
+    },
+    {
+      "ticker": "MTDR",
+      "company": "Matador Resources",
+      "sector": "Energy",
+      "yield": 0.03616763113683032,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Stagnant",
+      "key_signal": "Yield 3.6% is 2.9x 5Y avg \u2014 stretched"
+    },
+    {
+      "ticker": "NFG",
+      "company": "Next Fifteen Communications Group",
+      "sector": "Communication Services",
+      "yield": 0.00661016033145122,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Interest coverage NEGATIVE (-1.5x)"
+    },
+    {
+      "ticker": "DBI",
+      "company": "Designer Brands",
+      "sector": "Consumer Cyclical",
+      "yield": 0.017772511848341235,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 1.0x \u2014 crisis level"
+    },
+    {
+      "ticker": "ULH",
+      "company": "Universal Logistics Holdings",
+      "sector": "Industrials",
+      "yield": 0.024561403508771926,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Interest coverage NEGATIVE (-1.5x)"
+    },
+    {
+      "ticker": "BAX",
+      "company": "Baxter International",
+      "sector": "Healthcare",
+      "yield": 0.026831785345717236,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage NEGATIVE (-0.9x)"
+    },
+    {
+      "ticker": "HVRRY",
+      "company": "Hannover R\u00fcck",
+      "sector": "Financial Services",
+      "yield": 0.055992581433557495,
+      "composite": -3.0,
       "bucket": "Red",
       "trajectory_pattern": "Recently Cut",
       "key_signal": "At/near 52W low"
     },
     {
-      "ticker": "PTAIY",
-      "company": "Astra International",
-      "sector": "Industrials",
-      "yield": 0.06393352941176471,
-      "composite": 0.0,
+      "ticker": "CMCSA",
+      "company": "Comcast",
+      "sector": "Communication Services",
+      "yield": 0.052057094878253565,
+      "composite": -3.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Dividend cut in 2024"
+    },
+    {
+      "ticker": "MBGYY",
+      "company": "Mercedes-Benz Group",
+      "sector": "Consumer Cyclical",
+      "yield": 0.07434276531934307,
+      "composite": -2.5,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Yield 7.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "BMWKY",
+      "company": "Bayerische Motoren Werke",
+      "sector": "Consumer Cyclical",
+      "yield": 0.06375624424448507,
+      "composite": -2.5,
       "bucket": "Red",
       "trajectory_pattern": null,
       "key_signal": "Yield 6.4% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "PEB",
+      "company": "Pebblebrook Hotel Trust",
+      "sector": "Real Estate",
+      "yield": 0.0011841326228537595,
+      "composite": -2.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 0.6x \u2014 crisis level"
+    },
+    {
+      "ticker": "CRCT",
+      "company": "Cricut",
+      "sector": "Technology",
+      "yield": 0.14492753623188406,
+      "composite": -2.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 14.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "WING",
+      "company": "Wingstop (Restaurants)",
+      "sector": "Consumer Cyclical",
+      "yield": 0.008230163196398424,
+      "composite": -2.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 0.8% is 2.0x 5Y avg, stock -63% from high \u2014 classic yield trap"
+    },
+    {
+      "ticker": "MBG",
+      "company": "Mercedes-Benz Group",
+      "sector": "Consumer Cyclical",
+      "yield": 0.07309912290694395,
+      "composite": -2.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 7.3% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "CDE",
+      "company": "Coeur Mining",
+      "sector": "Basic Materials",
+      "yield": 0.0916310323762981,
+      "composite": -2.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Yield 9.2% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "CBRL",
+      "company": "Cracker Barrel Old Country Store",
+      "sector": "Consumer Cyclical",
+      "yield": 0.02977963073257892,
+      "composite": -2.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Interest coverage NEGATIVE (-0.6x)"
+    },
+    {
+      "ticker": "CHRD",
+      "company": "Chord Energy",
+      "sector": "Energy",
+      "yield": 0.03857852956450775,
+      "composite": -2.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 1.5x \u2014 crisis level"
+    },
+    {
+      "ticker": "PDM",
+      "company": "Piedmont Realty Trust",
+      "sector": "Real Estate",
+      "yield": 0.05656108597285068,
+      "composite": -2.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 0.3x \u2014 crisis level"
+    },
+    {
+      "ticker": "NXRT",
+      "company": "NexPoint Residential Trust",
+      "sector": "Real Estate",
+      "yield": 0.07100999655291279,
+      "composite": -2.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 7.1% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "VC",
+      "company": "Visteon",
+      "sector": "Consumer Cyclical",
+      "yield": 0.36948750212838416,
+      "composite": -2.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Yield 36.9% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "EC",
+      "company": "TotalEnergies EP Gabon",
+      "sector": "Energy",
+      "yield": 0.1369971049907076,
+      "composite": -1.7,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 13.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "NTTYY",
+      "company": "Nippon Telegraph & Telephone",
+      "sector": "Communication Services",
+      "yield": 0.037166757469244284,
+      "composite": -1.7,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "At/near 52W low"
+    },
+    {
+      "ticker": "DWAHY",
+      "company": "Daiwa House Industry",
+      "sector": "Real Estate",
+      "yield": 0.035635561559243537,
+      "composite": -1.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Stock -33% from high; At/near 52W low"
+    },
+    {
+      "ticker": "TAK",
+      "company": "Takeda Pharmaceutical",
+      "sector": "Healthcare",
+      "yield": 0.021304113205128206,
+      "composite": -1.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 1.0x \u2014 crisis level"
+    },
+    {
+      "ticker": "VTRS",
+      "company": "Viatris",
+      "sector": "Healthcare",
+      "yield": 0.030236220472440945,
+      "composite": -1.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-0.7x)"
+    },
+    {
+      "ticker": "DAN",
+      "company": "Dana (Automotive)",
+      "sector": "Consumer Cyclical",
+      "yield": 0.011309018942606731,
+      "composite": -1.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 0.9x \u2014 crisis level"
+    },
+    {
+      "ticker": "DHC",
+      "company": "Diversified Healthcare Trust",
+      "sector": "Real Estate",
+      "yield": 0.0046865846514352666,
+      "composite": -1.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-0.9x)"
+    },
+    {
+      "ticker": "KAOOY",
+      "company": "Kao (Personal Products)",
+      "sector": "Consumer Defensive",
+      "yield": 0.02745183673469388,
+      "composite": -1.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "At/near 52W low"
+    },
+    {
+      "ticker": "HTLD",
+      "company": "Heartland Express",
+      "sector": "Industrials",
+      "yield": 0.0050858232676414495,
+      "composite": -1.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage NEGATIVE (-4.3x)"
+    },
+    {
+      "ticker": "BBUC",
+      "company": "Brookfield Business",
+      "sector": "Industrials",
+      "yield": 0.007575599123002258,
+      "composite": -1.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Frozen",
+      "key_signal": "Interest coverage 1.1x \u2014 crisis level"
+    },
+    {
+      "ticker": "ILPT",
+      "company": "Industrial Logistics Properties Trust",
+      "sector": "Real Estate",
+      "yield": 0.004648460197559558,
+      "composite": -1.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 0.5x \u2014 crisis level"
+    },
+    {
+      "ticker": "BN",
+      "company": "Brookfield Corporation",
+      "sector": "Financial Services",
+      "yield": 0.004775041298105918,
+      "composite": -1.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage 1.3x \u2014 crisis level"
+    },
+    {
+      "ticker": "INTC",
+      "company": "Intel",
+      "sector": "Technology",
+      "yield": 0.007461934052636886,
+      "composite": -1.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Interest coverage NEGATIVE (-1.7x)"
+    },
+    {
+      "ticker": "NEM",
+      "company": "Nemetschek Group",
+      "sector": "Technology",
+      "yield": 0.01057611364142643,
+      "composite": 1.0,
+      "bucket": "Red",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 1.1% is 1.9x 5Y avg, stock -54% from high \u2014 classic yield trap"
     }
   ],
-  "mcp_detail": []
+  "mcp_detail": [
+    {
+      "Ticker": "O",
+      "Company": "Realty Income",
+      "Sector": "Real Estate",
+      "Composite": -2.0,
+      "Risk Bucket": "Yellow",
+      "Pillars Scored": 5,
+      "Yield Signal Score": -2,
+      "Yield Signal Narrative": "Yield 6.6% on no-moat stock \u2014 absolute distress zone",
+      "Cash Flow Coverage Score": null,
+      "Cash Flow Coverage Narrative": "No current dividend",
+      "Balance Sheet Score": -1,
+      "Balance Sheet Narrative": "Interest coverage 2.1x \u2014 thin",
+      "Business Quality Score": 0,
+      "Business Quality Narrative": "Exemplary capital allocation; Low ROIC 3.1%",
+      "Market Signal Score": 0,
+      "Market Signal Narrative": "Short interest 3.7%; Within 15% of 52W low",
+      "Dividend Trajectory Score": 1,
+      "Dividend Trajectory Narrative": "Growing \u2014 49% total growth over 10 years"
+    },
+    {
+      "Ticker": "SWK",
+      "Company": "Stanley Black & Decker",
+      "Sector": "Industrials",
+      "Composite": -2.0,
+      "Risk Bucket": "Yellow",
+      "Pillars Scored": 5,
+      "Yield Signal Score": 1,
+      "Yield Signal Narrative": "Yield 4.2% near 5Y avg of 3.5%",
+      "Cash Flow Coverage Score": null,
+      "Cash Flow Coverage Narrative": "No current dividend",
+      "Balance Sheet Score": -2,
+      "Balance Sheet Narrative": "Interest coverage 1.4x \u2014 crisis level",
+      "Business Quality Score": 0,
+      "Business Quality Narrative": "Low ROIC 4.4%",
+      "Market Signal Score": 0,
+      "Market Signal Narrative": "Short interest 4.8%",
+      "Dividend Trajectory Score": -1,
+      "Dividend Trajectory Narrative": "DGR decelerating \u2014 recent growth well below historical pace"
+    },
+    {
+      "Ticker": "NOVO B",
+      "Company": "Novo Nordisk",
+      "Sector": "Healthcare",
+      "Composite": 0.0,
+      "Risk Bucket": "Yellow",
+      "Pillars Scored": 4,
+      "Yield Signal Score": -2,
+      "Yield Signal Narrative": "Yield 3.3% is 1.8x 5Y avg, stock -47% from high \u2014 classic yield trap",
+      "Cash Flow Coverage Score": null,
+      "Cash Flow Coverage Narrative": "No current dividend",
+      "Balance Sheet Score": null,
+      "Balance Sheet Narrative": "No balance sheet data",
+      "Business Quality Score": 2,
+      "Business Quality Narrative": "Wide moat; Exemplary capital allocation; Strong ROIC 39.8%",
+      "Market Signal Score": -1,
+      "Market Signal Narrative": "Stock -47% from high",
+      "Dividend Trajectory Score": 1,
+      "Dividend Trajectory Narrative": "Local-currency DGR 1Y +15.2%, 5Y +17.6% \u2014 growing"
+    },
+    {
+      "Ticker": "NKE",
+      "Company": "Nike",
+      "Sector": "Consumer Cyclical",
+      "Composite": 0.0,
+      "Risk Bucket": "Yellow",
+      "Pillars Scored": 4,
+      "Yield Signal Score": -2,
+      "Yield Signal Narrative": "Yield 3.7% is 2.3x 5Y avg, stock -46% from high \u2014 classic yield trap",
+      "Cash Flow Coverage Score": null,
+      "Cash Flow Coverage Narrative": "No current dividend",
+      "Balance Sheet Score": null,
+      "Balance Sheet Narrative": "No balance sheet data",
+      "Business Quality Score": 2,
+      "Business Quality Narrative": "Wide moat; Exemplary capital allocation; ROIC 8.8%",
+      "Market Signal Score": -1,
+      "Market Signal Narrative": "Short interest 3.6%; Stock -46% from high; At/near 52W low",
+      "Dividend Trajectory Score": 1,
+      "Dividend Trajectory Narrative": "Growing \u2014 153% total growth over 10 years"
+    },
+    {
+      "Ticker": "MKC",
+      "Company": "McCormick & Company",
+      "Sector": "Consumer Defensive",
+      "Composite": 1.0,
+      "Risk Bucket": "Yellow",
+      "Pillars Scored": 5,
+      "Yield Signal Score": -2,
+      "Yield Signal Narrative": "Yield 4.8% is 2.3x 5Y avg, stock -40% from high \u2014 classic yield trap",
+      "Cash Flow Coverage Score": null,
+      "Cash Flow Coverage Narrative": "No current dividend",
+      "Balance Sheet Score": 0,
+      "Balance Sheet Narrative": "Interest coverage 5.5x",
+      "Business Quality Score": 2,
+      "Business Quality Narrative": "Wide moat; Standard capital allocation; Strong ROIC 16.9%",
+      "Market Signal Score": 0,
+      "Market Signal Narrative": "Short interest 0.0%; Stock -40% from high; Within 15% of 52W low",
+      "Dividend Trajectory Score": 1,
+      "Dividend Trajectory Narrative": "Growing \u2014 113% total growth over 10 years"
+    },
+    {
+      "Ticker": "NYS:KOF",
+      "Company": "Coca-Cola FEMSA",
+      "Sector": "Consumer Defensive",
+      "Composite": 3.0,
+      "Risk Bucket": "Yellow",
+      "Pillars Scored": 5,
+      "Yield Signal Score": 2,
+      "Yield Signal Narrative": "Yield 2.4% is below 5Y avg \u2014 not stretched",
+      "Cash Flow Coverage Score": null,
+      "Cash Flow Coverage Narrative": "No current dividend",
+      "Balance Sheet Score": 1,
+      "Balance Sheet Narrative": "Interest coverage 7.4x \u2014 solid",
+      "Business Quality Score": 1,
+      "Business Quality Narrative": "Wide moat; Standard capital allocation; ROIC 11.3%",
+      "Market Signal Score": 1,
+      "Market Signal Narrative": "Short interest 0.2%; Near 52W high",
+      "Dividend Trajectory Score": -2,
+      "Dividend Trajectory Narrative": "Local-currency DGR 1Y -53.3% \u2014 dividend declined"
+    }
+  ]
 }
