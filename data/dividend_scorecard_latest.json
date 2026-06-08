@@ -1,7 +1,7 @@
 {
   "as_of_date": "2026-06-08",
   "summary": {
-    "total_scored": 17,
+    "total_scored": 47,
     "mcp_count": 1,
     "mcp_by_bucket": {
       "Strong": 1
@@ -13,11 +13,11 @@
       "ticker": "CME",
       "company": "CME Group",
       "sector": "Financial Services",
-      "yield": 0.029736957649782462,
-      "composite": 5.0,
+      "yield": 0.028943278943278947,
+      "composite": 4.2,
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
-      "key_signal": "FCF payout 63% \u2014 elevated but covered"
+      "key_signal": "FCF payout 81% \u2014 thin coverage"
     }
   ],
   "universe_flagged": [
@@ -25,21 +25,51 @@
       "ticker": "MCHB",
       "company": "Mechanics Bank",
       "sector": "Financial Services",
-      "yield": 0.08893414799728445,
-      "composite": -7.5,
+      "yield": 0.08739159439626418,
+      "composite": -6.2,
       "bucket": "Critical",
       "trajectory_pattern": null,
-      "key_signal": "Yield 8.9% on no-moat stock \u2014 absolute distress zone"
+      "key_signal": "Yield 8.7% on no-moat stock \u2014 absolute distress zone"
     },
     {
       "ticker": "PPERY",
       "company": "Bank Mandiri",
       "sector": "Financial Services",
-      "yield": 0.0904348199892531,
-      "composite": -6.7,
-      "bucket": "Critical",
+      "yield": 0.09739537037037037,
+      "composite": -2.5,
+      "bucket": "Red",
       "trajectory_pattern": null,
-      "key_signal": "Yield 9.0% on no-moat stock \u2014 absolute distress zone"
+      "key_signal": "Yield 9.7% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "EC",
+      "company": "TotalEnergies EP Gabon",
+      "sector": "Energy",
+      "yield": 0.08504532177777777,
+      "composite": -1.7,
+      "bucket": "Red",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Yield 8.5% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "NTTYY",
+      "company": "Nippon Telegraph & Telephone",
+      "sector": "Communication Services",
+      "yield": 0.018185764499121265,
+      "composite": -0.8,
+      "bucket": "Red",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "At/near 52W low"
+    },
+    {
+      "ticker": "PTAIY",
+      "company": "Astra International",
+      "sector": "Industrials",
+      "yield": 0.06393352941176471,
+      "composite": 0.0,
+      "bucket": "Red",
+      "trajectory_pattern": null,
+      "key_signal": "Yield 6.4% on no-moat stock \u2014 absolute distress zone"
     }
   ],
   "mcp_detail": []
