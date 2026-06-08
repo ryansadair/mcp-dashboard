@@ -1,332 +1,45 @@
 {
-  "as_of_date": "2026-06-01",
+  "as_of_date": "2026-06-08",
   "summary": {
-    "total_scored": 449,
-    "mcp_count": 0,
-    "mcp_by_bucket": {},
+    "total_scored": 17,
+    "mcp_count": 1,
+    "mcp_by_bucket": {
+      "Strong": 1
+    },
     "mcp_flagged": []
   },
-  "mcp_rows": [],
+  "mcp_rows": [
+    {
+      "ticker": "CME",
+      "company": "CME Group",
+      "sector": "Financial Services",
+      "yield": 0.029736957649782462,
+      "composite": 5.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "FCF payout 63% \u2014 elevated but covered"
+    }
+  ],
   "universe_flagged": [
     {
-      "ticker": "BAP",
-      "company": "Bapcor",
-      "sector": "#WAIT",
-      "yield": 0.08974098513931564,
+      "ticker": "MCHB",
+      "company": "Mechanics Bank",
+      "sector": "Financial Services",
+      "yield": 0.08893414799728445,
       "composite": -7.5,
       "bucket": "Critical",
-      "trajectory_pattern": "Recently Cut",
+      "trajectory_pattern": null,
+      "key_signal": "Yield 8.9% on no-moat stock \u2014 absolute distress zone"
+    },
+    {
+      "ticker": "PPERY",
+      "company": "Bank Mandiri",
+      "sector": "Financial Services",
+      "yield": 0.0904348199892531,
+      "composite": -6.7,
+      "bucket": "Critical",
+      "trajectory_pattern": null,
       "key_signal": "Yield 9.0% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "AGNC",
-      "company": "AGNC Investment",
-      "sector": "#WAIT",
-      "yield": 0.13649289099526069,
-      "composite": -6.7,
-      "bucket": "Critical",
-      "trajectory_pattern": "Frozen",
-      "key_signal": "Yield 13.6% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "CIHKY",
-      "company": "China Merchants Bank",
-      "sector": "Financial Services",
-      "yield": 0.07166121129635931,
-      "composite": -6.7,
-      "bucket": "Critical",
-      "trajectory_pattern": null,
-      "key_signal": "Yield 7.2% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "KAOOY",
-      "company": "Kao (Personal Products)",
-      "sector": "Consumer Defensive",
-      "yield": null,
-      "composite": -5.0,
-      "bucket": "Red",
-      "trajectory_pattern": "Recently Cut",
-      "key_signal": "Dividend cut in 2023"
-    },
-    {
-      "ticker": "TEF",
-      "company": "Telef\u00f3nica",
-      "sector": "#WAIT",
-      "yield": 0.0756845563264915,
-      "composite": -5.0,
-      "bucket": "Red",
-      "trajectory_pattern": "Variable",
-      "key_signal": "Yield 7.6% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "MBGYY",
-      "company": "Mercedes-Benz Group",
-      "sector": "Consumer Cyclical",
-      "yield": 0.06716612164813604,
-      "composite": -5.0,
-      "bucket": "Red",
-      "trajectory_pattern": null,
-      "key_signal": "Yield 6.7% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "CRRFY",
-      "company": "Carrefour (Massy)",
-      "sector": "Consumer Defensive",
-      "yield": 0.06154254742547425,
-      "composite": -5.0,
-      "bucket": "Red",
-      "trajectory_pattern": null,
-      "key_signal": "Yield 6.2% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "SNY",
-      "company": "Sanofi",
-      "sector": "Healthcare",
-      "yield": 0.05462856820234869,
-      "composite": -5.0,
-      "bucket": "Red",
-      "trajectory_pattern": "Recently Cut",
-      "key_signal": "At/near 52W low"
-    },
-    {
-      "ticker": "BKRKY",
-      "company": "Bank Rakyat Indonesia",
-      "sector": "#WAIT",
-      "yield": 0.11479099307159353,
-      "composite": -3.8,
-      "bucket": "Red",
-      "trajectory_pattern": null,
-      "key_signal": "Yield 11.5% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "PHG",
-      "company": "Patrangsit Healthcare Group",
-      "sector": "Healthcare",
-      "yield": 0.0665932622290306,
-      "composite": -3.8,
-      "bucket": "Red",
-      "trajectory_pattern": "Initiating",
-      "key_signal": "Yield 6.7% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "ASX",
-      "company": "ASX",
-      "sector": "Financial Services",
-      "yield": 0.04502611250794612,
-      "composite": -3.8,
-      "bucket": "Red",
-      "trajectory_pattern": "Recently Cut",
-      "key_signal": "Dividend cut in 2024"
-    },
-    {
-      "ticker": "EHC",
-      "company": "Encompass Health",
-      "sector": "#WAIT",
-      "yield": 0.007023538344722856,
-      "composite": -3.8,
-      "bucket": "Red",
-      "trajectory_pattern": "Recently Cut",
-      "key_signal": "Dividend cut in 2023"
-    },
-    {
-      "ticker": "CG",
-      "company": "The Carlyle Group",
-      "sector": "Financial Services",
-      "yield": 0.031049013084941224,
-      "composite": -3.8,
-      "bucket": "Red",
-      "trajectory_pattern": "Post-Cut Recovery",
-      "key_signal": "FCF is negative (-13.45/sh) \u2014 dividend funded externally"
-    },
-    {
-      "ticker": "PRNDY",
-      "company": "Pernod Ricard",
-      "sector": "Consumer Defensive",
-      "yield": 0.07323694779116466,
-      "composite": -3.8,
-      "bucket": "Red",
-      "trajectory_pattern": null,
-      "key_signal": "Yield 7.3% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "SF",
-      "company": "Stifel Financial",
-      "sector": "Financial Services",
-      "yield": null,
-      "composite": -3.8,
-      "bucket": "Red",
-      "trajectory_pattern": "Decelerating",
-      "key_signal": "MS Financial Health 0.48 \u2014 weak (D2D signal veto)"
-    },
-    {
-      "ticker": "BTI",
-      "company": "Bailador Technology Investments",
-      "sector": "#WAIT",
-      "yield": 0.07634857572592249,
-      "composite": -3.8,
-      "bucket": "Red",
-      "trajectory_pattern": "Variable",
-      "key_signal": "Yield 7.6% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "STAG",
-      "company": "STAG Industrial",
-      "sector": "#WAIT",
-      "yield": 0.036347354566991306,
-      "composite": -3.3,
-      "bucket": "Red",
-      "trajectory_pattern": "Frozen",
-      "key_signal": "Dividend frozen for 7 years \u2014 warning signal"
-    },
-    {
-      "ticker": "SMMYY",
-      "company": "Sumitomo Metal Mining",
-      "sector": "#WAIT",
-      "yield": 0.007325738396624472,
-      "composite": -3.3,
-      "bucket": "Red",
-      "trajectory_pattern": null,
-      "key_signal": "Interest coverage NEGATIVE (-0.5x)"
-    },
-    {
-      "ticker": "BWA",
-      "company": "BorgWarner",
-      "sector": "Consumer Cyclical",
-      "yield": null,
-      "composite": -3.3,
-      "bucket": "Red",
-      "trajectory_pattern": "Recently Cut",
-      "key_signal": "Dividend cut in 2024"
-    },
-    {
-      "ticker": "ALLY",
-      "company": "Ally Financial",
-      "sector": "#WAIT",
-      "yield": 0.028037383177570093,
-      "composite": -3.3,
-      "bucket": "Red",
-      "trajectory_pattern": "Frozen",
-      "key_signal": "Dividend frozen for 3 years \u2014 warning signal"
-    },
-    {
-      "ticker": "TIMB",
-      "company": "Tim Participacoes",
-      "sector": "#WAIT",
-      "yield": 0.0639207453973956,
-      "composite": -3.3,
-      "bucket": "Red",
-      "trajectory_pattern": "Variable",
-      "key_signal": "Yield 6.4% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "ESI",
-      "company": "Element Solutions (Specialty Chemicals)",
-      "sector": "Basic Materials",
-      "yield": 0.007633587786259542,
-      "composite": -3.3,
-      "bucket": "Red",
-      "trajectory_pattern": "Frozen",
-      "key_signal": "Dividend frozen for 3 years \u2014 warning signal"
-    },
-    {
-      "ticker": "FHN",
-      "company": "First Horizon (Memphis)",
-      "sector": "#WAIT",
-      "yield": 0.02559867877786953,
-      "composite": -3.3,
-      "bucket": "Red",
-      "trajectory_pattern": "Frozen",
-      "key_signal": "Dividend frozen for 5 years \u2014 warning signal"
-    },
-    {
-      "ticker": "CRBG",
-      "company": "Corebridge Financial",
-      "sector": "Financial Services",
-      "yield": 0.036479879654005266,
-      "composite": -3.3,
-      "bucket": "Red",
-      "trajectory_pattern": "Recently Cut",
-      "key_signal": "Dividend cut in 2024"
-    },
-    {
-      "ticker": "HESAY",
-      "company": "Herm\u00e8s International",
-      "sector": "#WAIT",
-      "yield": 0.011043612727368035,
-      "composite": -3.3,
-      "bucket": "Red",
-      "trajectory_pattern": null,
-      "key_signal": "Stock -34% from high; At/near 52W low"
-    },
-    {
-      "ticker": "SUHJY",
-      "company": "Sun Hung Kai Properties",
-      "sector": "Real Estate",
-      "yield": 0.02884109589041096,
-      "composite": -3.3,
-      "bucket": "Red",
-      "trajectory_pattern": "Recently Cut",
-      "key_signal": "Dividend cut in 2025"
-    },
-    {
-      "ticker": "SVNDY",
-      "company": "Seven & i Holdings",
-      "sector": "Consumer Defensive",
-      "yield": 0.014107217391304347,
-      "composite": -3.3,
-      "bucket": "Red",
-      "trajectory_pattern": null,
-      "key_signal": "Stock -31% from high; At/near 52W low"
-    },
-    {
-      "ticker": "BMPSY",
-      "company": "Banca Monte dei Paschi di Siena",
-      "sector": "Financial Services",
-      "yield": 0.09322248134328358,
-      "composite": -3.3,
-      "bucket": "Red",
-      "trajectory_pattern": null,
-      "key_signal": "Yield 9.3% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "BSBR",
-      "company": "Banco Santander (Brasil)",
-      "sector": "Financial Services",
-      "yield": 0.062498348623853214,
-      "composite": -3.0,
-      "bucket": "Red",
-      "trajectory_pattern": "Variable",
-      "key_signal": "Yield 6.2% on no-moat stock \u2014 absolute distress zone"
-    },
-    {
-      "ticker": "VIV",
-      "company": "Vivendi",
-      "sector": "Communication Services",
-      "yield": 0.01767468864719516,
-      "composite": -3.0,
-      "bucket": "Red",
-      "trajectory_pattern": "Variable",
-      "key_signal": "Interest coverage 0.9x \u2014 crisis level"
-    },
-    {
-      "ticker": "KNYJY",
-      "company": "Kone",
-      "sector": "Industrials",
-      "yield": 0.03519045996592845,
-      "composite": -3.0,
-      "bucket": "Red",
-      "trajectory_pattern": null,
-      "key_signal": "At/near 52W low"
-    },
-    {
-      "ticker": "NTTYY",
-      "company": "Nippon Telegraph & Telephone",
-      "sector": "Communication Services",
-      "yield": 0.03564364710848459,
-      "composite": -3.0,
-      "bucket": "Red",
-      "trajectory_pattern": "Recently Cut",
-      "key_signal": "At/near 52W low"
     }
   ],
   "mcp_detail": []
