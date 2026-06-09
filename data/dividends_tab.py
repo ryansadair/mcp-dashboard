@@ -1239,12 +1239,26 @@ Each pillar scores from −2 (severe stress) to +2 (healthy). Composite scales t
                         return f"color: {BRAND['gold']}; font-weight: 600;"
                     return f"color: {BRAND['red']}; font-weight: 700;"
 
+                def _fmt_pillar_score(v):
+                    # Pillar scores are -1 / 0 / +1 but can arrive as numpy
+                    # float64/int64, None, or NaN (e.g. a pillar with no score
+                    # in this scorecard run). The ":d" code only accepts a true
+                    # Python int, so coerce defensively and fall back to an em
+                    # dash for anything non-numeric or blank.
+                    try:
+                        if v is None or pd.isna(v):
+                            return "—"
+                    except (TypeError, ValueError):
+                        pass
+                    try:
+                        return f"{int(round(float(v))):+d}"
+                    except (TypeError, ValueError):
+                        return "—"
+
                 styled_p = (
                     pillar_df.style
                     .map(_pillar_score_color, subset=["Score"])
-                    .format({
-                        "Score": lambda v: f"{v:+d}" if isinstance(v, (int, float)) and v is not None else "—",
-                    })
+                    .format({"Score": _fmt_pillar_score})
                 )
                 st.dataframe(
                     styled_p, width="stretch", hide_index=True,
