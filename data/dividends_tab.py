@@ -700,7 +700,11 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
             "10Y Growth":     r["growth_10y"],
             "Paid":           paid_str,
             "Raised":         raised_str,
-            "Recessions":     r["recessions"] if r["consec_years"] > 0 else "N/A",
+            "Recessions":     (str(int(r["recessions"]))
+                               if r["consec_years"] > 0
+                                  and r["recessions"] is not None
+                                  and not pd.isna(r["recessions"])
+                               else "N/A"),
             "Payout %":       r["payout_ratio"],
             "Safety":         r["safety"],
             "Src":            "CCC" if r.get("fish_sourced", False) else "yF",
