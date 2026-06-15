@@ -1,11 +1,11 @@
 {
-  "as_of_date": "2026-06-08",
+  "as_of_date": "2026-06-15",
   "summary": {
-    "total_scored": 1929,
-    "mcp_count": 178,
+    "total_scored": 1803,
+    "mcp_count": 52,
     "mcp_by_bucket": {
-      "Green": 139,
       "Strong": 33,
+      "Green": 13,
       "Yellow": 6
     },
     "mcp_flagged": [
@@ -26,20 +26,20 @@
         "primary_concern": "Interest coverage 1.4x \u2014 crisis level"
       },
       {
-        "ticker": "NOVO B",
-        "company": "Novo Nordisk",
-        "composite": 0.0,
-        "bucket": "Yellow",
-        "trajectory_pattern": "Growing",
-        "primary_concern": "Yield 3.3% is 1.8x 5Y avg, stock -47% from high \u2014 classic yield trap"
-      },
-      {
         "ticker": "NKE",
         "company": "Nike",
         "composite": 0.0,
         "bucket": "Yellow",
         "trajectory_pattern": "Growing",
         "primary_concern": "Yield 3.7% is 2.3x 5Y avg, stock -46% from high \u2014 classic yield trap"
+      },
+      {
+        "ticker": "NOVO B",
+        "company": "Novo Nordisk",
+        "composite": 0.0,
+        "bucket": "Yellow",
+        "trajectory_pattern": "Growing",
+        "primary_concern": "Yield 3.3% is 1.8x 5Y avg, stock -47% from high \u2014 classic yield trap"
       },
       {
         "ticker": "MKC",
@@ -81,6 +81,16 @@
       "key_signal": "Interest coverage 1.4x \u2014 crisis level"
     },
     {
+      "ticker": "NKE",
+      "company": "Nike",
+      "sector": "Consumer Cyclical",
+      "yield": 0.03652861796184273,
+      "composite": 0.0,
+      "bucket": "Yellow",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 3.7% is 2.3x 5Y avg, stock -46% from high \u2014 classic yield trap"
+    },
+    {
       "ticker": "CNP",
       "company": "CenterPoint Energy",
       "sector": "Utilities",
@@ -89,26 +99,6 @@
       "bucket": "Green",
       "trajectory_pattern": "Post-Cut Recovery",
       "key_signal": "Interest coverage 2.4x \u2014 thin"
-    },
-    {
-      "ticker": "EMN",
-      "company": "Eastman Chemical",
-      "sector": "Basic Materials",
-      "yield": 0.06945991091314031,
-      "composite": 0.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Yield 6.9% on narrow-moat stock \u2014 elevated absolute level"
-    },
-    {
-      "ticker": "NOVO B",
-      "company": "Novo Nordisk",
-      "sector": "Healthcare",
-      "yield": 0.03264737781808326,
-      "composite": 0.0,
-      "bucket": "Yellow",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Yield 3.3% is 1.8x 5Y avg, stock -47% from high \u2014 classic yield trap"
     },
     {
       "ticker": "VZ",
@@ -121,6 +111,16 @@
       "key_signal": "Yield 6.0% on narrow-moat stock \u2014 elevated absolute level"
     },
     {
+      "ticker": "NOVO B",
+      "company": "Novo Nordisk",
+      "sector": "Healthcare",
+      "yield": 0.03264737781808326,
+      "composite": 0.0,
+      "bucket": "Yellow",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Yield 3.3% is 1.8x 5Y avg, stock -47% from high \u2014 classic yield trap"
+    },
+    {
       "ticker": "PFE",
       "company": "Pfizer (Pharmaceuticals)",
       "sector": "Healthcare",
@@ -131,14 +131,14 @@
       "key_signal": "Yield 6.5% on narrow-moat stock \u2014 elevated absolute level"
     },
     {
-      "ticker": "NKE",
-      "company": "Nike",
-      "sector": "Consumer Cyclical",
-      "yield": 0.03652861796184273,
+      "ticker": "EMN",
+      "company": "Eastman Chemical",
+      "sector": "Basic Materials",
+      "yield": 0.06945991091314031,
       "composite": 0.0,
-      "bucket": "Yellow",
+      "bucket": "Green",
       "trajectory_pattern": "Growing",
-      "key_signal": "Yield 3.7% is 2.3x 5Y avg, stock -46% from high \u2014 classic yield trap"
+      "key_signal": "Yield 6.9% on narrow-moat stock \u2014 elevated absolute level"
     },
     {
       "ticker": "DOX",
@@ -151,66 +151,6 @@
       "key_signal": "Yield 3.4% is 1.6x 5Y avg, stock -37% from high"
     },
     {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "BKH",
-      "company": "Black Hills",
-      "sector": "Utilities",
-      "yield": 0.03709810387469085,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 2.6x \u2014 thin"
-    },
-    {
-      "ticker": "CLX",
-      "company": "The Clorox Company",
-      "sector": "Consumer Defensive",
-      "yield": 0.05183768854896962,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Decelerating",
-      "key_signal": "Yield 5.2% is 1.5x 5Y avg, stock -29% from high"
-    },
-    {
-      "ticker": "HRL",
-      "company": "Hormel Foods",
-      "sector": "Consumer Defensive",
-      "yield": 0.04911092294665537,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Yield 4.9% is 1.5x 5Y avg, stock -26% from high"
-    },
-    {
       "ticker": "MKC",
       "company": "McCormick & Company",
       "sector": "Consumer Defensive",
@@ -219,86 +159,6 @@
       "bucket": "Yellow",
       "trajectory_pattern": "Growing",
       "key_signal": "Yield 4.8% is 2.3x 5Y avg, stock -40% from high \u2014 classic yield trap"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
     },
     {
       "ticker": "POR",
@@ -311,534 +171,34 @@
       "key_signal": "Interest coverage 2.2x \u2014 thin"
     },
     {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
+      "ticker": "HRL",
+      "company": "Hormel Foods",
+      "sector": "Consumer Defensive",
+      "yield": 0.04911092294665537,
       "composite": 1.0,
       "bucket": "Green",
       "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
+      "key_signal": "Yield 4.9% is 1.5x 5Y avg, stock -26% from high"
     },
     {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
+      "ticker": "CLX",
+      "company": "The Clorox Company",
+      "sector": "Consumer Defensive",
+      "yield": 0.05183768854896962,
       "composite": 1.0,
       "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "Yield 5.2% is 1.5x 5Y avg, stock -29% from high"
     },
     {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
+      "ticker": "BKH",
+      "company": "Black Hills",
       "sector": "Utilities",
-      "yield": 0.03170608958228485,
+      "yield": 0.03709810387469085,
       "composite": 1.0,
       "bucket": "Green",
       "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
-    },
-    {
-      "ticker": "PEG",
-      "company": "Public Service Enterprise Group",
-      "sector": "Utilities",
-      "yield": 0.03170608958228485,
-      "composite": 1.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 3.5x"
+      "key_signal": "Interest coverage 2.6x \u2014 thin"
     },
     {
       "ticker": "TROW",
@@ -851,406 +211,6 @@
       "key_signal": "Short interest 11.7% \u2014 elevated"
     },
     {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
       "ticker": "ETR",
       "company": "Entergy",
       "sector": "Utilities",
@@ -1261,234 +221,14 @@
       "key_signal": "Interest coverage 2.3x \u2014 thin"
     },
     {
-      "ticker": "AWR",
-      "company": "American States Water",
+      "ticker": "PEG",
+      "company": "Public Service Enterprise Group",
       "sector": "Utilities",
-      "yield": 0.02474161031006763,
+      "yield": 0.03170608958228485,
       "composite": 2.0,
       "bucket": "Green",
       "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
-    },
-    {
-      "ticker": "AWR",
-      "company": "American States Water",
-      "sector": "Utilities",
-      "yield": 0.02474161031006763,
-      "composite": 2.0,
-      "bucket": "Green",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 4.6x"
+      "key_signal": "Interest coverage 3.5x"
     },
     {
       "ticker": "AWR",
@@ -1511,34 +251,14 @@
       "key_signal": "Low ROIC 2.6%"
     },
     {
-      "ticker": "MDT",
-      "company": "Medtronic",
-      "sector": "Healthcare",
-      "yield": 0.03428431492592139,
+      "ticker": "JKHY",
+      "company": "Jack Henry & Associates",
+      "sector": "Technology",
+      "yield": 0.01736457933154053,
       "composite": 3.0,
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
-      "key_signal": "Narrow moat; Standard capital allocation; ROIC 6.8%"
-    },
-    {
-      "ticker": "UNP",
-      "company": "Union Pacific",
-      "sector": "Industrials",
-      "yield": 0.0199764982373678,
-      "composite": 3.0,
-      "bucket": "Strong",
-      "trajectory_pattern": "Decelerating",
-      "key_signal": "DGR decelerating \u2014 recent growth well below historical pace"
-    },
-    {
-      "ticker": "MSM",
-      "company": "MSC Industrial Direct",
-      "sector": "Industrials",
-      "yield": 0.04415202147000259,
-      "composite": 3.0,
-      "bucket": "Strong",
-      "trajectory_pattern": "Variable",
-      "key_signal": "Narrow moat; Standard capital allocation; ROIC 11.4%"
+      "key_signal": "Yield 1.7% is 1.4x 5Y avg \u2014 stretched"
     },
     {
       "ticker": "RGA",
@@ -1551,6 +271,36 @@
       "key_signal": "Interest coverage 5.2x"
     },
     {
+      "ticker": "NYS:KOF",
+      "company": "Coca-Cola FEMSA",
+      "sector": "Consumer Defensive",
+      "yield": 0.023550812435427823,
+      "composite": 3.0,
+      "bucket": "Yellow",
+      "trajectory_pattern": "Recently Cut",
+      "key_signal": "Local-currency DGR 1Y -53.3% \u2014 dividend declined"
+    },
+    {
+      "ticker": "MSM",
+      "company": "MSC Industrial Direct",
+      "sector": "Industrials",
+      "yield": 0.04415202147000259,
+      "composite": 3.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Narrow moat; Standard capital allocation; ROIC 11.4%"
+    },
+    {
+      "ticker": "UNP",
+      "company": "Union Pacific",
+      "sector": "Industrials",
+      "yield": 0.0199764982373678,
+      "composite": 3.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Decelerating",
+      "key_signal": "DGR decelerating \u2014 recent growth well below historical pace"
+    },
+    {
       "ticker": "PAYX",
       "company": "Paychex",
       "sector": "Technology",
@@ -1561,24 +311,14 @@
       "key_signal": "Yield 4.0% is 1.4x 5Y avg \u2014 stretched"
     },
     {
-      "ticker": "JKHY",
-      "company": "Jack Henry & Associates",
-      "sector": "Technology",
-      "yield": 0.01736457933154053,
+      "ticker": "MDT",
+      "company": "Medtronic",
+      "sector": "Healthcare",
+      "yield": 0.03428431492592139,
       "composite": 3.0,
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
-      "key_signal": "Yield 1.7% is 1.4x 5Y avg \u2014 stretched"
-    },
-    {
-      "ticker": "NYS:KOF",
-      "company": "Coca-Cola FEMSA",
-      "sector": "Consumer Defensive",
-      "yield": 0.023550812435427823,
-      "composite": 3.0,
-      "bucket": "Yellow",
-      "trajectory_pattern": "Recently Cut",
-      "key_signal": "Local-currency DGR 1Y -53.3% \u2014 dividend declined"
+      "key_signal": "Narrow moat; Standard capital allocation; ROIC 6.8%"
     },
     {
       "ticker": "PEP",
@@ -1591,34 +331,14 @@
       "key_signal": "Yield 4.0% is 1.3x 5Y avg"
     },
     {
-      "ticker": "AMGN",
-      "company": "Amgen",
-      "sector": "Healthcare",
-      "yield": 0.04124949939927913,
+      "ticker": "PSX",
+      "company": "Phillips 66",
+      "sector": "Energy",
+      "yield": 0.025944942101813414,
       "composite": 4.0,
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
-      "key_signal": "Yield 4.1% is 1.3x 5Y avg"
-    },
-    {
-      "ticker": "INGR",
-      "company": "Ingredion",
-      "sector": "Consumer Defensive",
-      "yield": 0.032406481296259254,
-      "composite": 4.0,
-      "bucket": "Strong",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Short interest 5.1%; At/near 52W low"
-    },
-    {
-      "ticker": "DGX",
-      "company": "Quest Diagnostics",
-      "sector": "Healthcare",
-      "yield": 0.01597683359129263,
-      "composite": 4.0,
-      "bucket": "Strong",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Narrow moat; Standard capital allocation; ROIC 9.2%"
+      "key_signal": "Interest coverage 5.2x"
     },
     {
       "ticker": "HII",
@@ -1631,24 +351,34 @@
       "key_signal": "Short interest 2.3%; Stock -36% from high"
     },
     {
-      "ticker": "UL",
-      "company": "Unilever",
+      "ticker": "INGR",
+      "company": "Ingredion",
       "sector": "Consumer Defensive",
-      "yield": 0.022111248236953457,
+      "yield": 0.032406481296259254,
       "composite": 4.0,
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
-      "key_signal": "Short interest 0.2%; At/near 52W low"
+      "key_signal": "Short interest 5.1%; At/near 52W low"
     },
     {
-      "ticker": "PSX",
-      "company": "Phillips 66",
-      "sector": "Energy",
-      "yield": 0.025944942101813414,
+      "ticker": "AMGN",
+      "company": "Amgen",
+      "sector": "Healthcare",
+      "yield": 0.04124949939927913,
       "composite": 4.0,
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
-      "key_signal": "Interest coverage 5.2x"
+      "key_signal": "Yield 4.1% is 1.3x 5Y avg"
+    },
+    {
+      "ticker": "DGX",
+      "company": "Quest Diagnostics",
+      "sector": "Healthcare",
+      "yield": 0.01597683359129263,
+      "composite": 4.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Narrow moat; Standard capital allocation; ROIC 9.2%"
     },
     {
       "ticker": "SNA",
@@ -1661,6 +391,16 @@
       "key_signal": "Narrow moat; Standard capital allocation; ROIC 14.7%"
     },
     {
+      "ticker": "UL",
+      "company": "Unilever",
+      "sector": "Consumer Defensive",
+      "yield": 0.022111248236953457,
+      "composite": 4.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Short interest 0.2%; At/near 52W low"
+    },
+    {
       "ticker": "CME",
       "company": "CME Group",
       "sector": "Financial Services",
@@ -1669,6 +409,26 @@
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
       "key_signal": "FCF payout 81% \u2014 thin coverage"
+    },
+    {
+      "ticker": "COR",
+      "company": "Cencora",
+      "sector": "Healthcare",
+      "yield": 0.007998836532867946,
+      "composite": 5.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "Short interest 2.7%; Within 15% of 52W low"
+    },
+    {
+      "ticker": "DVN",
+      "company": "Devon Energy",
+      "sector": "Energy",
+      "yield": 0.03274616079494128,
+      "composite": 5.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Variable",
+      "key_signal": "Variable dividend policy (amplitude 21.5x, 2 direction changes)"
     },
     {
       "ticker": "ALSN",
@@ -1711,24 +471,24 @@
       "key_signal": "Standard capital allocation; ROIC 9.0%"
     },
     {
-      "ticker": "DVN",
-      "company": "Devon Energy",
-      "sector": "Energy",
-      "yield": 0.03274616079494128,
-      "composite": 5.0,
-      "bucket": "Strong",
-      "trajectory_pattern": "Variable",
-      "key_signal": "Variable dividend policy (amplitude 21.5x, 2 direction changes)"
-    },
-    {
-      "ticker": "COR",
-      "company": "Cencora",
-      "sector": "Healthcare",
-      "yield": 0.007998836532867946,
-      "composite": 5.0,
+      "ticker": "PG",
+      "company": "Procter & Gamble",
+      "sector": "Consumer Defensive",
+      "yield": 0.027816978299440426,
+      "composite": 6.0,
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
-      "key_signal": "Short interest 2.7%; Within 15% of 52W low"
+      "key_signal": "Short interest 1.2%; Within 15% of 52W low"
+    },
+    {
+      "ticker": "LECO",
+      "company": "The Lincoln Electric Company",
+      "sector": "Industrials",
+      "yield": 0.011597741492446207,
+      "composite": 6.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "No concerns"
     },
     {
       "ticker": "CSCO",
@@ -1751,40 +511,10 @@
       "key_signal": "No concerns"
     },
     {
-      "ticker": "LECO",
-      "company": "The Lincoln Electric Company",
-      "sector": "Industrials",
-      "yield": 0.011597741492446207,
-      "composite": 6.0,
-      "bucket": "Strong",
-      "trajectory_pattern": "Growing",
-      "key_signal": "No concerns"
-    },
-    {
-      "ticker": "PG",
-      "company": "Procter & Gamble",
-      "sector": "Consumer Defensive",
-      "yield": 0.027816978299440426,
-      "composite": 6.0,
-      "bucket": "Strong",
-      "trajectory_pattern": "Growing",
-      "key_signal": "Short interest 1.2%; Within 15% of 52W low"
-    },
-    {
       "ticker": "XOM",
       "company": "Exxon Mobil",
       "sector": "Energy",
       "yield": 0.026680896478121666,
-      "composite": 7.0,
-      "bucket": "Strong",
-      "trajectory_pattern": "Growing",
-      "key_signal": "No concerns"
-    },
-    {
-      "ticker": "GD",
-      "company": "General Dynamics",
-      "sector": "Industrials",
-      "yield": 0.017319016279875303,
       "composite": 7.0,
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
@@ -1801,11 +531,11 @@
       "key_signal": "No concerns"
     },
     {
-      "ticker": "JPM",
-      "company": "JP Morgan Chase",
-      "sector": "Financial Services",
-      "yield": 0.018567724173256077,
-      "composite": 7.5,
+      "ticker": "GD",
+      "company": "General Dynamics",
+      "sector": "Industrials",
+      "yield": 0.017319016279875303,
+      "composite": 7.0,
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
       "key_signal": "No concerns"
@@ -1821,11 +551,11 @@
       "key_signal": "No concerns"
     },
     {
-      "ticker": "TXN",
-      "company": "Texas Instruments",
-      "sector": "Technology",
-      "yield": 0.019294183680628643,
-      "composite": 8.0,
+      "ticker": "JPM",
+      "company": "JP Morgan Chase",
+      "sector": "Financial Services",
+      "yield": 0.018567724173256077,
+      "composite": 7.5,
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
       "key_signal": "No concerns"
@@ -1835,6 +565,16 @@
       "company": "Johnson & Johnson",
       "sector": "Healthcare",
       "yield": 0.02208188340421876,
+      "composite": 8.0,
+      "bucket": "Strong",
+      "trajectory_pattern": "Growing",
+      "key_signal": "No concerns"
+    },
+    {
+      "ticker": "TXN",
+      "company": "Texas Instruments",
+      "sector": "Technology",
+      "yield": 0.019294183680628643,
       "composite": 8.0,
       "bucket": "Strong",
       "trajectory_pattern": "Growing",
@@ -4675,26 +3415,6 @@
       "Dividend Trajectory Narrative": "DGR decelerating \u2014 recent growth well below historical pace"
     },
     {
-      "Ticker": "NOVO B",
-      "Company": "Novo Nordisk",
-      "Sector": "Healthcare",
-      "Composite": 0.0,
-      "Risk Bucket": "Yellow",
-      "Pillars Scored": 4,
-      "Yield Signal Score": -2,
-      "Yield Signal Narrative": "Yield 3.3% is 1.8x 5Y avg, stock -47% from high \u2014 classic yield trap",
-      "Cash Flow Coverage Score": null,
-      "Cash Flow Coverage Narrative": "No current dividend",
-      "Balance Sheet Score": null,
-      "Balance Sheet Narrative": "No balance sheet data",
-      "Business Quality Score": 2,
-      "Business Quality Narrative": "Wide moat; Exemplary capital allocation; Strong ROIC 39.8%",
-      "Market Signal Score": -1,
-      "Market Signal Narrative": "Stock -47% from high",
-      "Dividend Trajectory Score": 1,
-      "Dividend Trajectory Narrative": "Local-currency DGR 1Y +15.2%, 5Y +17.6% \u2014 growing"
-    },
-    {
       "Ticker": "NKE",
       "Company": "Nike",
       "Sector": "Consumer Cyclical",
@@ -4713,6 +3433,26 @@
       "Market Signal Narrative": "Short interest 3.6%; Stock -46% from high; At/near 52W low",
       "Dividend Trajectory Score": 1,
       "Dividend Trajectory Narrative": "Growing \u2014 153% total growth over 10 years"
+    },
+    {
+      "Ticker": "NOVO B",
+      "Company": "Novo Nordisk",
+      "Sector": "Healthcare",
+      "Composite": 0.0,
+      "Risk Bucket": "Yellow",
+      "Pillars Scored": 4,
+      "Yield Signal Score": -2,
+      "Yield Signal Narrative": "Yield 3.3% is 1.8x 5Y avg, stock -47% from high \u2014 classic yield trap",
+      "Cash Flow Coverage Score": null,
+      "Cash Flow Coverage Narrative": "No current dividend",
+      "Balance Sheet Score": null,
+      "Balance Sheet Narrative": "No balance sheet data",
+      "Business Quality Score": 2,
+      "Business Quality Narrative": "Wide moat; Exemplary capital allocation; Strong ROIC 39.8%",
+      "Market Signal Score": -1,
+      "Market Signal Narrative": "Stock -47% from high",
+      "Dividend Trajectory Score": 1,
+      "Dividend Trajectory Narrative": "Local-currency DGR 1Y +15.2%, 5Y +17.6% \u2014 growing"
     },
     {
       "Ticker": "MKC",
