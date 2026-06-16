@@ -18,9 +18,9 @@ Run modes:
                    (Sprint 23E). ~8-12 min for ~60 tickers because of yfinance
                    financial-statement throttling.
 
-Environment variables (set via GitHub Secrets):
-    SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
-    SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # paste your service role key here
+Environment variables (set via GitHub Secrets / local env — NEVER commit real values):
+    SUPABASE_URL = "https://YOUR-PROJECT.supabase.co"
+    SUPABASE_KEY = "sb_secret_..."   # service role key — keep this out of source control
 
 Local testing:
     export SUPABASE_URL="https://..."
@@ -69,10 +69,25 @@ SB_UPSERT_HEADERS = {
 # SUPABASE HELPERS
 # ══════════════════════════════════════════════════════════════════════════
 
+def _json_safe(obj):
+    """Recursively replace NaN/Inf floats with None so the payload is valid JSON.
+    PostgREST rejects 'NaN'/'Infinity' (not JSON-compliant); a single NaN in one
+    field of one row would otherwise raise during serialization and silently drop
+    the ENTIRE chunk it was in — which is exactly what froze the prices table."""
+    if isinstance(obj, float):
+        return None if (math.isnan(obj) or math.isinf(obj)) else obj
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    return obj
+
+
 def sb_upsert(table, rows, chunk_size=200, timeout=30):
     """Upsert rows to a Supabase table in chunks. Returns True on success."""
     if not rows:
         return True
+    rows = _json_safe(rows)   # NaN/Inf -> None so a single bad float can't kill a chunk
     url = f"{SUPABASE_URL}/rest/v1/{table}"
     for i in range(0, len(rows), chunk_size):
         chunk = rows[i:i + chunk_size]
@@ -685,7 +700,13 @@ def fetch_financials(tickers):
 def push_to_supabase(prices=None, dividends=None, indices=None,
                      benchmarks=None, price_history=None,
                      financials=None, warbook_metrics=None):
-    """Upsert all fetched data to Supabase."""
+    """Upsert all fetched data to Supabase.
+
+    Returns a list of table names that FAILED to push (empty == all good).
+    Callers must treat a non-empty list as a hard failure and exit non-zero,
+    so a dropped write surfaces as a RED run instead of a silently stale board.
+    """
+    failures = []
 
     if warbook_metrics:
         # Sprint 23E — slow-path yfinance fields. Upsert all rows even when
@@ -697,6 +718,8 @@ def push_to_supabase(prices=None, dividends=None, indices=None,
         print(f"  Pushing: warbook_metrics ({len(rows)} rows)...")
         if sb_upsert("warbook_metrics", rows):
             print(f"    ✓ warbook_metrics OK")
+        else:
+            failures.append("warbook_metrics")
 
     if prices:
         # Preserve existing dividend_yield and sector when yfinance returns 0/empty
@@ -732,16 +755,22 @@ def push_to_supabase(prices=None, dividends=None, indices=None,
         print(f"  Pushing: prices ({len(prices)} rows)...")
         if sb_upsert("prices", list(prices.values())):
             print(f"    ✓ prices OK")
+        else:
+            failures.append("prices")
 
     if dividends:
         print(f"  Pushing: dividends ({len(dividends)} rows)...")
         if sb_upsert("dividends", list(dividends.values())):
             print(f"    ✓ dividends OK")
+        else:
+            failures.append("dividends")
 
     if indices:
         print(f"  Pushing: indices ({len(indices)} rows)...")
         if sb_upsert("indices", list(indices.values())):
             print(f"    ✓ indices OK")
+        else:
+            failures.append("indices")
 
     if benchmarks:
         ytd_rows = [{"symbol": s, "ytd_return": d["ytd_return"], "fetched_at": d["fetched_at"]}
@@ -749,6 +778,8 @@ def push_to_supabase(prices=None, dividends=None, indices=None,
         print(f"  Pushing: benchmark_ytd ({len(ytd_rows)} rows)...")
         if sb_upsert("benchmark_ytd", ytd_rows):
             print(f"    ✓ benchmark_ytd OK")
+        else:
+            failures.append("benchmark_ytd")
 
         all_history = []
         for d in benchmarks.values():
@@ -757,11 +788,15 @@ def push_to_supabase(prices=None, dividends=None, indices=None,
             print(f"  Pushing: benchmark_history ({len(all_history)} rows)...")
             if sb_upsert("benchmark_history", all_history):
                 print(f"    ✓ benchmark_history OK")
+            else:
+                failures.append("benchmark_history")
 
     if financials:
         print(f"  Pushing: financials ({len(financials)} rows)...")
         if sb_upsert("financials", financials):
             print(f"    ✓ financials OK")
+        else:
+            failures.append("financials")
 
     if price_history:
         # Push ticker by ticker to avoid memory issues
@@ -778,8 +813,15 @@ def push_to_supabase(prices=None, dividends=None, indices=None,
             else:
                 failed += 1
         print(f"    ✓ price_history: {pushed} OK, {failed} failed")
+        if failed:
+            failures.append(f"price_history ({failed}/{total_tickers} tickers)")
 
-    print("  Push complete.")
+    if failures:
+        print(f"  [FAILED] {len(failures)} table(s) did not push: {', '.join(failures)}")
+    else:
+        print("  Push complete.")
+
+    return failures
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -1259,9 +1301,10 @@ def main():
         elapsed = round(time.time() - start, 1)
         print(f"\n  Fetch complete in {elapsed}s")
 
+        push_failures = []
         if not args.dry:
             print(f"\n[Push] Pushing to Supabase...")
-            push_to_supabase(warbook_metrics=warbook)
+            push_failures = push_to_supabase(warbook_metrics=warbook)
         else:
             print(f"\n  DRY RUN — skipping Supabase push")
             if warbook:
@@ -1270,6 +1313,9 @@ def main():
 
         total_elapsed = round(time.time() - start, 1)
         print(f"\n  Done in {total_elapsed}s at {_utc_now().strftime('%H:%M:%S UTC')}")
+        if push_failures:
+            print(f"\n[FATAL] Supabase push failed for: {', '.join(push_failures)}")
+            sys.exit(1)
         return
 
     # 2. Always fetch prices + indices (quick/full/eod modes)
@@ -1307,9 +1353,10 @@ def main():
     print(f"\n  Fetch complete in {elapsed}s")
 
     # 4. Push to Supabase
+    push_failures = []
     if not args.dry:
         print(f"\n[Push] Pushing to Supabase...")
-        push_to_supabase(
+        push_failures = push_to_supabase(
             prices=prices,
             dividends=dividends,
             indices=indices,
@@ -1325,6 +1372,9 @@ def main():
 
     total_elapsed = round(time.time() - start, 1)
     print(f"\n  Done in {total_elapsed}s at {_utc_now().strftime('%H:%M:%S UTC')}")
+    if push_failures:
+        print(f"\n[FATAL] Supabase push failed for: {', '.join(push_failures)}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
