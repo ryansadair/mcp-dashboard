@@ -184,6 +184,96 @@ def _get_tickers_from_tamarac():
 # PRICE FETCHING
 # ══════════════════════════════════════════════════════════════════════════
 
+def _ny_today():
+    """Current calendar date in US market time."""
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo("America/New_York")).date()
+
+
+def _bday_gap(d1, d2):
+    """Approximate business days between d1 (older) and d2 (newer), exclusive
+    of d1, inclusive of d2. Weekends only — market holidays are handled by the
+    tolerance in _resolve_price_prev, not here."""
+    if d1 >= d2:
+        return 0
+    n, d = 0, d1
+    while d < d2:
+        d = d + timedelta(days=1)
+        if d.weekday() < 5:
+            n += 1
+    return n
+
+
+def _resolve_price_prev(closes, fi_last, fi_prev, today=None):
+    """
+    Resolve (price, previous_close) from a daily-close series + live quote.
+
+    Daily HISTORY is the source of truth for previous_close (the official
+    close of the last completed session). The live quote (fast_info) supplies
+    the intraday price, and is used for previous_close ONLY when the history
+    is gapped by 2+ sessions.
+
+    Why: yfinance's fast_info.previous_close frequently returns extended-hours
+    or stale quote-meta values that do not match the official prior close
+    (verified 2026-07-29: wrong for 24 of 37 QDVD holdings, off by up to
+    2.8%, which systematically distorted the dashboard's daily returns vs
+    Finviz/Tamarac). History intermittently drops a recent session (the
+    "missing Monday" problem), which is why fast_info was preferred before —
+    the date validation below catches that gap explicitly instead.
+
+    Args:
+        closes:  pandas Series of daily closes (DatetimeIndex), raw
+                 (auto_adjust=False) so prev close matches the official
+                 unadjusted close, same convention as Finviz/Tamarac.
+        fi_last: fast_info.last_price (float or 0)
+        fi_prev: fast_info.previous_close (float or 0) — fallback only
+        today:   date override for testing
+    Returns (price, previous_close); either may be 0.0 if unresolvable.
+    """
+    today = today or _ny_today()
+    price, prev = 0.0, 0.0
+
+    if closes is not None and len(closes) > 0:
+        closes = closes.dropna()
+    if closes is not None and len(closes) > 0:
+        last_bar_date = closes.index[-1]
+        last_bar_date = last_bar_date.date() if hasattr(last_bar_date, "date") else last_bar_date
+        last_close = float(closes.iloc[-1])
+        price = last_close
+
+        if last_bar_date >= today:
+            # History includes today's (live/just-closed) bar → previous
+            # close is the bar before it.
+            if len(closes) >= 2:
+                prev = float(closes.iloc[-2])
+        else:
+            gap = _bday_gap(last_bar_date, today)
+            if gap <= 1:
+                # Normal pre-market / overnight shape: the most recent
+                # completed close IS the previous close.
+                prev = last_close
+            else:
+                # History is gapped (missing recent session). Prefer the
+                # quote's previous_close, but only if it is plausibly a
+                # close (within 15% of the last known close) — otherwise a
+                # market holiday just made the gap look bigger and the last
+                # close is still correct.
+                if fi_prev and fi_prev > 0 and last_close > 0 \
+                        and abs(fi_prev - last_close) / last_close <= 0.15:
+                    prev = float(fi_prev)
+                else:
+                    prev = last_close
+
+    # Live intraday price from the quote always wins when present.
+    if fi_last and float(fi_last) > 0:
+        price = round(float(fi_last), 2)
+    # Last-resort fallback if history gave us nothing.
+    if prev <= 0 and fi_prev and float(fi_prev) > 0:
+        prev = float(fi_prev)
+
+    return round(price, 2), round(prev, 2)
+
+
 def fetch_all_prices(tickers):
     """Fetch price + fundamentals for all tickers."""
     import yfinance as yf
@@ -195,42 +285,31 @@ def fetch_all_prices(tickers):
         try:
             tk = yf.Ticker(ticker)
 
-            # 5-day history for accurate daily change
-            hist5 = tk.history(period="5d", auto_adjust=True)
-            price, prev_close, chg_1d = 0.0, 0.0, 0.0
-            if hist5 is not None and len(hist5) >= 2:
-                price      = round(float(hist5["Close"].iloc[-1]), 2)
-                prev_close = round(float(hist5["Close"].iloc[-2]), 2)
-                if prev_close > 0:
-                    chg_1d = round((price - prev_close) / prev_close * 100, 2)
-                    if abs(chg_1d) > 25:
-                        chg_1d = 0.0
-            elif hist5 is not None and len(hist5) == 1:
-                price = round(float(hist5["Close"].iloc[-1]), 2)
+            # 5-day RAW history (auto_adjust=False so the prior close matches
+            # the official unadjusted close — the same convention Finviz and
+            # Tamarac use — instead of a dividend-adjusted close on ex-div days)
+            hist5 = tk.history(period="5d", auto_adjust=False)
 
-            # fast_info for market cap & 52w range
+            # fast_info for live price, market cap & 52w range
             fi          = tk.fast_info
             market_cap  = getattr(fi, "market_cap", 0) or 0
             week52_high = round(float(getattr(fi, "year_high", 0) or 0), 2)
             week52_low  = round(float(getattr(fi, "year_low",  0) or 0), 2)
+            fi_last     = getattr(fi, "last_price", None) or 0
+            fi_prev     = getattr(fi, "previous_close", None) or 0
 
-            # Prefer the live quote for price + previous close. Yahoo's daily
-            # history intermittently drops the most recent completed session
-            # (we've seen Monday missing for ^GSPC and ordinary equities alike),
-            # which makes the history iloc[-2] reach a session too far back and
-            # roll an extra day's move into the "1-day" change. The quote's
-            # previous_close stays correct across that gap. Falls back to the
-            # history-derived values above when fast_info is unavailable.
-            fi_last = getattr(fi, "last_price", None)
-            fi_prev = getattr(fi, "previous_close", None)
-            if fi_last and float(fi_last) > 0:
-                price = round(float(fi_last), 2)
-            if fi_prev and float(fi_prev) > 0:
-                prev_close = round(float(fi_prev), 2)
-                if price > 0:
-                    chg_1d = round((price - prev_close) / prev_close * 100, 2)
-                    if abs(chg_1d) > 25:
-                        chg_1d = 0.0
+            # Resolve price + previous close. History is authoritative for the
+            # previous close (fast_info.previous_close returns extended-hours /
+            # stale values for many tickers); the quote supplies the live
+            # intraday price. See _resolve_price_prev for the full rationale.
+            closes = hist5["Close"] if hist5 is not None and not hist5.empty else None
+            price, prev_close = _resolve_price_prev(closes, fi_last, fi_prev)
+
+            chg_1d = 0.0
+            if price > 0 and prev_close > 0:
+                chg_1d = round((price - prev_close) / prev_close * 100, 2)
+                if abs(chg_1d) > 25:
+                    chg_1d = 0.0
 
             # Deeper fundamentals
             info = {}
@@ -488,34 +567,26 @@ def fetch_index_data():
 
             # Price + previous close.
             #
-            # Yahoo's daily *history* for index symbols (^GSPC, ^DJI, ^IXIC,
-            # ...) intermittently omits the most recent completed session — we
-            # have seen it return Fri then Tue with Monday missing entirely,
-            # both in batch form (NaN row) and per-ticker. With that gap,
-            # iloc[-2] reaches a session too far back and rolls an extra day's
-            # move into "today" (e.g. a flat day shows as +1.5%). The live
-            # quote's previous_close carries the correct prior-session close
-            # even when the history has the gap, so prefer it for non-futures.
-            # fast_info.previous_close is NOT reliable for futures (=F), so
-            # those keep the history-based computation.
-            price = None
-            prev  = None
+            # History is authoritative for the previous close; the live quote
+            # supplies the intraday price. _resolve_price_prev date-validates
+            # the history and only falls back to fast_info.previous_close when
+            # the history is gapped by 2+ sessions (the "missing Monday" case)
+            # — fast_info.previous_close otherwise returns extended-hours /
+            # stale values that don't match the official close. Futures (=F)
+            # skip the quote entirely: fast_info is not reliable for them at
+            # all, so they stay purely history-based (unchanged behavior).
+            fi_last, fi_prev = 0, 0
             if not symbol.endswith("=F"):
                 try:
                     fi = yf.Ticker(symbol).fast_info
-                    lp = getattr(fi, "last_price", None)
-                    pc = getattr(fi, "previous_close", None)
-                    if lp and float(lp) > 0:
-                        price = round(float(lp), 2)
-                    if pc and float(pc) > 0:
-                        prev = round(float(pc), 2)
+                    fi_last = getattr(fi, "last_price", None) or 0
+                    fi_prev = getattr(fi, "previous_close", None) or 0
                 except Exception:
                     pass
 
-            if price is None:
-                price = round(float(df["Close"].iloc[-1]), 2)
-            if prev is None:
-                prev = round(float(df["Close"].iloc[-2]), 2) if len(df) >= 2 else price
+            price, prev = _resolve_price_prev(df["Close"], fi_last, fi_prev)
+            if prev <= 0:
+                prev = price
 
             chg = round((price - prev) / prev * 100, 2) if prev > 0 else 0
 
