@@ -416,7 +416,7 @@ def _render_focus_chart(ticker, name, batch_data, period_label, section_key):
 
     st.plotly_chart(
         fig,
-        use_container_width=True,
+        width="stretch",
         config={
             "displayModeBar": False, "scrollZoom": False,
             "doubleClick": False, "showTips": False, "staticPlot": False,

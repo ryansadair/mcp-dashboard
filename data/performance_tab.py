@@ -305,22 +305,22 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
     # Small vertical spacer so the controls don't crowd the period-return cards above.
     st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
     preset_cols = st.columns([1, 1, 1, 1, 1, 1, 2, 2])
-    if preset_cols[0].button("YTD", key=f"preset_ytd_{strategy}", use_container_width=True):
+    if preset_cols[0].button("YTD", key=f"preset_ytd_{strategy}", width="stretch"):
         _apply_preset(ytd=True)
         st.rerun()
-    if preset_cols[1].button("1Y", key=f"preset_1y_{strategy}", use_container_width=True):
+    if preset_cols[1].button("1Y", key=f"preset_1y_{strategy}", width="stretch"):
         _apply_preset(years=1)
         st.rerun()
-    if preset_cols[2].button("3Y", key=f"preset_3y_{strategy}", use_container_width=True):
+    if preset_cols[2].button("3Y", key=f"preset_3y_{strategy}", width="stretch"):
         _apply_preset(years=3)
         st.rerun()
-    if preset_cols[3].button("5Y", key=f"preset_5y_{strategy}", use_container_width=True):
+    if preset_cols[3].button("5Y", key=f"preset_5y_{strategy}", width="stretch"):
         _apply_preset(years=5)
         st.rerun()
-    if preset_cols[4].button("10Y", key=f"preset_10y_{strategy}", use_container_width=True):
+    if preset_cols[4].button("10Y", key=f"preset_10y_{strategy}", width="stretch"):
         _apply_preset(years=10)
         st.rerun()
-    if preset_cols[5].button("All", key=f"preset_all_{strategy}", use_container_width=True):
+    if preset_cols[5].button("All", key=f"preset_all_{strategy}", width="stretch"):
         _apply_preset(inception=True)
         st.rerun()
 
@@ -459,7 +459,7 @@ def _render_cumulative_chart(comp_df, strategy, color, name, as_of_iso):
         f'· {actual_start} – {actual_end}</span></div>',
         unsafe_allow_html=True,
     )
-    st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CHART_CONFIG)
+    st.plotly_chart(fig, width="stretch", config=PLOTLY_CHART_CONFIG)
 
     if invalid_msg:
         st.caption(invalid_msg)
@@ -649,7 +649,7 @@ def _render_monthly_heatmap(comp_df, strategy, color, as_of_iso):
         '<div class="heatmap-scroll-wrapper" style="overflow-x:auto; -webkit-overflow-scrolling:touch;">',
         unsafe_allow_html=True,
     )
-    st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+    st.plotly_chart(fig, width="stretch", config=PLOTLY_CONFIG)
     st.markdown('</div>', unsafe_allow_html=True)
 
 
@@ -718,4 +718,4 @@ def _render_annual_returns(data, strategy, color):
     display_df = pd.DataFrame(display_data)
 
     st.markdown("""<div style="font-size:13px; font-weight:700; color:rgba(255,255,255,0.7); text-transform:uppercase; letter-spacing:0.04em; margin-top:16px; margin-bottom:8px;">Calendar Year Returns (Gross)</div>""", unsafe_allow_html=True)
-    st.dataframe(display_df, hide_index=True, use_container_width=True)
+    st.dataframe(display_df, hide_index=True, width="stretch")

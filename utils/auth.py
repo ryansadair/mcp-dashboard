@@ -53,6 +53,6 @@ def check_password() -> bool:
             placeholder="Enter password...",
             label_visibility="collapsed",
         )
-        st.button("Sign In", on_click=_submit, use_container_width=True)
+        st.button("Sign In", on_click=_submit, width="stretch")
 
     return False

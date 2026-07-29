@@ -1,10 +1,11 @@
-streamlit>=1.35.0
+streamlit>=1.50.0,<2
 pandas>=2.0.0
 plotly>=5.18.0
-yfinance>=0.2.40
+yfinance>=1.5.2,<2
 requests>=2.31.0
 openpyxl>=3.1.0
 numpy>=1.24.0
+pytz>=2024.1
 streamlit-autorefresh>=1.0.0
 finvizfinance
 xlrd

@@ -296,7 +296,7 @@ def render_watchlist_tab():
             height=max(250, len(yield_df) * 30 + 60),
             showlegend=False,
         )
-        st.plotly_chart(fig, use_container_width=True, config={
+        st.plotly_chart(fig, width="stretch", config={
             "displayModeBar": False,
             "scrollZoom": False,
             "doubleClick": False,

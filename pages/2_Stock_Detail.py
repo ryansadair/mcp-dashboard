@@ -922,7 +922,7 @@ if not hist.empty:
     period_cols = st.columns(len(period_options))
     for i, (label, _) in enumerate(period_options.items()):
         with period_cols[i]:
-            if st.button(label, key=f"period_{label}", use_container_width=True,
+            if st.button(label, key=f"period_{label}", width="stretch",
                          type="primary" if st.session_state["chart_period"] == label else "secondary"):
                 st.session_state["chart_period"] = label
                 st.rerun()
@@ -977,7 +977,7 @@ if not hist.empty:
     )
     fig_price.update_xaxes(fixedrange=True, **_SPIKE)
     fig_price.update_yaxes(fixedrange=True, **_SPIKE)
-    st.plotly_chart(fig_price, use_container_width=True, config=PLOTLY_CONFIG)
+    st.plotly_chart(fig_price, width="stretch", config=PLOTLY_CONFIG)
 else:
     st.info("No price history available.")
 
@@ -1312,7 +1312,7 @@ if not financials.empty:
                 )
                 fig_fin.update_xaxes(fixedrange=True, **_SPIKE)
                 fig_fin.update_yaxes(fixedrange=True)
-                st.plotly_chart(fig_fin, use_container_width=True, config=PLOTLY_CONFIG)
+                st.plotly_chart(fig_fin, width="stretch", config=PLOTLY_CONFIG)
 
             with col_margin:
                 st.markdown("**Margins**")
@@ -1613,7 +1613,7 @@ if annual_divs is not None and len(annual_divs) >= 2:
     )
     fig_div.update_xaxes(fixedrange=True, **_SPIKE)
     fig_div.update_yaxes(fixedrange=True)
-    st.plotly_chart(fig_div, use_container_width=True, config=PLOTLY_CONFIG)
+    st.plotly_chart(fig_div, width="stretch", config=PLOTLY_CONFIG)
 
     # ── Year-over-Year Growth Table (newest to oldest) ────────────────────
     if len(annual_divs) >= 3:
@@ -1634,7 +1634,7 @@ if annual_divs is not None and len(annual_divs) >= 2:
             })
         st.dataframe(
             pd.DataFrame(growth_data),
-            use_container_width=True, hide_index=True,
+            width="stretch", hide_index=True,
             height=(42 + len(growth_data) * 36),
         )
 

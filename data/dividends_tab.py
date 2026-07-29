@@ -768,7 +768,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
 
     # Row-selection enabled dataframe — click a row to navigate to stock detail
     event = st.dataframe(
-        styled, use_container_width=True, hide_index=True,
+        styled, width="stretch", hide_index=True,
         height=(42 + len(detail_df) * 36),
         selection_mode="single-row",
         on_select="rerun",
@@ -864,7 +864,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
                 yaxis={**_YAXIS, "tickfont": dict(size=10)},
                 showlegend=True,
             )
-            st.plotly_chart(fig_yoc, use_container_width=True, config=PLOTLY_CONFIG)
+            st.plotly_chart(fig_yoc, width="stretch", config=PLOTLY_CONFIG)
 
     # ── Consecutive Increases chart (moved from Income Dashboard) ──────────
     with col_streak:
@@ -905,7 +905,7 @@ def _render_dividend_detail(edf, active_strategy, strat_color):
                 yaxis=_YAXIS,
                 showlegend=False,
             )
-            st.plotly_chart(fig_streak, use_container_width=True, config=PLOTLY_CONFIG)
+            st.plotly_chart(fig_streak, width="stretch", config=PLOTLY_CONFIG)
         else:
             st.info("No consecutive-year data available for this strategy.")
 
