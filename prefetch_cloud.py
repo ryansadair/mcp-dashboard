@@ -184,6 +184,32 @@ def _get_tickers_from_tamarac():
 # PRICE FETCHING
 # ══════════════════════════════════════════════════════════════════════════
 
+# ── Finviz Elite export (primary bulk source, 2026-07) ─────────────────────
+# One authenticated call returns every needed field for every ticker —
+# replacing the sequential yfinance loop as the primary source. yfinance
+# remains the per-ticker fallback for anything Finviz misses and the sole
+# source for what Finviz doesn't carry (indices/futures/crypto, dividend
+# payment history, financial statements). Reads FINVIZ_AUTH from the
+# environment (GitHub Actions secret); if unset, fetches return {} and
+# every caller falls through to the yfinance path unchanged.
+
+_FV_MEMO = {}
+
+
+def _fv_snapshot(tickers):
+    """Fetch the Finviz export once per run for a given ticker set."""
+    key = frozenset(tickers)
+    if key not in _FV_MEMO:
+        try:
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from data.finviz_export import fetch_once
+            _FV_MEMO[key] = fetch_once(list(tickers))
+        except Exception as e:
+            print(f"  [WARN] Finviz export unavailable: {e}")
+            _FV_MEMO[key] = {}
+    return _FV_MEMO[key]
+
+
 def _ny_today():
     """Current calendar date in US market time."""
     from zoneinfo import ZoneInfo
@@ -275,13 +301,54 @@ def _resolve_price_prev(closes, fi_last, fi_prev, today=None):
 
 
 def fetch_all_prices(tickers):
-    """Fetch price + fundamentals for all tickers."""
+    """
+    Fetch price + fundamentals for all tickers.
+
+    Primary: ONE Finviz Elite export call for the entire list — real-time
+    price, official Prev Close, and all fundamentals in ~2 seconds.
+    Fallback: the original per-ticker yfinance path (history-authoritative
+    previous close via _resolve_price_prev) for any ticker the export
+    missed, or for the whole list when FINVIZ_AUTH is not configured.
+    """
     import yfinance as yf
 
     results = {}
-    total = len(tickers)
 
-    for i, ticker in enumerate(tickers, 1):
+    # ── Finviz Elite bulk pass ─────────────────────────────────────────────
+    fv = _fv_snapshot(tickers)
+    for ticker in tickers:
+        d = fv.get(ticker.upper())
+        if not d or not (d.get("price") or 0) > 0:
+            continue
+        chg = d.get("change_pct")
+        if chg is None or abs(chg) > 25:
+            chg = 0.0
+        results[ticker] = {
+            "ticker":         ticker,
+            "price":          d.get("price") or 0,
+            "previous_close": d.get("prev_close") or 0,
+            "change_1d_pct":  chg,
+            "dividend_yield": d.get("dividend_yield") or 0,
+            "sector":         d.get("sector", ""),
+            "industry":       d.get("industry", ""),
+            "pe_ratio":       round(d.get("pe") or 0, 2),
+            "forward_pe":     round(d.get("forward_pe") or 0, 2),
+            "market_cap":     d.get("market_cap") or 0,
+            "week52_high":    d.get("week52_high") or 0,
+            "week52_low":     d.get("week52_low") or 0,
+            "beta":           round(d.get("beta") or 0, 2),
+            "name":           d.get("name") or ticker,
+            "price_to_book":  round(d.get("pb") or 0, 2),
+            "fetched_at":     _utc_now().isoformat(),
+        }
+    yf_list = [t for t in tickers if t not in results]
+    print(f"  Prices: Finviz export covered {len(results)}/{len(tickers)}"
+          f"{' — yfinance fallback for ' + str(len(yf_list)) if yf_list else ''}")
+
+    # ── yfinance fallback pass ─────────────────────────────────────────────
+    total = len(yf_list)
+
+    for i, ticker in enumerate(yf_list, 1):
         try:
             tk = yf.Ticker(ticker)
 
@@ -445,6 +512,25 @@ def fetch_all_dividends(tickers):
                         result["ex_dividend_date"] = str(ex_div)
                 except Exception:
                     pass
+
+            # ── Finviz Elite overrides (authoritative when present) ────────
+            # Real-time yield/rate/payout and — most valuably — the actual
+            # upcoming ex-dividend date, which yfinance's info blob often
+            # lags or omits. yfinance history below still owns dividend
+            # growth and consecutive-year streaks (and Fish CCC overrides
+            # both downstream).
+            fvd = _fv_snapshot(tickers).get(ticker.upper())
+            if fvd:
+                if fvd.get("dividend_yield") and fvd["dividend_yield"] <= 15:
+                    result["dividend_yield"] = round(fvd["dividend_yield"], 2)
+                fv_rate = fvd.get("dividend_est") or fvd.get("dividend_ttm")
+                if fv_rate:
+                    result["dividend_rate"] = round(float(fv_rate), 4)
+                fv_payout = fvd.get("payout_ratio")
+                if fv_payout is not None and 0 < fv_payout <= 150:
+                    result["payout_ratio"] = min(round(fv_payout, 1), 100)
+                if fvd.get("ex_dividend_date"):
+                    result["ex_dividend_date"] = fvd["ex_dividend_date"]
 
             # Dividend growth from history
             if divs is not None and not divs.empty and len(divs) >= 4:
@@ -1297,6 +1383,29 @@ def fetch_warbook_metrics(tickers):
 
         except Exception as e:
             print(f"  [ERROR] {ticker}: {e}")
+
+        # ── Finviz Elite gap-fill ──────────────────────────────────────────
+        # Facts (industry, country, forward P/E) and simple ratios fill in
+        # whenever yfinance came back empty. Statement-derived metrics keep
+        # their existing yfinance methodology — Finviz only backstops them
+        # so a yfinance outage no longer blanks the warbook.
+        try:
+            fvd = _fv_snapshot(tickers).get(ticker.upper())
+            if fvd:
+                if row["roe_ttm"] is None and fvd.get("roe") is not None:
+                    row["roe_ttm"] = round(fvd["roe"], 1)
+                if row["fcf_yield"] is None and fvd.get("fcf_yield") is not None:
+                    row["fcf_yield"] = fvd["fcf_yield"]
+                if not row["sub_industry"] and fvd.get("industry"):
+                    row["sub_industry"] = fvd["industry"]
+                if not row["country"] and fvd.get("country"):
+                    row["country"] = fvd["country"]
+                if row["forward_pe"] is None and fvd.get("forward_pe") is not None:
+                    row["forward_pe"] = round(fvd["forward_pe"], 1)
+                if row["super_sector"] is None and fvd.get("sector"):
+                    row["super_sector"] = _WB_SUPER_SECTOR_MAP.get(fvd["sector"])
+        except Exception:
+            pass
 
         results[ticker] = row
 

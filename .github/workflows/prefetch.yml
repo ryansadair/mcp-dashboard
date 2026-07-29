@@ -27,6 +27,7 @@
 # Required GitHub Secrets (Settings > Secrets and variables > Actions):
 #   SUPABASE_URL  — e.g. https://idtytpyehfbqldnvwenb.supabase.co
 #   SUPABASE_KEY  — your service role key (not anon key)
+#   FINVIZ_AUTH   — Finviz Elite export API token
 
 name: Data Pre-Fetch
 
@@ -74,6 +75,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          FINVIZ_AUTH: ${{ secrets.FINVIZ_AUTH }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             MODE="${{ github.event.inputs.mode }}"

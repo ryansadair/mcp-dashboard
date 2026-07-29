@@ -45,6 +45,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          FINVIZ_AUTH: ${{ secrets.FINVIZ_AUTH }}
         # --force bypasses the market-hours gate (since we WANT this to run
         # before market open, not during). The slow mode doesn't auto-detect
         # via --mode auto so this is required even though the cron schedule
