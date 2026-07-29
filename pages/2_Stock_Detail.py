@@ -548,8 +548,109 @@ def _fetch_yfinance_with_retry(ticker, max_retries=3, delay=2):
     raise last_err
 
 
-@st.cache_data(ttl=900, show_spinner=False)
+def _finviz_info_overlay(ticker):
+    """
+    Build a live overlay for the info dict from the Finviz Elite export
+    (via data/finviz_export.py — one shared, self-throttled call).
+
+    Returns (override, fill):
+      override — fields where Finviz is authoritative (real-time quote,
+                 valuation, profitability). Applied over everything.
+      fill     — descriptive fields (name, sector, ...) applied only when
+                 the merged info is missing them; yfinance/Supabase names
+                 read better than Finviz's (e.g. "AMGEN Inc").
+
+    Unit conventions follow yfinance's info dict, which the rest of this
+    page expects: ROE / margins / dividendYield / payoutRatio as DECIMALS
+    (the display layer multiplies by 100). Finviz returns percents, so we
+    divide here. debtToEquity is intentionally NOT mapped — yfinance uses a
+    percent-like convention there and Finviz a plain ratio; skipping it
+    avoids a silent 100x unit error.
+    """
+    try:
+        from data.finviz_export import get_snapshot
+        d = get_snapshot((ticker,)).get(ticker.upper())
+    except Exception:
+        return {}, {}
+    if not d:
+        return {}, {}
+
+    ov = {}
+
+    def put(key, val):
+        if val is not None and val != 0:
+            ov[key] = val
+
+    def put_pct_as_decimal(key, val):
+        if val is not None:
+            ov[key] = val / 100.0
+
+    put("currentPrice",                 d.get("price"))
+    put("regularMarketPrice",           d.get("price"))
+    put("previousClose",                d.get("prev_close"))
+    put("marketCap",                    d.get("market_cap"))
+    put("trailingPE",                   d.get("pe"))
+    put("forwardPE",                    d.get("forward_pe"))
+    put("priceToBook",                  d.get("pb"))
+    put("pegRatio",                     d.get("peg"))
+    put("priceToSalesTrailing12Months", d.get("ps"))
+    put("beta",                         d.get("beta"))
+    put("fiftyTwoWeekHigh",             d.get("week52_high"))
+    put("fiftyTwoWeekLow",              d.get("week52_low"))
+    put("targetMeanPrice",              d.get("target_price"))
+    put("recommendationMean",           d.get("recommendation_raw"))
+    put("currentRatio",                 d.get("current_ratio"))
+    put("dividendRate",                 d.get("dividend_est") or d.get("dividend_ttm"))
+
+    if d.get("roe") is not None:
+        put_pct_as_decimal("returnOnEquity", d["roe"])
+    if d.get("gross_margin") is not None:
+        put_pct_as_decimal("grossMargins", d["gross_margin"])
+    if d.get("oper_margin") is not None:
+        put_pct_as_decimal("operatingMargins", d["oper_margin"])
+    if d.get("profit_margin") is not None:
+        put_pct_as_decimal("profitMargins", d["profit_margin"])
+    if d.get("dividend_yield"):
+        put_pct_as_decimal("dividendYield", d["dividend_yield"])
+    if d.get("payout_ratio") and 0 < d["payout_ratio"] <= 150:
+        put_pct_as_decimal("payoutRatio", d["payout_ratio"])
+    if d.get("ex_dividend_date"):
+        ov["exDividendDate"] = d["ex_dividend_date"]
+
+    fill = {
+        "longName":  d.get("name"),
+        "shortName": d.get("name"),
+        "sector":    d.get("sector"),
+        "industry":  d.get("industry"),
+        "country":   d.get("country"),
+    }
+    return ov, fill
+
+
 def fetch_stock_data(ticker, _v=2):
+    """
+    Public entry point — heavy data (history, dividends, financials, base
+    info) comes from the 15-min cached loader below; the Finviz live overlay
+    is applied HERE, outside the cache, so quote-driven fields refresh every
+    rerun (~1 min, self-throttled by finviz_export) without re-running the
+    expensive yfinance calls. If Finviz is unavailable this is a no-op and
+    the page behaves exactly as before. (_v retained for signature compat.)
+    """
+    data = _fetch_stock_data_v3(ticker)
+
+    ov, fill = _finviz_info_overlay(ticker)
+    if ov or any(fill.values()):
+        info = dict(data.get("info") or {})
+        info.update(ov)
+        for k, v in fill.items():
+            if v and not info.get(k):
+                info[k] = v
+        data = {**data, "info": info}
+    return data
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _fetch_stock_data_v3(ticker):
     """
     Fetch comprehensive stock data.
     Info/fundamentals: Supabase first, yfinance fallback.
