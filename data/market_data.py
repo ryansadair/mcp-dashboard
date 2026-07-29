@@ -76,22 +76,69 @@ def _load_index_cache():
 
 # ── Public API ─────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=900, show_spinner=False)
 def fetch_batch_prices(tickers_tuple, _cache_v=2):
     """
     Fetch price data for a batch of tickers.
     Returns: { "TICK": { "price": 123.45, "change_1d_pct": 0.5, ... }, ... }
 
-    Priority: Supabase -> local JSON cache -> live yfinance
+    Priority: Finviz Elite live -> Supabase -> local JSON cache -> yfinance
 
-    _cache_v: bump this number to force a cache miss after deploying fixes.
+    Public wrapper — keeps the historical name/signature for all callers.
+    The cached worker carries a v3 suffix (see the cache-invalidation note
+    in this repo: renaming the cached function is the only reliable way to
+    bust a stale entry on Streamlit Cloud). _cache_v is retained for
+    signature compatibility and is unused.
+    """
+    return _fetch_batch_prices_v3(tickers_tuple)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_batch_prices_v3(tickers_tuple):
+    """
+    v3 (2026-07): Finviz Elite export added as the primary, LIVE source —
+    one authenticated call for the whole ticker list, real-time quotes,
+    official Prev Close. TTL dropped from 900s to 60s to match; the export
+    module self-throttles HTTP calls, so the short TTL costs at most ~1-2
+    Finviz requests per minute across all sessions. Supabase remains the
+    last-known-good fallback (populated by prefetch_cloud.py) so an export
+    outage degrades to exactly the pre-Finviz behavior — never a blank page.
     """
     results = {}
     missing = list(tickers_tuple)
 
+    # ── 0. Finviz Elite live export (primary) ─────────────────────────────
+    try:
+        from data.finviz_export import get_snapshot
+        fv = get_snapshot(tickers_tuple)
+        for t in tickers_tuple:
+            d = fv.get(t.upper())
+            if d and (d.get("price") or 0) > 0:
+                chg = d.get("change_pct")
+                if chg is None or abs(chg) > 25:   # same sanity cap as prefetch
+                    chg = 0
+                results[t] = {
+                    "price":          d.get("price") or 0,
+                    "previous_close": d.get("prev_close") or 0,
+                    "change_1d_pct":  chg,
+                    "dividend_yield": d.get("dividend_yield") or 0,
+                    "sector":         d.get("sector", ""),
+                    "industry":       d.get("industry", ""),
+                    "pe_ratio":       d.get("pe") or 0,
+                    "forward_pe":     d.get("forward_pe") or 0,
+                    "market_cap":     d.get("market_cap") or 0,
+                    "52w_high":       d.get("week52_high") or 0,
+                    "52w_low":        d.get("week52_low") or 0,
+                    "beta":           d.get("beta") or 0,
+                    "name":           d.get("name") or t,
+                    "price_to_book":  d.get("pb") or 0,
+                }
+        missing = [t for t in tickers_tuple if t not in results]
+    except Exception:
+        missing = [t for t in tickers_tuple if t not in results]
+
     # ── 1. Try Supabase ───────────────────────────────────────────────────
-    if SUPABASE_KEY != "YOUR_SERVICE_ROLE_KEY":
-        tickers_filter = f"in.({','.join(tickers_tuple)})"
+    if missing and SUPABASE_KEY != "YOUR_SERVICE_ROLE_KEY":
+        tickers_filter = f"in.({','.join(missing)})"
         rows = _sb_get("prices", filters={"ticker": tickers_filter})
         if rows:
             for row in rows:

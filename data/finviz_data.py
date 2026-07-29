@@ -240,15 +240,74 @@ def _parse_snapshot(raw):
     return parsed
 
 
+def _from_export(d):
+    """Map a finviz_export snapshot row into this module's field names."""
+    rec_num, rec_label = _parse_recommendation(d.get("recommendation_raw"))
+    parsed = {
+        "recommendation":   rec_num,
+        "rec_label":        rec_label,
+        "target_price":     d.get("target_price"),
+        "price":            d.get("price"),
+        "rsi_14":           d.get("rsi_14"),
+        "sma20_dist":       d.get("sma20_dist"),
+        "sma50_dist":       d.get("sma50_dist"),
+        "sma200_dist":      d.get("sma200_dist"),
+        "short_float":      d.get("short_float"),
+        "insider_own":      d.get("insider_own"),
+        "insider_trans":    d.get("insider_trans"),
+        "inst_own":         d.get("inst_own"),
+        "inst_trans":       d.get("inst_trans"),
+        "vol_weekly":       d.get("vol_weekly"),
+        "vol_monthly":      d.get("vol_monthly"),
+        "perf_week":        d.get("perf_week"),
+        "perf_month":       d.get("perf_month"),
+        "perf_quarter":     d.get("perf_quarter"),
+        "perf_half":        d.get("perf_half"),
+        "perf_year":        d.get("perf_year"),
+        "perf_ytd":         d.get("perf_ytd"),
+        "avg_volume":       d.get("avg_volume"),
+        "rel_volume":       d.get("rel_volume"),
+        "earnings_date":    d.get("earnings_date_finviz") or None,
+        "beta":             d.get("beta"),
+        "atr":              d.get("atr"),
+        "from_52w_high":    d.get("from_52w_high"),
+        "from_52w_low":     d.get("from_52w_low"),
+        "pe":               d.get("pe"),
+        "forward_pe":       d.get("forward_pe"),
+        "peg":              d.get("peg"),
+        "ps":               d.get("ps"),
+        "pb":               d.get("pb"),
+        "p_fcf":            d.get("p_fcf"),
+        "eps_ttm":          d.get("eps_ttm"),
+        "eps_next_y":       None,   # not exposed by the export API
+        "eps_next_q":       d.get("eps_next_q"),
+        "div_yield_finviz": d.get("dividend_yield"),
+        "roe":              d.get("roe"),
+        "roa":              d.get("roa"),
+        "roi":              d.get("roic"),
+        "gross_margin":     d.get("gross_margin"),
+        "oper_margin":      d.get("oper_margin"),
+        "profit_margin":    d.get("profit_margin"),
+    }
+    tp, px = parsed.get("target_price"), parsed.get("price")
+    parsed["upside_pct"] = round((tp - px) / px * 100, 1) if tp and px else None
+    return parsed
+
+
 def fetch_finviz_batch(tickers_tuple):
     """
     Fetch Finviz fundamental snapshot for a batch of tickers.
 
+    Source order (v3, 2026-07):
+      1. Finviz Elite export API — ONE authenticated call for the whole
+         batch via data/finviz_export.py (real-time, official, fast)
+      2. Direct quote-page scrape — per-ticker fallback if the export is
+         unavailable (no auth token configured, outage)
+      3. finvizfinance library — legacy last resort
+
     Public entry point — thin wrapper so callers keep importing the same
-    name. The cached worker below carries a v2 suffix to invalidate the
-    stale (empty) entries Streamlit Cloud cached while the old
-    finvizfinance-only path was broken; renaming the cached function is
-    the only reliable invalidation on Streamlit Cloud.
+    name. The cached worker carries a version suffix because renaming the
+    cached function is the only reliable invalidation on Streamlit Cloud.
 
     Returns dict: {
         "TICK": {
@@ -269,28 +328,38 @@ def fetch_finviz_batch(tickers_tuple):
         }
     }
     """
-    return _fetch_finviz_batch_v2(tickers_tuple)
+    return _fetch_finviz_batch_v3(tickers_tuple)
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def _fetch_finviz_batch_v2(tickers_tuple):
+@st.cache_data(ttl=900, show_spinner=False)
+def _fetch_finviz_batch_v3(tickers_tuple):
     import time as _time
 
-    results = {}
-    total = len(tickers_tuple)
+    results = {t: {} for t in tickers_tuple}
 
-    for i, ticker in enumerate(tickers_tuple, 1):
+    # ── 1. Export API: one call for the whole batch ───────────────────────
+    try:
+        from data.finviz_export import get_snapshot
+        snap = get_snapshot(tickers_tuple)
+        for t in tickers_tuple:
+            d = snap.get(t.upper())
+            if d:
+                results[t] = _from_export(d)
+    except Exception:
+        pass
+
+    # ── 2/3. Per-ticker scrape fallback for anything the export missed ────
+    missing = [t for t in tickers_tuple if not results[t]]
+    for i, ticker in enumerate(missing, 1):
         try:
             raw = _direct_snapshot(ticker)
             if not raw:
                 raw = _finvizfinance_snapshot(ticker)
-
             results[ticker] = _parse_snapshot(raw) if raw else {}
         except Exception:
             results[ticker] = {}
-
-        if i < total:
-            _time.sleep(0.5)  # rate limit: ~2 req/sec to avoid Finviz throttle
+        if i < len(missing):
+            _time.sleep(0.5)  # rate limit the scrape path
 
     return results
 
