@@ -150,11 +150,19 @@ def _dividend_alerts(tickers, price_data, div_data):
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def _fetch_earnings_dates(tickers_tuple):
+def _fetch_earnings_dates_v2(tickers_tuple):
     """
     Fetch upcoming earnings dates from yfinance.
     Cached 1 hour since earnings calendars don't change often.
     Returns dict: {ticker: earnings_date_str}
+
+    v2 (2026-07): yfinance's Ticker.calendar now returns a *dict*, not a
+    DataFrame. The old code checked `not cal.empty` first, which raises
+    AttributeError on dicts — silently swallowed by the outer except — so
+    the dict branch was unreachable and the fallback returned nothing for
+    months. Dict handling now comes first; the DataFrame branch is kept for
+    older yfinance versions. (Function renamed v2 to bust the stale
+    Streamlit Cloud cache entry — version bumps alone don't invalidate.)
     """
     result = {}
     try:
@@ -163,24 +171,26 @@ def _fetch_earnings_dates(tickers_tuple):
 
         for ticker in tickers_tuple:
             try:
-                tk = yf.Ticker(ticker)
-                cal = tk.calendar
-                if cal is not None and not cal.empty:
-                    # calendar can be a DataFrame with "Earnings Date" row
+                cal = yf.Ticker(ticker).calendar
+                ed = None
+
+                if isinstance(cal, dict):
+                    # Current yfinance: {"Earnings Date": [date, ...], ...}
+                    dates = cal.get("Earnings Date")
+                    if dates:
+                        ed = dates[0] if isinstance(dates, (list, tuple)) else dates
+                elif cal is not None and hasattr(cal, "empty") and not cal.empty:
+                    # Legacy yfinance: DataFrame with "Earnings Date" row
                     if "Earnings Date" in cal.index:
                         dates = cal.loc["Earnings Date"]
                         if len(dates) > 0:
                             ed = dates.iloc[0]
-                            if hasattr(ed, "strftime"):
-                                result[ticker] = ed.strftime("%Y-%m-%d")
-                            elif isinstance(ed, str):
-                                result[ticker] = ed[:10]
-                elif isinstance(cal, dict) and "Earnings Date" in cal:
-                    dates = cal["Earnings Date"]
-                    if dates:
-                        ed = dates[0] if isinstance(dates, list) else dates
-                        if hasattr(ed, "strftime"):
-                            result[ticker] = ed.strftime("%Y-%m-%d")
+
+                if ed is not None:
+                    if hasattr(ed, "strftime"):
+                        result[ticker] = ed.strftime("%Y-%m-%d")
+                    elif isinstance(ed, str) and len(ed) >= 10:
+                        result[ticker] = ed[:10]
                 _time.sleep(0.15)
             except Exception:
                 pass
@@ -240,8 +250,12 @@ def _parse_finviz_earnings_date(s):
 def _build_earnings_calendar(tickers, price_data, finviz_data, days_ahead=30):
     """
     Build the earnings calendar from Finviz (primary) + yfinance (fallback).
-    Returns list of dicts: {ticker, name, date, timing, days_until, week_key, week_label}.
-    Sorted by date ascending.
+    Returns (rows, sources):
+      rows    — list of dicts {ticker, name, date, timing, days_until,
+                week_key, week_label}, sorted by date ascending
+      sources — {"finviz": n, "yfinance": n} counts, so the UI can show
+                where the data came from (and make source outages visible
+                instead of silently rendering an empty calendar)
     """
     today = datetime.now().date()
     horizon = today + timedelta(days=days_ahead)
@@ -260,8 +274,9 @@ def _build_earnings_calendar(tickers, price_data, finviz_data, days_ahead=30):
 
     # 2) yfinance fallback — only for tickers Finviz didn't return
     missing = [t for t in tickers if t not in results]
+    n_finviz = len(results)
     if missing:
-        yf_dates = _fetch_earnings_dates(tuple(missing))
+        yf_dates = _fetch_earnings_dates_v2(tuple(missing))
         for ticker, date_str in yf_dates.items():
             try:
                 dt = datetime.strptime(date_str[:10], "%Y-%m-%d").date()
@@ -300,11 +315,18 @@ def _build_earnings_calendar(tickers, price_data, finviz_data, days_ahead=30):
         })
 
     rows.sort(key=lambda r: (r["date"], r["timing"] or "ZZZ", r["ticker"]))
-    return rows
+    sources = {"finviz": n_finviz, "yfinance": len(results) - n_finviz}
+    return rows, sources
 
 
-def _render_earnings_calendar(rows):
-    """Render the earnings calendar as a compact grouped-by-week list."""
+def _render_earnings_calendar(rows, sources=None):
+    """Render the earnings calendar as a compact grouped-by-week list.
+
+    sources: optional {"finviz": n, "yfinance": n} counts. Shown as a small
+    footer so a dead data source is visible instead of silently rendering
+    "No earnings" (which is exactly what happened for months when both the
+    Finviz scrape and the yfinance calendar API broke at the same time).
+    """
     st.markdown(
         '<div style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);'
         'text-transform:uppercase;letter-spacing:0.08em;padding:0 0 8px;'
@@ -317,9 +339,17 @@ def _render_earnings_calendar(rows):
     )
 
     if not rows:
+        # Distinguish "sources worked, genuinely nothing upcoming" from
+        # "both sources returned nothing at all" (likely an outage).
+        total_from_sources = sum((sources or {}).values())
+        if sources is not None and total_from_sources == 0:
+            msg = ('No earnings data returned by Finviz or yfinance — '
+                   'sources may be unavailable.')
+        else:
+            msg = 'No earnings in the next 30 days.'
         st.markdown(
-            '<div style="padding:16px 0;font-size:13px;color:rgba(255,255,255,0.35);">'
-            'No earnings in the next 30 days.'
+            f'<div style="padding:16px 0;font-size:13px;color:rgba(255,255,255,0.35);">'
+            f'{msg}'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -392,6 +422,21 @@ def _render_earnings_calendar(rows):
 
     # Close the final table
     html_parts.append("</tbody></table>")
+
+    # Source footer — makes a dead source visible at a glance.
+    if sources is not None:
+        parts = []
+        if sources.get("finviz"):
+            parts.append("Finviz " + str(sources["finviz"]))
+        if sources.get("yfinance"):
+            parts.append("yfinance " + str(sources["yfinance"]))
+        if parts:
+            html_parts.append(
+                '<div style="font-size:10px;color:rgba(255,255,255,0.22);'
+                'padding-top:8px;letter-spacing:0.04em;">'
+                f'Sources: {" · ".join(parts)}'
+                '</div>'
+            )
     st.markdown("".join(html_parts), unsafe_allow_html=True)
 
 
@@ -877,7 +922,7 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
     # ── Generate alerts ───────────────────────────────────────────────────
     price_alerts = _price_mover_alerts(tickers, price_data)
     div_alerts = _dividend_alerts(tickers, price_data, div_data) if div_data else []
-    earnings_rows = _build_earnings_calendar(tickers, price_data, finviz_data, days_ahead=30)
+    earnings_rows, earnings_sources = _build_earnings_calendar(tickers, price_data, finviz_data, days_ahead=30)
 
     # ── Row 1: Side-by-side alerts + earnings calendar ────────────────────
     col_alerts, col_earnings = st.columns([1, 1])
@@ -906,7 +951,7 @@ def render_alerts_tab(tamarac_parsed, active_strategy):
                 _render_alert_section("Dividend Events", div_alerts)
 
     with col_earnings:
-        _render_earnings_calendar(earnings_rows)
+        _render_earnings_calendar(earnings_rows, earnings_sources)
 
     # Spacer between top row and news
     st.markdown('<div style="height:24px;"></div>', unsafe_allow_html=True)

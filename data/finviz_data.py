@@ -119,10 +119,136 @@ def _parse_recommendation(val):
     return round(num, 1), label
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+# ── Direct Finviz snapshot parser ──────────────────────────────────────────
+# (2026-07) Finviz restructured its quote page: the snapshot data now lives
+# in several <table class="js-snapshot-table"> tables where each field is a
+# label <td> (containing div.snapshot-td-label) followed by a value <td>.
+# finvizfinance 1.3.0 — the latest release — still expects the old flat
+# layout and raises inside ticker_fundament(), which silently killed every
+# Finviz-sourced field (earnings dates, analyst ratings, RSI, targets...).
+# The values ARE still server-rendered, so we parse them directly here.
+# finvizfinance is kept as a fallback in case Finviz reverts or a fixed
+# library release ships.
+
+_SNAPSHOT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+    )
+}
+
+# Finviz renamed a few labels in the redesign — normalize them back to the
+# names _FIELD_MAP expects so the mapping table stays in one place.
+_LABEL_ALIASES = {
+    "ATR (14)":       "ATR",
+    "ROIC":           "ROI",
+    "Volatility W/M": "Volatility",
+}
+
+
+def _direct_snapshot(ticker):
+    """
+    Fetch and parse the Finviz quote-page snapshot for one ticker.
+    Returns a {label: value_str} dict, or {} on any failure.
+    """
+    import requests
+    from bs4 import BeautifulSoup
+
+    try:
+        resp = requests.get(
+            f"https://finviz.com/quote.ashx?t={ticker}&p=d",
+            headers=_SNAPSHOT_HEADERS,
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            return {}
+        soup = BeautifulSoup(resp.text, "html.parser")
+        raw = {}
+        for tbl in soup.find_all("table", class_="js-snapshot-table"):
+            for lab in tbl.find_all("div", class_="snapshot-td-label"):
+                key = lab.get_text(strip=True)
+                label_td = lab.find_parent("td")
+                val_td = label_td.find_next_sibling("td") if label_td else None
+                if val_td is not None:
+                    raw[_LABEL_ALIASES.get(key, key)] = val_td.get_text(" ", strip=True)
+
+        # "Dividend %" no longer exists as its own field; derive it from
+        # "Dividend TTM" which renders like "5.62 (2.07%)".
+        if "Dividend %" not in raw and raw.get("Dividend TTM"):
+            m = raw["Dividend TTM"]
+            if "(" in m and "%" in m:
+                raw["Dividend %"] = m.split("(")[-1].split(")")[0]
+        return raw
+    except Exception:
+        return {}
+
+
+def _finvizfinance_snapshot(ticker):
+    """Legacy path via the finvizfinance library. Returns {} on failure."""
+    try:
+        from finvizfinance.quote import finvizfinance
+        stock = finvizfinance(ticker)
+        return stock.ticker_fundament() or {}
+    except Exception:
+        return {}
+
+
+def _parse_snapshot(raw):
+    """Map a raw Finviz {label: value} dict into our internal field names."""
+    parsed = {}
+    for finviz_key, our_key in _FIELD_MAP.items():
+        val = raw.get(finviz_key)
+        if our_key == "recommendation":
+            num, label = _parse_recommendation(val)
+            parsed["recommendation"] = num
+            parsed["rec_label"] = label
+        elif our_key in (
+            "sma20_dist", "sma50_dist", "sma200_dist",
+            "short_float", "insider_own", "insider_trans",
+            "inst_own", "inst_trans",
+            "perf_week", "perf_month", "perf_quarter",
+            "perf_half", "perf_year", "perf_ytd",
+            "from_52w_high", "from_52w_low",
+            "div_yield_finviz",
+            "roe", "roa", "roi",
+            "gross_margin", "oper_margin", "profit_margin",
+        ):
+            # "52W High"/"52W Low" now render as "334.03 -18.75%" (level +
+            # distance); take the trailing % token for the distance fields.
+            if our_key in ("from_52w_high", "from_52w_low") and val:
+                tokens = str(val).split()
+                val = tokens[-1] if tokens else val
+            parsed[our_key] = _parse_pct(val)
+        elif our_key == "volatility":
+            # Finviz returns "3.50% 2.10%" (weekly monthly)
+            parts = str(val).split() if val else []
+            parsed["vol_weekly"] = _parse_pct(parts[0]) if len(parts) >= 1 else None
+            parsed["vol_monthly"] = _parse_pct(parts[1]) if len(parts) >= 2 else None
+        elif our_key == "earnings_date":
+            parsed[our_key] = str(val).strip() if val and val != "-" else None
+        else:
+            parsed[our_key] = _parse_float(val)
+
+    # Compute upside/downside to target
+    if parsed.get("target_price") and parsed.get("price"):
+        tp = parsed["target_price"]
+        px = parsed["price"]
+        parsed["upside_pct"] = round((tp - px) / px * 100, 1) if px > 0 else None
+    else:
+        parsed["upside_pct"] = None
+
+    return parsed
+
+
 def fetch_finviz_batch(tickers_tuple):
     """
     Fetch Finviz fundamental snapshot for a batch of tickers.
+
+    Public entry point — thin wrapper so callers keep importing the same
+    name. The cached worker below carries a v2 suffix to invalidate the
+    stale (empty) entries Streamlit Cloud cached while the old
+    finvizfinance-only path was broken; renaming the cached function is
+    the only reliable invalidation on Streamlit Cloud.
 
     Returns dict: {
         "TICK": {
@@ -138,72 +264,33 @@ def fetch_finviz_batch(tickers_tuple):
             "insider_own": 5.3,
             "insider_trans": -0.5,
             "inst_own": 78.2,
+            "earnings_date": "Oct 27 AMC",
             ...
         }
     }
     """
+    return _fetch_finviz_batch_v2(tickers_tuple)
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _fetch_finviz_batch_v2(tickers_tuple):
+    import time as _time
+
     results = {}
+    total = len(tickers_tuple)
 
-    try:
-        from finvizfinance.quote import finvizfinance
-        import time as _time
+    for i, ticker in enumerate(tickers_tuple, 1):
+        try:
+            raw = _direct_snapshot(ticker)
+            if not raw:
+                raw = _finvizfinance_snapshot(ticker)
 
-        for ticker in tickers_tuple:
-            try:
-                stock = finvizfinance(ticker)
-                raw = stock.ticker_fundament()
-
-                if not raw:
-                    results[ticker] = {}
-                    continue
-
-                parsed = {}
-                for finviz_key, our_key in _FIELD_MAP.items():
-                    val = raw.get(finviz_key)
-                    if our_key == "recommendation":
-                        num, label = _parse_recommendation(val)
-                        parsed["recommendation"] = num
-                        parsed["rec_label"] = label
-                    elif our_key in (
-                        "sma20_dist", "sma50_dist", "sma200_dist",
-                        "short_float", "insider_own", "insider_trans",
-                        "inst_own", "inst_trans",
-                        "perf_week", "perf_month", "perf_quarter",
-                        "perf_half", "perf_year", "perf_ytd",
-                        "from_52w_high", "from_52w_low",
-                        "div_yield_finviz",
-                        "roe", "roa", "roi",
-                        "gross_margin", "oper_margin", "profit_margin",
-                    ):
-                        parsed[our_key] = _parse_pct(val)
-                    elif our_key == "volatility":
-                        # Finviz returns "3.50% 2.10%" (weekly monthly)
-                        parts = str(val).split() if val else []
-                        parsed["vol_weekly"] = _parse_pct(parts[0]) if len(parts) >= 1 else None
-                        parsed["vol_monthly"] = _parse_pct(parts[1]) if len(parts) >= 2 else None
-                    elif our_key == "earnings_date":
-                        parsed[our_key] = str(val).strip() if val and val != "-" else None
-                    else:
-                        parsed[our_key] = _parse_float(val)
-
-                # Compute upside/downside to target
-                if parsed.get("target_price") and parsed.get("price"):
-                    tp = parsed["target_price"]
-                    px = parsed["price"]
-                    parsed["upside_pct"] = round((tp - px) / px * 100, 1) if px > 0 else None
-                else:
-                    parsed["upside_pct"] = None
-
-                results[ticker] = parsed
-                _time.sleep(0.5)  # rate limit: ~2 req/sec to avoid Finviz throttle
-
-            except Exception:
-                results[ticker] = {}
-
-    except ImportError:
-        # finvizfinance not installed
-        for ticker in tickers_tuple:
+            results[ticker] = _parse_snapshot(raw) if raw else {}
+        except Exception:
             results[ticker] = {}
+
+        if i < total:
+            _time.sleep(0.5)  # rate limit: ~2 req/sec to avoid Finviz throttle
 
     return results
 
