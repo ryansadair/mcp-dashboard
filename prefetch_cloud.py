@@ -341,6 +341,31 @@ def fetch_all_prices(tickers):
             "price_to_book":  round(d.get("pb") or 0, 2),
             "fetched_at":     _utc_now().isoformat(),
         }
+    # Yield ruling (2026-07): the headline dividend_yield is the INDICATED
+    # REGULAR yield — the canonical rate computed by the dividends job
+    # (last regular payment x frequency, specials filtered) divided by the
+    # live price. Finviz's yield field is estimate-based and folds variable
+    # dividends in (CME reads 4.4% there vs the 1.9% regular), so it serves
+    # only as the fallback when no canonical rate exists yet.
+    try:
+        rate_rows = requests.get(
+            f"{SUPABASE_URL}/rest/v1/dividends",
+            headers=SB_HEADERS,
+            params={"select": "ticker,dividend_rate",
+                    "ticker": f"in.({','.join(tickers)})"},
+            timeout=10,
+        ).json()
+        rates = {r["ticker"]: r.get("dividend_rate") for r in rate_rows
+                 if isinstance(r, dict)}
+        for t, row in results.items():
+            rt = rates.get(t)
+            if rt and row.get("price"):
+                y = round(float(rt) / row["price"] * 100, 2)
+                if 0 < y <= 15:
+                    row["dividend_yield"] = y
+    except Exception as e:
+        print(f"  [WARN] indicated-yield overlay skipped: {e}")
+
     yf_list = [t for t in tickers if t not in results]
     print(f"  Prices: Finviz export covered {len(results)}/{len(tickers)}"
           f"{' — yfinance fallback for ' + str(len(yf_list)) if yf_list else ''}")
@@ -440,6 +465,46 @@ def fetch_all_prices(tickers):
 # DIVIDEND FETCHING
 # ══════════════════════════════════════════════════════════════════════════
 
+def _indicated_regular_dividend(divs):
+    """
+    Indicated REGULAR dividend rate (ruled 2026-07): the most recent regular
+    payment x payment frequency, with special/variable payments filtered out.
+
+    Why: neither vendor field is what MCP means by "yield". Finviz's forward
+    estimate folds expected variable dividends in (CME showed 4.4% vs the
+    2% regular), and TTM fields have opaque special-handling. Computing it
+    from the payment record is deterministic and auditable.
+
+    Filter: a payment is "special" when it exceeds 1.75x the median of the
+    trailing regular payments (specials like CME's annual variable run 3-5x
+    the quarterly regular; genuine raises run 1.03-1.15x, far below the
+    threshold). Frequency = count of regular payments in the last 370 days
+    (4 = quarterly, 2 = semiannual ADRs, 12 = monthly payers like O).
+
+    Returns (rate, frequency) or (None, None) when history is insufficient.
+    """
+    try:
+        import pandas as pd
+        if divs is None or len(divs) < 2:
+            return None, None
+        tail = divs.tail(10)
+        amounts = [float(v) for v in tail.values]
+        med = sorted(amounts)[len(amounts) // 2]
+        if med <= 0:
+            return None, None
+        regs = [(ts, amt) for ts, amt in zip(tail.index, amounts)
+                if amt <= med * 1.75]
+        if not regs:
+            return None, None
+        last_ts, last_amt = regs[-1]
+        cutoff = last_ts - pd.Timedelta(days=370)
+        n_year = sum(1 for ts, _ in regs if ts > cutoff)
+        freq = 12 if n_year >= 10 else 4 if n_year >= 4 else 2 if n_year >= 2 else 1
+        return round(last_amt * freq, 4), freq
+    except Exception:
+        return None, None
+
+
 def fetch_all_dividends(tickers):
     """Fetch dividend details for all tickers."""
     import yfinance as yf
@@ -513,19 +578,28 @@ def fetch_all_dividends(tickers):
                 except Exception:
                     pass
 
-            # ── Finviz Elite overrides (authoritative when present) ────────
-            # Real-time yield/rate/payout and — most valuably — the actual
-            # upcoming ex-dividend date, which yfinance's info blob often
-            # lags or omits. yfinance history below still owns dividend
-            # growth and consecutive-year streaks (and Fish CCC overrides
-            # both downstream).
+            # ── Indicated regular rate & yield (canonical, ruled 2026-07) ──
+            # Computed from the payment record; overrides whatever the info
+            # blob supplied above. See _indicated_regular_dividend.
             fvd = _fv_snapshot(tickers).get(ticker.upper())
+            ind_rate, _freq = _indicated_regular_dividend(divs)
+            ind_price = (fvd.get("price") if fvd else 0) or price
+            if ind_rate and ind_price and ind_price > 0:
+                ind_yld = round(ind_rate / ind_price * 100, 2)
+                if 0 < ind_yld <= 15:
+                    result["dividend_rate"] = ind_rate
+                    result["dividend_yield"] = ind_yld
+
+            # ── Finviz Elite overrides (facts only) ────────────────────────
+            # Payout ratio and — most valuably — the actual upcoming
+            # ex-dividend date, which yfinance's info blob often lags or
+            # omits. Yield/rate are NOT taken from Finviz anymore: the
+            # indicated-regular computation above is canonical (Finviz's
+            # yield is estimate-based and folds variable dividends in).
+            # yfinance history below still owns dividend growth and
+            # consecutive-year streaks (and Fish CCC overrides both
+            # downstream).
             if fvd:
-                if fvd.get("dividend_yield") and fvd["dividend_yield"] <= 15:
-                    result["dividend_yield"] = round(fvd["dividend_yield"], 2)
-                fv_rate = fvd.get("dividend_est") or fvd.get("dividend_ttm")
-                if fv_rate:
-                    result["dividend_rate"] = round(float(fv_rate), 4)
                 fv_payout = fvd.get("payout_ratio")
                 if fv_payout is not None and 0 < fv_payout <= 150:
                     result["payout_ratio"] = min(round(fv_payout, 1), 100)
@@ -1081,7 +1155,9 @@ def _wb_balance_sheet_metrics(tk):
         "lt_debt_to_capital": None,
         "net_debt_to_capital": None,
         "debt_coverage_ratio": None,
+        "roe_nm": False,
     }
+    cur_ltd = None
 
     try:
         bs = tk.balance_sheet
@@ -1099,12 +1175,62 @@ def _wb_balance_sheet_metrics(tk):
             return None
 
         lt_debt = _bs_get("Long Term Debt", "Long-Term Debt", "LongTermDebt")
+        # Canonical capital definition (ruled 2026-07): total equity INCLUDING
+        # minority interest, per the textbook LT Debt / (LT Debt + Total
+        # Equity) formula. Gross-minority key is preferred; common-equity
+        # keys are fallbacks for issuers where Yahoo omits it.
         equity = _bs_get(
+            "Total Equity Gross Minority Interest",
             "Stockholders Equity",
             "Common Stock Equity",
             "Total Stockholder Equity",
-            "Total Equity Gross Minority Interest",
         )
+        total_assets = _bs_get("Total Assets")
+        cur_ltd = _bs_get(
+            "Current Debt And Capital Lease Obligation",
+            "Current Debt",
+            "Other Current Borrowings",
+        )
+
+        # ROE "NM" inputs (ruled 2026-07): equity-thinness signal for the
+        # caller. Hard-flag only clearly degenerate bases here (equity <= 0
+        # or under 5% of assets); the caller applies the full rule, including
+        # a >200% display ceiling. e.g. CLX printed 4,163% and HD 1,466% in
+        # the FactSet warbook off near-zero historical equity.
+        if equity is not None:
+            if equity <= 0 or (total_assets and equity / total_assets < 0.05):
+                out["roe_nm"] = True
+            if total_assets and total_assets > 0:
+                out["_equity_pct_assets"] = round(equity / total_assets * 100, 1)
+
+        # Statement-computed ROE (TTM NI / average equity): Yahoo's packaged
+        # returnOnEquity is unreliable on thin-equity names (CLX comes back
+        # 5.5% when the arithmetic says ~150%), so the caller substitutes
+        # this when equity is under 15% of assets.
+        try:
+            if equity is not None and equity > 0:
+                eq_prev = None
+                if len(bs.columns) > 1:
+                    for k in ("Total Equity Gross Minority Interest",
+                              "Stockholders Equity", "Common Stock Equity"):
+                        if k in bs.index:
+                            v = _wb_safe_float(bs.loc[k, bs.columns[1]])
+                            if v is not None:
+                                eq_prev = v
+                                break
+                avg_eq = (equity + eq_prev) / 2 if eq_prev and eq_prev > 0 else equity
+                is2 = tk.income_stmt
+                if is2 is not None and not is2.empty:
+                    ni = None
+                    for k in ("Net Income", "Net Income Common Stockholders"):
+                        if k in is2.index:
+                            ni = _wb_safe_float(is2.loc[k, is2.columns[0]])
+                            if ni is not None:
+                                break
+                    if ni is not None and avg_eq > 0:
+                        out["_roe_stmt"] = round(ni / avg_eq * 100, 1)
+        except Exception:
+            pass
         cash = _bs_get(
             "Cash And Cash Equivalents",
             "Cash Cash Equivalents And Short Term Investments",
@@ -1144,10 +1270,20 @@ def _wb_balance_sheet_metrics(tk):
             )
             interest_exp = _is_get("Interest Expense", "Interest Expense Non Operating")
 
-            if op_income is not None and interest_exp is not None:
-                ie_abs = abs(interest_exp)
-                if ie_abs > 0:
-                    out["debt_coverage_ratio"] = round(op_income / ie_abs, 1)
+            # Debt-Service Coverage (ruled 2026-07):
+            #     EBIT / (interest expense + current LT debt maturities)
+            # i.e. "can this year's operating earnings cover this year's
+            # actual debt obligations." Replaces the old plain interest-
+            # coverage calc (EBIT/interest), which read far higher than the
+            # legacy FactSet warbook column and answered a weaker question.
+            # Finance-lease current maturities are included when Yahoo folds
+            # them into the current-debt line (its default presentation).
+            # Financials and REITs are blanked by the caller — capital-
+            # structure coverage is not meaningful for them.
+            if op_income is not None:
+                denom = abs(interest_exp or 0) + (cur_ltd or 0)
+                if denom > 0:
+                    out["debt_coverage_ratio"] = round(op_income / denom, 1)
     except Exception:
         pass
 
@@ -1323,6 +1459,7 @@ def fetch_warbook_metrics(tickers):
             "lt_debt_to_capital": None,
             "net_debt_to_capital": None,
             "debt_coverage_ratio": None,
+            "roe_nm": False,
             "fcf_yield": None,
             "fcf_div_coverage": None,
             "cf_div_coverage": None,
@@ -1392,7 +1529,8 @@ def fetch_warbook_metrics(tickers):
         try:
             fvd = _fv_snapshot(tickers).get(ticker.upper())
             if fvd:
-                if row["roe_ttm"] is None and fvd.get("roe") is not None:
+                if row["roe_ttm"] is None and not row.get("roe_nm") \
+                        and fvd.get("roe") is not None:
                     row["roe_ttm"] = round(fvd["roe"], 1)
                 if row["fcf_yield"] is None and fvd.get("fcf_yield") is not None:
                     row["fcf_yield"] = fvd["fcf_yield"]
@@ -1406,6 +1544,29 @@ def fetch_warbook_metrics(tickers):
                     row["super_sector"] = _WB_SUPER_SECTOR_MAP.get(fvd["sector"])
         except Exception:
             pass
+
+        # ── Canonical-definition rulings (2026-07) ─────────────────────────
+        # 1. ROE: on thin equity (<15% of assets) trust the statement
+        #    arithmetic over Yahoo's packaged figure; flag NM when the base
+        #    is degenerate (equity <= 0 / <5% of assets) or the resulting
+        #    figure exceeds 200% — past that point the number is a
+        #    capital-structure artifact, not a profitability signal.
+        _epa = row.pop("_equity_pct_assets", None)
+        _roe_stmt = row.pop("_roe_stmt", None)
+        if _epa is not None and _epa < 15 and _roe_stmt is not None:
+            row["roe_ttm"] = _roe_stmt
+        if row.get("roe_ttm") is not None and row["roe_ttm"] > 200:
+            row["roe_nm"] = True
+        if row.get("roe_nm"):
+            row["roe_ttm"] = None
+        # 2. Debt-Service Coverage is not meaningful for financials (funding
+        #    IS the business) or REITs; blank it, matching the legacy
+        #    warbook convention of showing 0/— for banks.
+        _sec = (row.get("sub_industry") or "").lower()
+        if any(k in _sec for k in ("bank", "insurance", "reinsurance",
+                                   "asset manag", "capital markets",
+                                   "financial data", "exchange", "reit")):
+            row["debt_coverage_ratio"] = None
 
         results[ticker] = row
 

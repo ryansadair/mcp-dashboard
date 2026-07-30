@@ -116,11 +116,19 @@ def _fetch_batch_prices_v3(tickers_tuple):
                 chg = d.get("change_pct")
                 if chg is None or abs(chg) > 25:   # same sanity cap as prefetch
                     chg = 0
+                # Yield ruling (2026-07): prefer TTM-regular basis over
+                # Finviz's estimate-based yield field (which folds variable
+                # dividends in — CME reads 4.4% there vs the ~1.9% regular).
+                # The canonical indicated-regular figure is overlaid from
+                # Supabase right after this loop.
+                px = d.get("price") or 0
+                ttm = d.get("dividend_ttm")
+                yld = round(ttm / px * 100, 2) if (ttm and px) else (d.get("dividend_yield") or 0)
                 results[t] = {
-                    "price":          d.get("price") or 0,
+                    "price":          px,
                     "previous_close": d.get("prev_close") or 0,
                     "change_1d_pct":  chg,
-                    "dividend_yield": d.get("dividend_yield") or 0,
+                    "dividend_yield": yld if 0 < yld <= 15 else 0,
                     "sector":         d.get("sector", ""),
                     "industry":       d.get("industry", ""),
                     "pe_ratio":       d.get("pe") or 0,
@@ -133,6 +141,25 @@ def _fetch_batch_prices_v3(tickers_tuple):
                     "price_to_book":  d.get("pb") or 0,
                 }
         missing = [t for t in tickers_tuple if t not in results]
+
+        # Canonical indicated-regular yield overlay (one small read per
+        # cache cycle): dividend_rate is computed by the prefetch dividends
+        # job as last-regular-payment x frequency, specials filtered.
+        if results and SUPABASE_KEY != "YOUR_SERVICE_ROLE_KEY":
+            try:
+                rate_rows = _sb_get(
+                    "dividends",
+                    filters={"ticker": f"in.({','.join(results)})"},
+                    select="ticker,dividend_rate",
+                ) or []
+                for r in rate_rows:
+                    t, rt = r.get("ticker"), r.get("dividend_rate")
+                    if t in results and rt and results[t]["price"]:
+                        y = round(float(rt) / results[t]["price"] * 100, 2)
+                        if 0 < y <= 15:
+                            results[t]["dividend_yield"] = y
+            except Exception:
+                pass
     except Exception:
         missing = [t for t in tickers_tuple if t not in results]
 

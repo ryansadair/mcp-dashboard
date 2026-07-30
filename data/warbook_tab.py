@@ -743,7 +743,10 @@ def _render_qdg_characteristics(
             "Yield":              mkt.get("dividend_yield") or 0,
             "Mkt Cap $Bln":       mkt_cap_bln,
             "Sector":             normalize_sector(mkt.get("sector", "")),
-            "ROE %":              wm.get("roe_ttm"),
+            # ROE NM rule (2026-07): degenerate equity base (negative or
+            # <5% of assets, e.g. CLX/HD post-buybacks) renders ROE
+            # meaningless — the prefetch flags it and we display "NM".
+            "ROE %":              ("NM" if wm.get("roe_nm") else wm.get("roe_ttm")),
             "LT D/Cap %":         wm.get("lt_debt_to_capital"),
             "Qual (S&P)":         nm.get("sp_quality") or "",
             "Paid Since":         paid_since,
@@ -772,7 +775,10 @@ def _render_qdg_characteristics(
 
     # Coerce numeric columns to float dtype for proper sort + na_rep handling.
     numeric_cols = [
-        "Shares", "Value", "Yield", "Mkt Cap $Bln", "ROE %", "LT D/Cap %",
+        # "ROE %" deliberately NOT coerced numeric — it can carry the "NM"
+        # sentinel string (degenerate-equity rule) which to_numeric would
+        # silently turn into NaN/em-dash.
+        "Shares", "Value", "Yield", "Mkt Cap $Bln", "LT D/Cap %",
         "Paid Since", "Raised Since", "Payout %", "Last Bump %",
         "1Y DG %", "3Y DG %", "5Y DG %", "FCF Yld %", "Weight",
     ]
@@ -790,7 +796,7 @@ def _render_qdg_characteristics(
             "Value":         lambda v: f"${v:,.0f}" if _is_num(v) else "—",
             "Yield":         lambda v: f"{v:.2f}%" if _is_num(v) else "—",
             "Mkt Cap $Bln":  lambda v: f"${v:,.1f}" if _is_num(v) else "—",
-            "ROE %":         lambda v: f"{v:.1f}%" if _is_num(v) else "—",
+            "ROE %":         lambda v: f"{v:.1f}%" if _is_num(v) else ("NM" if v == "NM" else "—"),
             "LT D/Cap %":    lambda v: f"{v:.1f}%" if _is_num(v) else "—",
             "Paid Since":    lambda v: f"{int(v)}" if _is_num(v) else "—",
             "Raised Since":  lambda v: f"{int(v)}" if _is_num(v) else "—",
@@ -956,7 +962,13 @@ def _render_risk_correlation(
             "Sector":        st.column_config.TextColumn("Sector", width="medium"),
             "Sub-Industry":  st.column_config.TextColumn("Sub-Industry", width="medium"),
             "Credit (S&P)":  st.column_config.TextColumn("S&P Cr", width="small"),
-            "Debt Cov":      st.column_config.TextColumn("Debt Cov", width="small"),
+            "Debt Cov":      st.column_config.TextColumn(
+                "Debt Svc Cov",
+                width="small",
+                help="Debt-Service Coverage = EBIT ÷ (interest expense + "
+                     "current LT debt maturities). Financials and REITs "
+                     "shown as — (not meaningful).",
+            ),
             "LT D/Cap %":    st.column_config.TextColumn("LT D/Cap", width="small"),
             "Beta":          st.column_config.TextColumn("Beta", width="small"),
             "Style":         st.column_config.TextColumn("Style", width="small"),
@@ -971,6 +983,8 @@ def _render_risk_correlation(
     st.markdown(
         "<div style='font-size:10px;color:rgba(255,255,255,0.3);"
         "margin-top:14px;text-align:right;'>"
+        "Debt-Service Coverage = EBIT ÷ (interest + current LT debt "
+        "maturities); — for financials/REITs. · "
         "Source: Tamarac (positions) · yfinance (price, market cap, beta) · "
         "warbook_metrics (super sector, sub-industry, country, debt coverage) · "
         "Notion (S&amp;P credit, Mstar grades, style)"
