@@ -90,6 +90,7 @@ TAB_SUBTITLES = {
     "qdg":          "QDG Characteristics",
     "risk":         "Risk Correlation",
     "attribution":  "Supplemental Attribution & Quality Characteristics",
+    "cld_notes":    "CLD Thesis Notes",
 }
 
 # Super sector mapping — duplicated from warbook_tab.py to keep this module
@@ -793,6 +794,103 @@ def _safe_strftime(d):
 
 # ── Public API ────────────────────────────────────────────────────────────
 
+def _build_cld_notes_rows(tam_df, notion_data):
+    """
+    Symbol / Company / CLD Thesis for holdings that have commentary in the
+    Notion "CLD Comments" column. Weight-sorted to match the on-screen
+    thesis-notes panel. Holdings without commentary are omitted (blank rows
+    add nothing to a printed research page).
+    """
+    rows = []
+    for _, h in tam_df.iterrows():
+        sym = str(h["symbol"]).strip().upper()
+        cmt = (notion_data.get(sym, {}).get("cld_comments") or "").strip()
+        if cmt:
+            rows.append({
+                "Weight":     h["weight_pct"],
+                "Symbol":     sym,
+                "Company":    h["description"],
+                "CLD Thesis": cmt,
+            })
+    if not rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(rows).sort_values("Weight", ascending=False)
+    return df.drop(columns=["Weight"]).reset_index(drop=True)
+
+
+def _write_cld_notes_tab(ws, df, strategy_code, strategy_display_name,
+                         as_of_date, logo_path=None):
+    """
+    Dedicated writer for the thesis-notes sheet. Unlike the grid tabs
+    (rotated headers, landscape, fit-to-width across 18 columns), thesis
+    text wants reading width: portrait, three columns, wrapped text, and
+    unset row heights so Excel auto-fits each thesis. Title block matches
+    _write_tab so the printed page carries the same letterhead.
+    """
+    HEADER_ROW = 5
+    DATA_START_ROW = 6
+
+    ws["B1"] = f"Martin Capital Partners — {strategy_display_name}"
+    ws["B1"].font = Font(name="Arial", size=16, bold=True, color=_BRAND_BLACK)
+    ws["B1"].alignment = Alignment(horizontal="left", vertical="center")
+    ws["B2"] = TAB_SUBTITLES["cld_notes"]
+    ws["B2"].font = Font(name="Arial", size=11, italic=True, color="595959")
+    ws["B2"].alignment = Alignment(horizontal="left", vertical="center")
+    date_str = _safe_strftime(as_of_date) or f"{as_of_date.month}/{as_of_date.day}/{as_of_date.year}"
+    ws["B3"] = f"As of {date_str}"
+    ws["B3"].font = Font(name="Arial", size=10, color="808080")
+    ws["B3"].alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[1].height = 26
+    ws.row_dimensions[2].height = 18
+    ws.row_dimensions[3].height = 16
+
+    if logo_path:
+        try:
+            img = XLImage(logo_path)
+            if img.height and img.width:
+                aspect = img.width / img.height
+                target_h_px = 50
+                img.height = target_h_px
+                img.width = int(target_h_px * aspect)
+            ws.add_image(img, "A1")
+        except Exception:
+            pass
+
+    cols = [("Symbol", 9), ("Company", 30), ("CLD Thesis", 100)]
+    hdr_font = Font(name="Arial", size=9, bold=True, color="FFFFFF")
+    hdr_fill = PatternFill("solid", fgColor=_BRAND_BLUE)
+    for i, (label, width) in enumerate(cols, start=1):
+        c = ws.cell(row=HEADER_ROW, column=i, value=label)
+        c.font = hdr_font
+        c.fill = hdr_fill
+        c.alignment = Alignment(horizontal="left", vertical="center")
+        ws.column_dimensions[get_column_letter(i)].width = width
+
+    body = Font(name="Arial", size=9)
+    sym_font = Font(name="Arial", size=9, bold=True)
+    thin = Side(style="thin", color="D9D9D9")
+    for r_i, (_, row) in enumerate(df.iterrows(), start=DATA_START_ROW):
+        vals = [row["Symbol"], row["Company"], row["CLD Thesis"]]
+        for c_i, v in enumerate(vals, start=1):
+            c = ws.cell(row=r_i, column=c_i, value=v)
+            c.font = sym_font if c_i == 1 else body
+            c.alignment = Alignment(
+                horizontal="left",
+                vertical="top",
+                wrap_text=(c_i == 3),
+            )
+            c.border = Border(bottom=thin)
+        # No explicit row height — Excel auto-fits the wrapped thesis text.
+
+    ws.freeze_panes = f"A{DATA_START_ROW}"
+    ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+    ws.page_setup.paperSize = ws.PAPERSIZE_LETTER
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_title_rows = f"{HEADER_ROW}:{HEADER_ROW}"
+
+
 def build_strategy_xlsx(
     *,
     strategy_code,
@@ -848,6 +946,13 @@ def build_strategy_xlsx(
     if not df_ov.empty:
         _write_tab(ws, "overview", OVERVIEW_COLS, df_ov,
                    strategy_code, strat_name, as_of_date, logo_path)
+
+    # ── Tab 1b: CLD Thesis Notes (companion to Strategy Overview) ───────
+    df_notes = _build_cld_notes_rows(tam_df, notion_data)
+    if not df_notes.empty:
+        ws = wb.create_sheet("CLD Thesis Notes")
+        _write_cld_notes_tab(ws, df_notes, strategy_code, strat_name,
+                             as_of_date, logo_path)
 
     # ── Tab 2: QDG Characteristics ─────────────────────────────────────
     df_qdg = _build_qdg_rows(tam_df, price_data, notion_data, warbook_data,
@@ -938,6 +1043,16 @@ def build_single_tab_xlsx(
     if not df.empty:
         _write_tab(ws, tab_key, cols, df,
                    strategy_code, strat_name, as_of_date, logo_path)
+
+    # The Strategy Overview download carries its companion thesis-notes
+    # sheet, mirroring the on-screen panel (and the legacy warbook's
+    # hand-typed column U — now sourced from Notion, on the right rows).
+    if tab_key == "overview" and notion_data:
+        df_notes = _build_cld_notes_rows(tam_df, notion_data)
+        if not df_notes.empty:
+            ws_n = wb.create_sheet("CLD Thesis Notes")
+            _write_cld_notes_tab(ws_n, df_notes, strategy_code, strat_name,
+                                 as_of_date, logo_path)
 
     buf = io.BytesIO()
     wb.save(buf)
