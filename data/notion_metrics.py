@@ -251,6 +251,14 @@ def fetch_notion_metrics():
             "raised_since":         _extract_number(props.get("Raised Since", {})),
             "timing_of_raise":      _extract_text(props.get("Timing of Raise", {})),
 
+            # Sprint 25: CLD thesis commentary — Cameron's per-holding
+            # competitive-leadership notes, migrated from the hard-copy
+            # warbook's Strategy tab (col U). Manually curated in Notion;
+            # blank until filled. Surfaces as the "CLD Thesis Notes" panel
+            # on the Strategy Overview sub-tab within one cache cycle
+            # (ttl=300s) of a Notion edit.
+            "cld_comments":         _extract_text(props.get("CLD Comments", {})),
+
             # Sprint 24-6: 1Y/3Y/5Y dividend growth — manually curated in
             # Notion for the ADRs only (Fish doesn't cover them and yfinance-
             # derived growth carries FX/cadence noise). For U.S. names these

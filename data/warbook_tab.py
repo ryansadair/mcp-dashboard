@@ -411,6 +411,7 @@ def _render_strategy_overview(tam_df, active_strategy, price_data, notion_data, 
     (matches the spreadsheet's red 4% on PFE).
     """
     rows = []
+    cld_notes = []
     for _, h in tam_df.iterrows():
         sym = str(h["symbol"]).strip().upper()
         mkt = price_data.get(sym, {})
@@ -495,6 +496,14 @@ def _render_strategy_overview(tam_df, active_strategy, price_data, notion_data, 
             "DG ≥ Base":            exceeds or "—",
             "Date Eval":            date_eval_str,
         })
+
+        # CLD thesis commentary (Notion "CLD Comments") — collected outside
+        # the dataframe so the table stays compact; rendered as the
+        # expandable notes panel below it.
+        _cmt = (nm.get("cld_comments") or "").strip()
+        if _cmt:
+            cld_notes.append((round(h["weight_pct"], 2), sym,
+                              h["description"], _cmt))
 
     df = pd.DataFrame(rows)
     if df.empty:
@@ -603,12 +612,39 @@ def _render_strategy_overview(tam_df, active_strategy, price_data, notion_data, 
         },
     )
 
+    # ── CLD Thesis Notes ────────────────────────────────────────────────
+    # Cameron's per-holding competitive-leadership commentary from the
+    # Notion "CLD Comments" column. Auto-populates as rows are filled in
+    # Notion (5-min cache). Holdings without commentary are simply omitted.
+    if cld_notes:
+        cld_notes.sort(key=lambda x: -x[0])
+        with st.expander(f"CLD Thesis Notes ({len(cld_notes)})", expanded=False):
+            parts = []
+            for _w, _sym, _name, _cmt in cld_notes:
+                parts.append(
+                    "<div style='margin-bottom:10px;'>"
+                    f"<span style='color:{BRAND['gold']};font-weight:600;'>{_sym}</span>"
+                    f"<span style='color:rgba(255,255,255,0.45);font-size:12px;'> — {_name}</span><br>"
+                    f"<span style='color:rgba(255,255,255,0.75);font-size:13px;line-height:1.5;'>{_cmt}</span>"
+                    "</div>"
+                )
+            st.markdown("".join(parts), unsafe_allow_html=True)
+    else:
+        st.markdown(
+            "<div style='font-size:11px;color:rgba(255,255,255,0.25);margin-top:8px;'>"
+            "CLD thesis notes appear here as the \'CLD Comments\' column is "
+            "filled in the Notion Master Holdings DB (refreshes within 5 min)."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
     # Footer attribution
     st.markdown(
         "<div style='font-size:10px;color:rgba(255,255,255,0.3);"
         "margin-top:14px;text-align:right;'>"
         "Source: Tamarac (positions, cost basis) · yfinance (price, yield) · "
-        "Fish CCC (5yr DG) · Notion (CLD, MCP Target, Baseline, Style, Date Eval)"
+        "Fish CCC (5yr DG) · Notion (CLD, MCP Target, Baseline, Style, "
+        "Date Eval, CLD Comments)"
         "</div>",
         unsafe_allow_html=True,
     )
