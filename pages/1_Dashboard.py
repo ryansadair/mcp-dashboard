@@ -166,17 +166,34 @@ render_market_ticker()
 # ── Data freshness + Tamarac status (combined, right-aligned) ─────────────
 _status_parts = []
 
-# Part 1: Supabase data freshness
+# Part 1: data freshness — live Finviz quote time when available (updated
+# every ~60s by the price layer), otherwise the Supabase prefetch timestamp.
+# On the very first render of a session the Finviz fetch hasn't happened
+# yet (it fires inside the tab bodies below), so the stamp shows Supabase
+# age once, then flips to the live time on the next rerun/autorefresh.
 try:
     from data.market_data import get_cache_timestamp
     _raw_ts = get_cache_timestamp()
-    if _raw_ts:
+    _live_source = False
+    try:
+        from data.finviz_export import last_fetch_time
+        _fv_epoch = last_fetch_time()
+    except Exception:
+        _fv_epoch = None
+    if _raw_ts or _fv_epoch:
         from datetime import timedelta, timezone
         try:
-            _parsed = datetime.fromisoformat(_raw_ts.replace("Z", "+00:00"))
-            # Make _parsed timezone-aware UTC if it came in naive
-            if _parsed.tzinfo is None:
-                _parsed = _parsed.replace(tzinfo=timezone.utc)
+            _parsed = None
+            if _raw_ts:
+                _parsed = datetime.fromisoformat(_raw_ts.replace("Z", "+00:00"))
+                # Make _parsed timezone-aware UTC if it came in naive
+                if _parsed.tzinfo is None:
+                    _parsed = _parsed.replace(tzinfo=timezone.utc)
+            if _fv_epoch:
+                _fv_dt = datetime.fromtimestamp(_fv_epoch, tz=timezone.utc)
+                if _parsed is None or _fv_dt > _parsed:
+                    _parsed = _fv_dt
+                    _live_source = True
             # Auto-detect PDT vs PST for display time
             _utc_now = datetime.now(timezone.utc)
             from zoneinfo import ZoneInfo
@@ -201,7 +218,7 @@ try:
                 f'<span style="display:inline-flex;align-items:center;gap:6px;">'
                 f'<span style="width:6px;height:6px;border-radius:50%;background:{_status_dot};'
                 f'display:inline-block;flex-shrink:0;"></span>'
-                f'<span>Data refreshed {_time_str} PT ({_age_str})</span>'
+                f'<span>{"Live quotes" if _live_source else "Data refreshed"} {_time_str} PT ({_age_str})</span>'
                 f'</span>'
             )
         except Exception:

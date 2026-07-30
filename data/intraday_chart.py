@@ -191,6 +191,35 @@ def _prev_close_from_quote(quote):
     return float(price) / (1.0 + chg_pct / 100.0)
 
 
+def _append_live_point(x, y, live_chg, open_pt, close_pt):
+    """
+    Append the current live quote as the final point of an intraday series,
+    so the line's endpoint always equals the value shown in the legend and
+    the Daily Return KPI (both quote-driven and ~1-min fresh via Finviz),
+    instead of lagging on the last cached 5-minute bar (up to 15 min old).
+
+    Rules: only during/after today's session (never before the open), never
+    plotted past the close, only appended when it's newer than the last bar,
+    and only onto a line that already has bars (a lone point doesn't render).
+    Mutates and returns (x, y).
+    """
+    if live_chg is None or not x:
+        return x, y
+    now_pt = datetime.now(_PT)
+    if now_pt < open_pt:
+        return x, y
+    ts = min(now_pt, close_pt)
+    last = x[-1]
+    try:
+        if ts <= last:
+            return x, y
+    except TypeError:
+        return x, y
+    x.append(ts)
+    y.append(round(float(live_chg), 3))
+    return x, y
+
+
 def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
     """
     Build the three series for the Overview intraday chart:
@@ -242,6 +271,11 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
         quote = quotes.get(ticker) or idx_supabase_quotes.get(ticker, {})
         prev = _prev_close_from_quote(quote)
         x, y = _intraday_pct_series(idx_intraday.get(ticker), prev)
+        # Live endpoint from the same quote that supplied prev close —
+        # SPYD rides the Finviz live layer; ^GSPC uses the freshest
+        # index quote available (same source as the ticker bar).
+        live_chg = quote.get("change_pct", quote.get("change_1d_pct", None))
+        x, y = _append_live_point(x, y, live_chg, open_pt, close_pt)
         index_series.append({"ticker": ticker, "label": label, "x": x, "y": y})
 
     # ── Strategy line ───────────────────────────────────────────────────
@@ -311,6 +345,18 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
 
                 strategy_x = list(weighted.index)
                 strategy_y = [round(v, 3) for v in weighted.values]
+
+                # Live endpoint: the current quote-weighted daily return —
+                # by construction the SAME number as the Daily Return KPI
+                # (same weights, same cash-included denominator, same
+                # fetch_batch_prices quotes), so legend and KPI now agree.
+                live_wsum = 0.0
+                for _, row in holdings.iterrows():
+                    q = holdings_quotes.get(row["symbol"], {})
+                    live_wsum += float(row["weight"]) * float(q.get("change_1d_pct", 0) or 0)
+                strategy_x, strategy_y = _append_live_point(
+                    strategy_x, strategy_y, live_wsum / denom, open_pt, close_pt
+                )
 
     return {
         "strategy": {"name": active_strategy, "x": strategy_x, "y": strategy_y},

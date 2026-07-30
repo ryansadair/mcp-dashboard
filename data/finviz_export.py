@@ -127,6 +127,7 @@ _CHUNK = 400              # tickers per request (URL-length safety; we have ~80)
 _STORE = {}               # ticker -> (normalized_row_dict, fetched_epoch)
 _KNOWN = set()            # every ticker ever requested this session
 _LAST_HTTP = 0.0
+_LAST_SUCCESS = 0.0       # epoch of last fetch that returned data
 _LOCK = threading.Lock()
 
 
@@ -320,7 +321,7 @@ def get_snapshot(tickers, max_age_s=_MAX_AGE_S):
     absent from the result — callers MUST treat missing tickers via their
     existing fallback chain (Supabase / yfinance).
     """
-    global _LAST_HTTP
+    global _LAST_HTTP, _LAST_SUCCESS
     auth = get_auth_token()
     if not auth:
         return {}
@@ -335,6 +336,8 @@ def get_snapshot(tickers, max_age_s=_MAX_AGE_S):
         if missing and (now - _LAST_HTTP) >= _MIN_INTERVAL_S:
             fetched = _http_fetch(sorted(_KNOWN), auth)
             _LAST_HTTP = time.time()
+            if fetched:
+                _LAST_SUCCESS = _LAST_HTTP
             for t, rowdata in fetched.items():
                 _STORE[t] = (rowdata, _LAST_HTTP)
         return {t: _STORE[t][0] for t in req
@@ -353,3 +356,13 @@ def fetch_once(tickers):
               "(falling back to yfinance)")
         return {}
     return _http_fetch([t.upper() for t in tickers if t], auth)
+
+
+def last_fetch_time():
+    """
+    Epoch seconds of the most recent SUCCESSFUL export fetch in this
+    process, or None if no fetch has succeeded yet. Used by the dashboard
+    freshness stamp to show live-quote freshness instead of the (older)
+    Supabase prefetch timestamp.
+    """
+    return _LAST_SUCCESS or None
