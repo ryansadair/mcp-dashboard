@@ -23,8 +23,13 @@ INDICES = [
     ("Nasdaq 100",         "^NDX"),
     ("Dow Jones 30",       "^DJI"),
     ("Russell 2000",       "^RUT"),
-    ("Russell 1000 Value", "^RLV"),
-    ("Russell 1000 Growth","^RLG"),
+    # ^RLV/^RLG swapped for their iShares proxies 2026-07-31: Yahoo's ^RLG
+    # feed went stale (froze at the 7/29 close, then started returning
+    # "possibly delisted"), which showed a two-day-old -1.78% as today's
+    # move. IWD/IWF are real-time, always tradable, and already used by
+    # the style box below — and this tab is ETF-proxied by design.
+    ("Russell 1000 Value (IWD)", "IWD"),
+    ("Russell 1000 Growth (IWF)","IWF"),
     ("US Agg Bond",        "AGG"),
 ]
 
@@ -560,6 +565,29 @@ def _fetch_market_quotes():
         # Compute YTD start date (Jan 1 of current year)
         year_start_str = datetime(datetime.now().year, 1, 1).strftime("%Y-%m-%d")
 
+        # Staleness reference: the most recent bar date across the whole
+        # batch defines "current". Any symbol whose last bar sits more than
+        # one BUSINESS day behind it has a frozen feed (the ^RLG failure
+        # mode) — its "1D change" would be days old. Business-day distance
+        # avoids false positives on weekends (BTC-USD trades when equities
+        # don't) and allows one day of grace for slow index feeds.
+        _batch_max_date = None
+        try:
+            for _t in _ALL_TICKERS:
+                try:
+                    _df_t = data[_t] if _t in data.columns.get_level_values(0) else None
+                    if _df_t is None:
+                        continue
+                    _dd = _df_t.dropna(subset=["Close"])
+                    if len(_dd):
+                        _d = _dd.index[-1].date()
+                        if _batch_max_date is None or _d > _batch_max_date:
+                            _batch_max_date = _d
+                except Exception:
+                    continue
+        except Exception:
+            _batch_max_date = None
+
         result = {}
         for ticker in _ALL_TICKERS:
             try:
@@ -596,6 +624,15 @@ def _fetch_market_quotes():
                             if len(df) < 1:
                                 result[ticker] = dict(_empty)
                                 continue
+
+                # Frozen-feed guard (see _batch_max_date above): show nothing
+                # rather than a stale change dressed up as today's.
+                if _batch_max_date is not None:
+                    import numpy as _np
+                    _lag = _np.busday_count(df.index[-1].date(), _batch_max_date)
+                    if _lag > 1:
+                        result[ticker] = dict(_empty)
+                        continue
 
                 close = float(df["Close"].iloc[-1])
                 prev = float(df["Close"].iloc[-2]) if len(df) >= 2 else close
@@ -984,4 +1021,4 @@ def render_markets_tab():
             _render_focus_section("Global Markets — Emerging", GLOBAL_EMERGING, "glem", _quotes, per_row=4)
 
     # ── Footer ────────────────────────────────────────────────────────────
-    st.caption(f"Data: yfinance (ETF proxies) · Cached 15 min · {datetime.now().strftime('%I:%M %p')}")
+    st.caption(f"Data: yfinance (ETF proxies) · Cached 15 min · {datetime.now().strftime('%I:%M %p')}")v
