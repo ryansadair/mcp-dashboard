@@ -252,6 +252,44 @@ if DETECTOR_AVAILABLE:
     except Exception:
         pass
 
+# Part 3: Data canary status — the daily invariant checks (canary.py via
+# GitHub Actions). Three states: green = all checks passed this morning,
+# amber = passed with warnings OR the canary hasn't reported in >30h
+# (i.e. the watcher itself is down — a missing canary must be as visible
+# as a failing one), red = an invariant failed (details in the Actions
+# log and the canary_status.failures column).
+try:
+    from data.market_data import _sb_get as _canary_sb_get
+    _canary_rows = _canary_sb_get(
+        "canary_status",
+        select="run_at,status,failures",
+        filters={"order": "run_at.desc", "limit": "1"},
+    ) or []
+    if _canary_rows:
+        from datetime import timezone as _tz
+        _c = _canary_rows[0]
+        _c_dt = datetime.fromisoformat(_c["run_at"].replace("Z", "+00:00"))
+        _c_age_h = (datetime.now(_tz.utc) - _c_dt).total_seconds() / 3600
+        # Weekend allowance: Friday's run is the newest until Monday 6:50a.
+        _overdue = _c_age_h > (78 if datetime.now(_tz.utc).weekday() == 0 else 30)
+        if _c["status"] == "fail":
+            _c_dot, _c_label = "#c45454", "Canary FAILED — see Actions log"
+        elif _overdue:
+            _c_dot, _c_label = "#C9A84C", f"Canary overdue ({_c_age_h:.0f}h)"
+        elif _c["status"] == "warn":
+            _c_dot, _c_label = "#C9A84C", "Canary ✓ (warnings)"
+        else:
+            _c_dot, _c_label = "rgba(86,149,66,0.7)", "Canary ✓"
+        _status_parts.append(
+            f'<span style="display:inline-flex;align-items:center;gap:6px;">'
+            f'<span style="width:6px;height:6px;border-radius:50%;background:{_c_dot};'
+            f'display:inline-block;flex-shrink:0;"></span>'
+            f'<span>{_c_label}</span>'
+            f'</span>'
+        )
+except Exception:
+    pass
+
 if _status_parts:
     _divider = '<span style="opacity:0.2;margin:0 6px;">|</span>'
     # Sprint 26: flex-wrap:wrap lets the status strip break to a second line

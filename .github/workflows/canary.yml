@@ -1,0 +1,51 @@
+# Martin Capital Partners — Daily Data Canary
+# .github/workflows/canary.yml
+#
+# Asserts the dashboard's data invariants every market morning, ~20 min
+# after the open (enough time for the first prefetch cycles and the
+# office-machine Tamarac commit). Any failed assertion turns the run RED,
+# which emails the repo owner (GitHub notifies on failed Actions by
+# default), and writes a status row that the dashboard header displays —
+# so a broken feed is known the same morning, not when someone happens
+# to cross-check Finviz.
+#
+# 13:50 UTC = 9:50 AM EDT = 6:50 AM PDT (see prefetch.yml for the DST
+# caveat — during EST this runs at 8:50 AM ET, still fine).
+#
+# Required GitHub Secrets (same as prefetch): SUPABASE_URL, SUPABASE_KEY,
+# FINVIZ_AUTH. Optional but recommended: NOTION_TOKEN (enables the Notion
+# reachability check; without it the check records a warning).
+
+name: Data Canary
+
+on:
+  schedule:
+    - cron: '50 13 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so Tamarac freshness can read commit dates
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests yfinance pandas numpy
+
+      - name: Run canary
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          FINVIZ_AUTH: ${{ secrets.FINVIZ_AUTH }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+        run: python canary.py
