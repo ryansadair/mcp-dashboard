@@ -97,10 +97,10 @@ COMMODITIES = [
     ("Bitcoin",     "BTC-USD"),
 ]
 
-# Currencies — Finviz-forex-page replacement. USD/JPY pinned first (carry-
-# trade watch), Dollar Index as the anchor, then majors in conventional
-# order, carry crosses last. Fixed order by design — FX daily moves are
-# small and shuffling the list by change% would defeat glanceability.
+# Currencies — Finviz-forex-page replacement. Table renders sorted by
+# daily change like every other section (so the big mover — usually the
+# story on carry-trade days — sits at an extreme). The order below is
+# just the definition/pill order.
 CURRENCIES = [
     ("USD/JPY",      "JPY=X"),
     ("Dollar Index", "DX-Y.NYB"),
@@ -915,10 +915,8 @@ def render_markets_tab():
         st.markdown(_render_market_table(_sort_by_change(COMMODITIES), quotes, section_label="Commodity"), unsafe_allow_html=True)
 
         # ── Currencies ───────────────────────────────────────────────────
-        # Deliberately NOT sorted by change: fixed conventional order with
-        # USD/JPY pinned on top (see CURRENCIES definition).
         st.markdown(_section_header("Currencies"), unsafe_allow_html=True)
-        st.markdown(_render_market_table(CURRENCIES, quotes, section_label="Pair"), unsafe_allow_html=True)
+        st.markdown(_render_market_table(_sort_by_change(CURRENCIES), quotes, section_label="Pair"), unsafe_allow_html=True)
 
         # ── Fixed Income ─────────────────────────────────────────────────
         st.markdown(_section_header("Fixed Income ETFs"), unsafe_allow_html=True)
