@@ -1021,4 +1021,4 @@ def render_markets_tab():
             _render_focus_section("Global Markets — Emerging", GLOBAL_EMERGING, "glem", _quotes, per_row=4)
 
     # ── Footer ────────────────────────────────────────────────────────────
-    st.caption(f"Data: yfinance (ETF proxies) · Cached 15 min · {datetime.now().strftime('%I:%M %p')}")v
+    st.caption(f"Data: yfinance (ETF proxies) · Cached 15 min · {datetime.now().strftime('%I:%M %p')}")
