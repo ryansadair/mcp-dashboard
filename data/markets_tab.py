@@ -92,6 +92,25 @@ COMMODITIES = [
     ("Bitcoin",     "BTC-USD"),
 ]
 
+# Currencies — Finviz-forex-page replacement. USD/JPY pinned first (carry-
+# trade watch), Dollar Index as the anchor, then majors in conventional
+# order, carry crosses last. Fixed order by design — FX daily moves are
+# small and shuffling the list by change% would defeat glanceability.
+CURRENCIES = [
+    ("USD/JPY",      "JPY=X"),
+    ("Dollar Index", "DX-Y.NYB"),
+    ("EUR/USD",      "EURUSD=X"),
+    ("GBP/USD",      "GBPUSD=X"),
+    ("USD/CHF",      "CHF=X"),
+    ("USD/CAD",      "CAD=X"),
+    ("AUD/USD",      "AUDUSD=X"),
+    ("NZD/USD",      "NZDUSD=X"),
+    ("EUR/GBP",      "EURGBP=X"),
+    ("GBP/JPY",      "GBPJPY=X"),
+    ("EUR/JPY",      "EURJPY=X"),
+]
+_FX_TICKERS = {t for _, t in CURRENCIES}
+
 # US Equity Factors — Morningstar-style 3x3 grid (iShares Russell ETFs)
 # Rows: Large, Mid, Small  |  Columns: Value, Core, Growth
 STYLE_BOX = [
@@ -208,8 +227,12 @@ def _render_stats_card(name, ticker, quotes, batch_data, period_label):
     low_52w = q.get("low_52w", 0)
     ytd_pct = q.get("ytd_pct", 0)
 
-    # Price formatting
+    # Price formatting. Currency pairs aren't dollar amounts — no $ prefix,
+    # and sub-10 quotes (EUR/USD) get four decimals.
+    _is_fx = ticker in _FX_TICKERS
     def _fmt_price(p):
+        if _is_fx:
+            return f"{p:.4f}" if p < 10 else f"{p:,.2f}"
         if p >= 10000:
             return f"${p:,.0f}"
         elif p >= 100:
@@ -492,7 +515,7 @@ def _render_focus_section(title, items, session_prefix, quotes, per_row=4):
     )
 
 # Collect all tickers for batch fetch
-_ALL_GROUPS = [INDICES, DIVIDEND_BENCHMARKS, SECTORS, FIXED_INCOME, GLOBAL_DEVELOPED, GLOBAL_EMERGING, COMMODITIES]
+_ALL_GROUPS = [INDICES, DIVIDEND_BENCHMARKS, SECTORS, FIXED_INCOME, GLOBAL_DEVELOPED, GLOBAL_EMERGING, COMMODITIES, CURRENCIES]
 _ALL_TICKERS = []
 for group in _ALL_GROUPS:
     for _, ticker in group:
@@ -653,16 +676,21 @@ def _render_market_table(items, quotes, show_pct=True, section_label=None):
         pct_from_high = q.get("pct_from_high", 0)
         color = _chg_color(pct)
 
-        # Format price
-        if price >= 10000:
+        # Format price. FX pairs quoted under 10 (EUR/USD 1.1476) need four
+        # decimals or the whole column is noise; yen crosses and DXY (>=10)
+        # read naturally at two.
+        is_fx = ticker in _FX_TICKERS
+        if is_fx and price < 10:
+            price_str = f"{price:.4f}"
+        elif price >= 10000:
             price_str = f"{price:,.0f}"
         elif price >= 100:
             price_str = f"{price:,.2f}"
         else:
             price_str = f"{price:.2f}"
 
-        # Format change
-        chg_str = f"{chg:+.2f}"
+        # Format change — same decimal treatment as the price it moves
+        chg_str = f"{chg:+.4f}" if (is_fx and price < 10) else f"{chg:+.2f}"
         pct_str = f"{pct:+.2f}%"
 
         # Format % from high — always negative or zero
@@ -849,6 +877,12 @@ def render_markets_tab():
         st.markdown(_section_header("Commodities"), unsafe_allow_html=True)
         st.markdown(_render_market_table(_sort_by_change(COMMODITIES), quotes, section_label="Commodity"), unsafe_allow_html=True)
 
+        # ── Currencies ───────────────────────────────────────────────────
+        # Deliberately NOT sorted by change: fixed conventional order with
+        # USD/JPY pinned on top (see CURRENCIES definition).
+        st.markdown(_section_header("Currencies"), unsafe_allow_html=True)
+        st.markdown(_render_market_table(CURRENCIES, quotes, section_label="Pair"), unsafe_allow_html=True)
+
         # ── Fixed Income ─────────────────────────────────────────────────
         st.markdown(_section_header("Fixed Income ETFs"), unsafe_allow_html=True)
         st.markdown(_render_market_table(_sort_by_change(FIXED_INCOME), quotes, section_label="Category"), unsafe_allow_html=True)
@@ -875,7 +909,7 @@ def render_markets_tab():
     # CHARTS SUB-TAB — Option B: focus chart with ticker pills per section
     # Lazy-loaded: charts don't render until user clicks "Load charts",
     # same pattern as the Holdings tab price-chart sub-tab. This keeps the
-    # rest of the dashboard fast since loading all 7 sections runs 40+
+    # rest of the dashboard fast since loading all 8 sections runs 50+
     # yfinance ticker fetches + 7 Plotly renders per rerun.
     # ══════════════════════════════════════════════════════════════════════
     with tab_charts:
@@ -890,7 +924,7 @@ def render_markets_tab():
                 "border:1px solid rgba(255,255,255,0.05);margin:12px 0;'>"
                 "<div style='font-size:14px;color:rgba(255,255,255,0.7);"
                 "margin-bottom:8px;font-weight:600;'>"
-                "Market charts · 7 sections, focus view</div>"
+                "Market charts · 8 sections, focus view</div>"
                 "<div style='font-size:12px;color:rgba(255,255,255,0.4);"
                 "margin-bottom:18px;'>"
                 "Loading charts takes ~15-25 seconds on first view. "
@@ -944,6 +978,7 @@ def render_markets_tab():
             _render_focus_section("Dividend Benchmarks", DIVIDEND_BENCHMARKS, "divbench", _quotes, per_row=3)
             _render_focus_section("S&P Sector ETFs", SECTORS, "sectors", _quotes, per_row=4)
             _render_focus_section("Commodities", COMMODITIES, "commod", _quotes, per_row=6)
+            _render_focus_section("Currencies", CURRENCIES, "fx", _quotes, per_row=6)
             _render_focus_section("Fixed Income ETFs", FIXED_INCOME, "fi", _quotes, per_row=4)
             _render_focus_section("Global Markets — Developed", GLOBAL_DEVELOPED, "gldev", _quotes, per_row=4)
             _render_focus_section("Global Markets — Emerging", GLOBAL_EMERGING, "glem", _quotes, per_row=4)
