@@ -377,101 +377,39 @@ PLOTLY_CONFIG = {
 # Crosshair spike settings — reusable across all charts
 _SPIKE = dict(showspikes=True, spikecolor="rgba(255,255,255,0.15)", spikethickness=1, spikemode="across", spikedash="solid")
 
-# ── Get all holdings tickers for the selector ─────────────────────────────
-available_tickers = []
-try:
-    from data.tamarac_parser import parse_tamarac_excel
-    import os
-    for p in ["data/Tamarac_Holdings.xlsx", "Tamarac_Holdings.xlsx"]:
-        if os.path.exists(p):
-            @st.cache_data(ttl=300)
-            def _load(path):
-                return parse_tamarac_excel(path)
-            parsed = _load(p)
-            # Collect all unique tickers across strategies
-            for strat_key, strat_data in parsed.items():
-                if isinstance(strat_data, pd.DataFrame) and "symbol" in strat_data.columns:
-                    available_tickers.extend(strat_data["symbol"].tolist())
-                elif isinstance(strat_data, dict) and "holdings" in strat_data:
-                    available_tickers.extend([h["symbol"] for h in strat_data["holdings"]])
-            available_tickers = sorted(set(available_tickers))
-            # Remove non-equity entries (e.g. CASH from Tamarac)
-            available_tickers = [t for t in available_tickers if t not in ("CASH",)]
-            break
-except Exception:
-    pass
-
-# ── Build ticker lookup with company names ────────────────────────────────
-# Fetches names from market_data cache so the selectbox shows "MSFT — Microsoft Corp"
-_ticker_labels = {}
-if available_tickers and _MARKET_DATA_AVAILABLE:
-    try:
-        _name_data = fetch_batch_prices(tuple(available_tickers))
-        for t in available_tickers:
-            name = _name_data.get(t, {}).get("name", "")
-            _ticker_labels[t] = f"{t}  —  {name}" if name else t
-    except Exception:
-        _ticker_labels = {t: t for t in available_tickers}
-else:
-    _ticker_labels = {t: t for t in available_tickers}
-
-# Sorted display list: holdings with company names + manual entry option at the end
-_display_options = [_ticker_labels.get(t, t) for t in available_tickers]
-_OTHER_OPTION = "Other — Enter any ticker..."
-_display_options.append(_OTHER_OPTION)
-
-# ── Ticker Selector ───────────────────────────────────────────────────────
-# Check if coming from Holdings tab with a pre-selected ticker
+# ── Ticker search (Sprint 26) ──────────────────────────────────────────────
+# One free-text box, mirroring the dashboard's search bar — the old
+# holdings dropdown (+ "Other" manual entry) is gone, along with the
+# fetch_batch_prices call it made on every page load just to render pretty
+# option labels. Pre-filled from the query param / session handoff, so
+# navigation from the dashboard, Holdings tab, and warbook links all work
+# unchanged; typing a new symbol and hitting Enter re-runs the page and
+# keeps the URL shareable via the query param sync below.
 default_ticker = (
     st.query_params.get("ticker")
     or st.session_state.get("detail_ticker")
     or ""
 ).upper()
 
-# Find default index: match holding, or default to "Other" if ticker isn't in holdings
-_default_idx = len(_display_options) - 1  # default to "Other"
-if default_ticker:
-    for i, opt in enumerate(_display_options[:-1]):  # skip "Other" entry
-        if opt.startswith(default_ticker + " ") or opt == default_ticker:
-            _default_idx = i
-            break
-
-# Truncate long option text in the selectbox on narrow screens
-st.markdown("""<style>
-[data-testid="stSelectbox"] [data-baseweb="select"] > div:first-child {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-</style>""", unsafe_allow_html=True)
-
-# Back button as a right-aligned link above the selectbox
+# Back button as a right-aligned link above the search box
 if st.button("← Back to Dashboard", key="back_btn"):
     st.switch_page("pages/1_Dashboard.py")
 
-selected_option = st.selectbox(
-    "Select or Search Ticker",
-    options=_display_options,
-    index=_default_idx,
-    placeholder="Type ticker or company name...",
-    key="detail_ticker_select",
-)
-
-# If "Other" is selected, show a text input for manual ticker entry
-if selected_option == _OTHER_OPTION:
-    manual_ticker = st.text_input(
-        "Enter any ticker symbol",
-        value=default_ticker if _default_idx == len(_display_options) - 1 and default_ticker else "",
-        placeholder="e.g. NVDA, META, CMCSA...",
-        key="detail_ticker_manual",
-    ).strip().upper()
-    ticker_input = manual_ticker
-else:
-    ticker_input = selected_option.split("  —  ")[0].strip().upper() if selected_option else ""
+ticker_input = st.text_input(
+    "Search Ticker",
+    value=default_ticker,
+    placeholder="Search any ticker — e.g. NVDA",
+    key="detail_ticker_search",
+).strip().upper()
 
 if not ticker_input:
     st.info("Enter a ticker symbol above to view stock details.")
     st.stop()
+
+# Keep the URL in sync so refresh/share/back-nav preserves the ticker.
+if st.query_params.get("ticker") != ticker_input:
+    st.query_params["ticker"] = ticker_input
+    st.session_state["detail_ticker"] = ticker_input
 
 
 # ── Fetch all data ────────────────────────────────────────────────────────
@@ -945,6 +883,15 @@ if not hist.empty:
         _hist_idx = hist.index
         if not isinstance(_hist_idx, pd.DatetimeIndex):
             _hist_idx = pd.to_datetime(_hist_idx)
+        # yfinance history carries a tz-aware index (America/New_York);
+        # Supabase history is naive. Comparing tz-aware to the naive
+        # Jan-1 anchor raises, and the except below silently left YTD at
+        # 0.00% for every non-portfolio ticker (the NVDA/SPCX symptom).
+        # Strip tz before comparing. For mid-year listings (SPCX) the
+        # first available bar anchors the figure — effectively "since
+        # IPO", which beats a fake zero.
+        if getattr(_hist_idx, "tz", None) is not None:
+            _hist_idx = _hist_idx.tz_localize(None)
         _ytd_slice = hist.loc[_hist_idx >= _year_start, "Close"]
         if len(_ytd_slice) > 0 and _stat_price > 0:
             _ytd_start_px = float(_ytd_slice.iloc[0])
