@@ -509,7 +509,7 @@ with _search_col:
         key="ticker_search_main",
         label_visibility="collapsed",
         on_change=_on_ticker_search,
-        placeholder="Search ticker — e.g. NVDA",
+        placeholder="Search ticker — e.g. NKE",
     )
 
 # Handle pending ticker navigation set by the search callback above.
