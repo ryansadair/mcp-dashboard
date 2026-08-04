@@ -84,22 +84,44 @@ def _json_safe(obj):
 
 
 def sb_upsert(table, rows, chunk_size=200, timeout=30):
-    """Upsert rows to a Supabase table in chunks. Returns True on success."""
+    """
+    Upsert rows to a Supabase table in chunks. Returns True on success.
+
+    Rows are grouped by their key SIGNATURE before pushing: PostgREST
+    rejects a bulk upsert whose rows carry different key sets (PGRST102
+    "All object keys must match") — one stub row from a failed ticker
+    took down the whole prices push on 2026-08-04. Grouping, rather than
+    null-padding to a common schema, is deliberate: an explicit null
+    OVERWRITES the existing column value on upsert, which would destroy
+    the preserved-fields behavior for rate-limited tickers; an omitted
+    key leaves the stored value untouched.
+    """
     if not rows:
         return True
     rows = _json_safe(rows)   # NaN/Inf -> None so a single bad float can't kill a chunk
+    grouped = {}
+    for r in rows:
+        grouped.setdefault(tuple(sorted(r.keys())), []).append(r)
+    if len(grouped) > 1:
+        print(f"  [INFO] {table}: {len(grouped)} distinct row shapes — "
+              f"pushing each separately "
+              f"({', '.join(str(len(g)) for g in grouped.values())} rows)")
     url = f"{SUPABASE_URL}/rest/v1/{table}"
-    for i in range(0, len(rows), chunk_size):
-        chunk = rows[i:i + chunk_size]
-        try:
-            resp = requests.post(url, headers=SB_UPSERT_HEADERS, json=chunk, timeout=timeout)
-            if resp.status_code not in (200, 201):
-                print(f"  [ERROR] {table} chunk {i // chunk_size + 1} "
-                      f"({resp.status_code}): {resp.text[:200]}")
+    n_chunk = 0
+    for group in grouped.values():
+        # chunk WITHIN each shape-group — a chunk must never mix shapes
+        for i in range(0, len(group), chunk_size):
+            chunk = group[i:i + chunk_size]
+            n_chunk += 1
+            try:
+                resp = requests.post(url, headers=SB_UPSERT_HEADERS, json=chunk, timeout=timeout)
+                if resp.status_code not in (200, 201):
+                    print(f"  [ERROR] {table} chunk {n_chunk} "
+                          f"({resp.status_code}): {resp.text[:200]}")
+                    return False
+            except Exception as e:
+                print(f"  [ERROR] {table} chunk {n_chunk}: {e}")
                 return False
-        except Exception as e:
-            print(f"  [ERROR] {table} chunk {i // chunk_size + 1}: {e}")
-            return False
     return True
 
 
@@ -165,12 +187,20 @@ def get_all_tickers():
             import openpyxl
             wb = openpyxl.load_workbook(wl_path, read_only=True, data_only=True)
             wl = set()
+            # Header/junk guard (2026-08-04): sheet header cells like
+            # "TICKER" pass a naive length/alpha filter — one got enrolled
+            # as a stock, produced a malformed stub row, and failed the
+            # whole prices push (PGRST102). Reject known header words and
+            # non-symbol entries.
+            _not_symbols = {"TICKER", "TICKERS", "SYMBOL", "SYMBOLS",
+                            "SYM", "NAME", "CASH", "TOTAL", "NOTES"}
             for ws in wb.worksheets:
                 for row in ws.iter_rows(min_col=1, max_col=1, values_only=True):
                     v = row[0]
                     if isinstance(v, str):
                         v = v.strip().upper()
-                        if v and len(v) <= 6 and v.replace(".", "").isalpha():
+                        if (v and len(v) <= 6 and v.replace(".", "").isalpha()
+                                and v not in _not_symbols):
                             wl.add(v)
             new_names = wl - set(tickers)
             if new_names:
