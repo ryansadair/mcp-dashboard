@@ -151,6 +151,36 @@ def get_all_tickers():
     tickers = sorted(set(t for t in tickers if t and len(t) <= 6 and t.replace(".", "").isalpha()))
     print(f"  Found {len(tickers)} tickers")
 
+    # ── Watchlist auto-enroll (Sprint 26) ──────────────────────────────────
+    # Research names in data/Watchlists.xlsx become first-class citizens:
+    # unioned into the universe here, they get 15-min Finviz prices, and the
+    # full/slow modes populate dividends, price history, financials, and
+    # warbook metrics — so the Stock Detail page loads them instantly from
+    # Supabase instead of a cold yfinance pull. Adding a ticker to any
+    # watchlist sheet is now all it takes; the row self-perpetuates via the
+    # prices-table read above once the first run upserts it.
+    try:
+        wl_path = "data/Watchlists.xlsx"
+        if os.path.exists(wl_path):
+            import openpyxl
+            wb = openpyxl.load_workbook(wl_path, read_only=True, data_only=True)
+            wl = set()
+            for ws in wb.worksheets:
+                for row in ws.iter_rows(min_col=1, max_col=1, values_only=True):
+                    v = row[0]
+                    if isinstance(v, str):
+                        v = v.strip().upper()
+                        if v and len(v) <= 6 and v.replace(".", "").isalpha():
+                            wl.add(v)
+            new_names = wl - set(tickers)
+            if new_names:
+                print(f"  Watchlists.xlsx: enrolling {len(new_names)} research "
+                      f"tickers: {', '.join(sorted(new_names)[:12])}"
+                      f"{' ...' if len(new_names) > 12 else ''}")
+            tickers = sorted(set(tickers) | wl)
+    except Exception as e:
+        print(f"  [WARN] watchlist enroll skipped: {e}")
+
     if not tickers:
         print("  [WARN] No tickers in Supabase! Falling back to Tamarac parser...")
         tickers = _get_tickers_from_tamarac()

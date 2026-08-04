@@ -477,75 +477,85 @@ if not ticker_input:
 # ── Fetch all data ────────────────────────────────────────────────────────
 def _fetch_yfinance_with_retry(ticker, max_retries=3, delay=2):
     """
-    Call yfinance with retry logic for rate-limit (429) errors and for silent
-    throttles where tk.info comes back empty / near-empty without raising.
+    Fetch yfinance data for the detail page — restructured 2026-07 for the
+    "speed up all searches" pass:
 
-    Empirically, Yahoo sometimes returns an empty dict from tk.info when
-    throttled instead of raising an exception — the old code treated that as
-    success and returned blank fields, which is what users see as the
-    "yfinance rate limited" banner with everything showing "—". Detecting the
-    empty-dict case and retrying recovers most of these.
+    PARALLEL, NOT SEQUENTIAL. The six calls (info, max history, dividends,
+    financials, quarterly financials, recommendations) run concurrently in
+    a thread pool, so cold-load wall time is the slowest single call
+    (~3-6s) instead of the old sequential sum (which, with .info-gated
+    retry sleeps, ran 15-45s and often died without ever attempting the
+    charts).
 
-    Returns (yf_info, hist, div_hist, financials, quarterly_financials, recs)
-    or raises the last exception / RuntimeError if all retries fail.
+    INFO IS A SIDECAR, NOT A GATEKEEPER. tk.info is the one Yahoo endpoint
+    that reliably throttles on shared cloud IPs. The old flow fetched it
+    FIRST, retried it 3x with sleeps, and raised if it stayed empty —
+    blocking price history that would have loaded fine. Since the Finviz
+    live overlay (below) now supplies the headline fields, an empty .info
+    only means some long-tail fields fall back to Supabase or blank. One
+    attempt, no gating, no retries.
+
+    Raises only when the page would truly be empty: no history, no
+    dividends, AND no info — that's an unknown ticker or a full outage,
+    and the caller shows the banner + Supabase/Finviz fallbacks.
+    (max_retries/delay retained in the signature for call compatibility;
+    delay is reused as the single history-retry pause.)
     """
     import time
+    from concurrent.futures import ThreadPoolExecutor
 
     def _looks_empty(info):
-        """Yahoo returns {} or near-empty dicts for throttled or unknown
-        tickers. Real responses always have at least a name or a price."""
         if not info:
             return True
-        # A real response for any listed ticker has at least one of these.
-        # We use regularMarketPrice over currentPrice because it's set even
-        # for tickers where currentPrice is missing.
         return not any(info.get(k) for k in (
             "longName", "shortName", "regularMarketPrice", "currentPrice"
         ))
 
-    last_err = None
-    for attempt in range(max_retries):
+    # Each job builds its own Ticker — yfinance's lazy property fetching is
+    # not safe to share across threads.
+    jobs = {
+        "info":  lambda: yf.Ticker(ticker).info or {},
+        "hist":  lambda: yf.Ticker(ticker).history(period="max"),
+        "divs":  lambda: yf.Ticker(ticker).dividends,
+        "fins":  lambda: yf.Ticker(ticker).financials,
+        "qfins": lambda: yf.Ticker(ticker).quarterly_financials,
+        "recs":  lambda: yf.Ticker(ticker).recommendations,
+    }
+    out = {}
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futs = {k: ex.submit(fn) for k, fn in jobs.items()}
+        for k, f in futs.items():
+            try:
+                out[k] = f.result(timeout=30)
+            except Exception:
+                out[k] = None
+
+    yf_info = out.get("info") or {}
+    if _looks_empty(yf_info):
+        yf_info = {}   # throttled — overlay + Supabase carry the headline
+
+    hist = out.get("hist")
+    if hist is None or hist.empty:
+        # One focused retry for the page's core content only.
+        time.sleep(delay)
         try:
-            tk      = yf.Ticker(ticker)
-            yf_info = tk.info or {}
+            hist = yf.Ticker(ticker).history(period="max")
+        except Exception:
+            hist = pd.DataFrame()
+    if hist is None:
+        hist = pd.DataFrame()
 
-            # Silent-throttle detection: treat empty info like a rate limit,
-            # since that's almost always what's happening.
-            if _looks_empty(yf_info):
-                if attempt < max_retries - 1:
-                    time.sleep(delay * (attempt + 1))  # 2s, 4s
-                    continue
-                # Final attempt still empty — raise so caller shows the banner
-                raise RuntimeError("yfinance returned empty info (likely throttled)")
+    divs = out.get("divs")
+    if divs is None:
+        divs = pd.Series(dtype=float)
+    fins = out.get("fins") if out.get("fins") is not None else pd.DataFrame()
+    qfins = out.get("qfins") if out.get("qfins") is not None else pd.DataFrame()
+    recs = out.get("recs") if out.get("recs") is not None else pd.DataFrame()
 
-            hist    = tk.history(period="max")
-            divs    = tk.dividends
-            fins    = pd.DataFrame()
-            qfins   = pd.DataFrame()
-            recs    = pd.DataFrame()
-            try:
-                fins  = tk.financials
-            except Exception:
-                pass
-            try:
-                qfins = tk.quarterly_financials
-            except Exception:
-                pass
-            try:
-                recs  = tk.recommendations
-            except Exception:
-                pass
-            return yf_info, hist, divs, fins, qfins, recs
-        except Exception as e:
-            last_err = e
-            err_str = str(e).lower()
-            if ("too many requests" in err_str or "rate limit" in err_str
-                    or "429" in err_str or "throttled" in err_str):
-                if attempt < max_retries - 1:
-                    time.sleep(delay * (attempt + 1))  # 2s, 4s
-                    continue
-            break  # non-rate-limit error, don't retry
-    raise last_err
+    if hist.empty and len(divs) == 0 and not yf_info:
+        raise RuntimeError(
+            "yfinance returned no data (unknown ticker or full throttle)")
+    return yf_info, hist, divs, fins, qfins, recs
 
 
 def _finviz_info_overlay(ticker):
@@ -636,7 +646,7 @@ def fetch_stock_data(ticker, _v=2):
     expensive yfinance calls. If Finviz is unavailable this is a no-op and
     the page behaves exactly as before. (_v retained for signature compat.)
     """
-    data = _fetch_stock_data_v3(ticker)
+    data = _fetch_stock_data_v4(ticker)
 
     ov, fill = _finviz_info_overlay(ticker)
     if ov or any(fill.values()):
@@ -650,7 +660,7 @@ def fetch_stock_data(ticker, _v=2):
 
 
 @st.cache_data(ttl=900, show_spinner=False)
-def _fetch_stock_data_v3(ticker):
+def _fetch_stock_data_v4(ticker):
     """
     Fetch comprehensive stock data.
     Info/fundamentals: Supabase first, yfinance fallback.
