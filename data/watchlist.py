@@ -115,10 +115,10 @@ def enrich_from_supabase(tickers):
     Fetch enrichment data from Supabase prices table.
     Returns dict: { "TICK": {info}, ... } for tickers found in Supabase.
     """
-    SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
-    SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # paste your service role key here
+    # Secrets policy 2026-08-04: never hardcoded — see data/market_data.py.
+    from data.market_data import SUPABASE_URL, SUPABASE_KEY
 
-    if SUPABASE_KEY == "YOUR_SERVICE_ROLE_KEY" or not tickers:
+    if not SUPABASE_KEY or not tickers:
         return {}
 
     try:

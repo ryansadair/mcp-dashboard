@@ -25,7 +25,8 @@ from datetime import datetime
 
 # ── Supabase config (must match market_data.py) ────────────────────────────
 SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
-SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # paste your service role key here
+# Secrets policy 2026-08-04: never hardcoded — see data/market_data.py.
+from data.market_data import SUPABASE_KEY  # noqa: F811 — shared resolver
 
 _SB_HEADERS = {
     "apikey":        SUPABASE_KEY,
@@ -35,7 +36,7 @@ _SB_HEADERS = {
 
 def _sb_get_dividends(tickers):
     """Fetch dividend rows from Supabase for a list of tickers."""
-    if SUPABASE_KEY == "YOUR_SERVICE_ROLE_KEY":
+    if not SUPABASE_KEY:
         return None
     try:
         url    = f"{SUPABASE_URL}/rest/v1/dividends"

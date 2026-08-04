@@ -16,8 +16,27 @@ from datetime import datetime
 
 # ── Supabase config ────────────────────────────────────────────────────────
 # Must match the values in prefetch_data.py
-SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
-SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # paste your service role key here
+def _resolve_secret(name):
+    """
+    Secrets policy (2026-08-04, after Supabase auto-revoked the previously
+    hardcoded service key it found in this public repo): credentials come
+    from st.secrets (Streamlit Cloud / local secrets.toml) or the
+    environment — NEVER from source. No hardcoded fallback, so a leaked
+    repo leaks nothing.
+    """
+    try:
+        import streamlit as _st
+        v = _st.secrets.get(name)
+        if v:
+            return str(v)
+    except Exception:
+        pass
+    import os as _os
+    return _os.environ.get(name, "")
+
+
+SUPABASE_URL = _resolve_secret("SUPABASE_URL") or "https://idtytpyehfbqldnvwenb.supabase.co"
+SUPABASE_KEY = _resolve_secret("SUPABASE_KEY")
 
 _SB_HEADERS = {
     "apikey":        SUPABASE_KEY,
@@ -145,7 +164,7 @@ def _fetch_batch_prices_v3(tickers_tuple):
         # Canonical indicated-regular yield overlay (one small read per
         # cache cycle): dividend_rate is computed by the prefetch dividends
         # job as last-regular-payment x frequency, specials filtered.
-        if results and SUPABASE_KEY != "YOUR_SERVICE_ROLE_KEY":
+        if results and SUPABASE_KEY:
             try:
                 rate_rows = _sb_get(
                     "dividends",
@@ -164,7 +183,7 @@ def _fetch_batch_prices_v3(tickers_tuple):
         missing = [t for t in tickers_tuple if t not in results]
 
     # ── 1. Try Supabase ───────────────────────────────────────────────────
-    if missing and SUPABASE_KEY != "YOUR_SERVICE_ROLE_KEY":
+    if missing and SUPABASE_KEY:
         tickers_filter = f"in.({','.join(missing)})"
         rows = _sb_get("prices", filters={"ticker": tickers_filter})
         if rows:
@@ -359,7 +378,7 @@ def get_index_data():
 
     except Exception:
         # Last resort: try Supabase or local cache if yfinance completely fails
-        if SUPABASE_KEY != "YOUR_SERVICE_ROLE_KEY":
+        if SUPABASE_KEY:
             rows = _sb_get("indices")
             if rows:
                 return {row["symbol"]: row for row in rows}
@@ -371,7 +390,7 @@ def get_index_data():
 
 def get_cache_timestamp():
     """Return the timestamp of the last Supabase fetch, or local cache time."""
-    if SUPABASE_KEY != "YOUR_SERVICE_ROLE_KEY":
+    if SUPABASE_KEY:
         rows = _sb_get("prices", select="fetched_at", filters={
             "limit": "1",
             "order": "fetched_at.desc",

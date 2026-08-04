@@ -35,7 +35,23 @@ sys.path.insert(0, SCRIPT_DIR)
 # Paste your Supabase project URL and service role key here after setup.
 # Get these from: supabase.com → your project → Settings → API
 SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
-SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # use service role key, not anon key
+# Secrets policy 2026-08-04 (after Supabase auto-revoked the hardcoded key
+# it found in this public repo): env var first (Task Scheduler / CI), local
+# .streamlit/secrets.toml second — never source.
+def _local_key():
+    import os
+    v = os.environ.get("SUPABASE_KEY")
+    if v:
+        return v
+    try:
+        import tomllib
+        with open(".streamlit/secrets.toml", "rb") as f:
+            return str(tomllib.load(f).get("SUPABASE_KEY", ""))
+    except Exception:
+        return ""
+
+
+SUPABASE_KEY = _local_key()   # use service role key, not anon key
 
 # ══════════════════════════════════════════════════════════════════════════
 # TICKER COLLECTION

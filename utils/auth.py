@@ -19,7 +19,7 @@ def check_password() -> bool:
             return
         if hmac.compare_digest(
             password,
-            st.secrets.get("PASSWORD", "Mcpqdg2010$"),
+            st.secrets.get("PASSWORD", ""),
         ):
             st.session_state["authenticated"] = True
             st.session_state.pop("password", None)
@@ -29,6 +29,13 @@ def check_password() -> bool:
 
     if st.session_state.get("authenticated"):
         return True
+
+    # Fail-closed guard: with no PASSWORD in Streamlit secrets nobody can
+    # log in (compare_digest against "" never matches non-empty input).
+    # Surface that plainly instead of leaving an admin guessing.
+    if not st.secrets.get("PASSWORD"):
+        st.warning("PASSWORD is not configured in Streamlit secrets — "
+                   "login is disabled until it is set.")
 
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:

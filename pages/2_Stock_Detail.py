@@ -64,7 +64,8 @@ except ImportError:
 
 # ── Supabase config ────────────────────────────────────────────────────────
 SUPABASE_URL = "https://idtytpyehfbqldnvwenb.supabase.co"
-SUPABASE_KEY = "sb_secret_P1XNpklX_g_gcMamZb0qqw_udXSu8T7"   # paste your service role key here
+# Secrets policy 2026-08-04: never hardcoded — see data/market_data.py.
+from data.market_data import SUPABASE_KEY  # noqa: F811 — shared resolver
 
 _SB_HEADERS = {
     "apikey":        SUPABASE_KEY,
