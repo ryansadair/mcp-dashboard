@@ -265,6 +265,18 @@ try:
         select="run_at,status,failures",
         filters={"order": "run_at.desc", "limit": "1"},
     ) or []
+    if not _canary_rows:
+        # No rows readable — either the canary has never written or the
+        # Supabase read is failing. Either way, SHOW it: the watcher's
+        # display must not fail silent (which is exactly how the chip
+        # vanished on 2026-08-04 instead of telling anyone why).
+        _status_parts.append(
+            '<span style="display:inline-flex;align-items:center;gap:6px;">'
+            '<span style="width:6px;height:6px;border-radius:50%;background:#C9A84C;'
+            'display:inline-block;flex-shrink:0;"></span>'
+            '<span>Canary status unreadable</span>'
+            '</span>'
+        )
     if _canary_rows:
         from datetime import timezone as _tz
         _c = _canary_rows[0]
@@ -288,7 +300,13 @@ try:
             f'</span>'
         )
 except Exception:
-    pass
+    _status_parts.append(
+        '<span style="display:inline-flex;align-items:center;gap:6px;">'
+        '<span style="width:6px;height:6px;border-radius:50%;background:#C9A84C;'
+        'display:inline-block;flex-shrink:0;"></span>'
+        '<span>Canary status unreadable</span>'
+        '</span>'
+    )
 
 if _status_parts:
     _divider = '<span style="opacity:0.2;margin:0 6px;">|</span>'

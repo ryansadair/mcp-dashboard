@@ -1403,7 +1403,23 @@ else:
 # ══════════════════════════════════════════════════════════════════════════
 # 6. PEER COMPARISON
 # ══════════════════════════════════════════════════════════════════════════
-# Find sector peers from the same Tamarac holdings universe
+# Find sector peers from the same Tamarac holdings universe.
+# (Universe builder restored 2026-08-04: the selector cleanup removed the
+# original one, missing that this section also consumed it — CLX page
+# crashed with NameError. Lean rebuild straight from the Tamarac file.)
+available_tickers = []
+try:
+    from data.tamarac_parser import parse_tamarac_excel, get_holdings_for_strategy
+    _tam = parse_tamarac_excel("data/Tamarac_Holdings.xlsx")
+    _syms = set()
+    for _sk in _tam:
+        _df_h = get_holdings_for_strategy(_tam, _sk)
+        if _df_h is not None and not _df_h.empty and "symbol" in _df_h.columns:
+            _syms.update(str(s).strip().upper() for s in _df_h["symbol"].tolist())
+    available_tickers = sorted(s for s in _syms if s and s != "CASH")
+except Exception:
+    available_tickers = []
+
 _current_sector = g("sector", "")
 if _current_sector and _MARKET_DATA_AVAILABLE and available_tickers:
     # Gather all unique tickers from Tamarac (excluding current ticker)
