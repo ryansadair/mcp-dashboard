@@ -439,6 +439,43 @@ def _fmt_rate(val, suffix="%"):
     return f"{val:.2f}{suffix}"
 
 
+def _fmt_asof(date_str, freq="daily"):
+    """
+    Humanized per-card "as of" label for FRED observation dates — the date
+    that actually answers "which print am I looking at?" (fetch time is
+    meaningless for macro: CPI re-fetched hourly is still June's number).
+
+    Formats per cadence:  daily/weekly -> "Jul 31" ("Jul 31 '25" if not
+    this year), monthly -> "Jun 2026", quarterly -> "Q2 2026".
+
+    Returns (label, color): the color turns gold when the observation is
+    meaningfully overdue for its cadence (~2x normal gap) — catching both
+    a late/stale FRED series and a silently failing fetch, per the "no
+    false data" principle. Thresholds: daily 10d, weekly 21d, monthly
+    75d, quarterly 160d.
+    """
+    _MUTED = "rgba(255,255,255,0.25)"
+    _STALE = "#C9A84C"
+    if not date_str:
+        return "", _MUTED
+    try:
+        d = datetime.strptime(date_str[:10], "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return "", _MUTED
+    age_days = (datetime.now() - d).days
+    stale_after = {"daily": 10, "weekly": 21, "monthly": 75, "quarterly": 160}
+    color = _STALE if age_days > stale_after.get(freq, 75) else _MUTED
+    if freq == "quarterly":
+        label = f"Q{(d.month - 1) // 3 + 1} {d.year}"
+    elif freq == "monthly":
+        label = d.strftime("%b %Y")
+    else:
+        label = d.strftime("%b %d").replace(" 0", " ")
+        if d.year != datetime.now().year:
+            label += f" '{d.year % 100:02d}"
+    return label, color
+
+
 def _fmt_chg(latest, prev, suffix="", is_bp=False):
     if latest is None or prev is None:
         return "—", "neutral"
@@ -576,6 +613,7 @@ def render_macro_tab(qdvd_yield=None):
                 "chg": chg_str,
                 "direction": direction,
                 "raw": latest,
+                "as_of": _fmt_asof(date_str, "daily"),
             })
 
         # 2s10s spread (computed)
@@ -596,6 +634,7 @@ def render_macro_tab(qdvd_yield=None):
                 "value": f"{spread_bp:+d}bp",
                 "chg": spread_chg,
                 "direction": spread_dir,
+                "as_of": _fmt_asof(obs_10y[0].get("date", "") if obs_10y else "", "daily"),
             })
         else:
             spread_bp = None
@@ -611,6 +650,7 @@ def render_macro_tab(qdvd_yield=None):
                     "chg": chg_str,
                     "direction": direction,
                     "raw": latest,
+                    "as_of": _fmt_asof(date_str, "weekly"),
                 })
 
     # Extract key rates for use in later sections — fall back to 30Y if 10Y unavailable
@@ -636,6 +676,7 @@ def render_macro_tab(qdvd_yield=None):
                 <div style="display:flex;align-items:center;margin-top:8px;gap:4px">
                     <span style="color:{arrow_color};font-size:12px">{arrow}</span>
                     <span style="color:{arrow_color};font-size:11px">{r["chg"]}</span>
+                    <span style="margin-left:auto;color:{r.get("as_of", ("", ""))[1]};font-size:9px">{r.get("as_of", ("", ""))[0]}</span>
                 </div>
             </div>
             ''', unsafe_allow_html=True)
@@ -669,23 +710,27 @@ def render_macro_tab(qdvd_yield=None):
     real_yield_val = "—"
     real_yield_color = "rgba(255,255,255,0.95)"
     real_yield_note = ""
-    breakeven, _, _ = _fred_latest("T10YIE")
+    breakeven, _, _be_date = _fred_latest("T10YIE")
     if ten_y is not None and breakeven is not None:
         real_y = ten_y - breakeven
         real_yield_val = f"{real_y:.2f}%"
         real_yield_color = "#569542" if real_y > 1.5 else "#C9A84C" if real_y > 0 else "#c45454"
-        real_yield_note = f"{ten_y_label} {ten_y:.2f}% − {breakeven:.2f}% breakeven"
+        _be_asof = _fmt_asof(_be_date, "daily")[0]
+        real_yield_note = (f"{ten_y_label} {ten_y:.2f}% − {breakeven:.2f}% breakeven"
+                           + (f" · as of {_be_asof}" if _be_asof else ""))
 
     # IG credit spread (ICE BofA US Corporate Index OAS)
     ig_spread_val = "—"
     ig_spread_color = "rgba(255,255,255,0.95)"
     ig_spread_note = ""
-    ig_oas, ig_oas_prev, _ = _fred_latest("BAMLC0A0CM")
+    ig_oas, ig_oas_prev, _ig_date = _fred_latest("BAMLC0A0CM")
     if ig_oas is not None:
         ig_spread_bp = round(ig_oas * 100)
         ig_spread_val = f"{ig_spread_bp}bp"
         ig_spread_color = "#569542" if ig_oas < 1.0 else "#C9A84C" if ig_oas < 1.8 else "#c45454"
-        ig_spread_note = "Investment grade OAS · Hist avg ~120bp"
+        _ig_asof = _fmt_asof(_ig_date, "daily")[0]
+        ig_spread_note = ("Investment grade OAS · Hist avg ~120bp"
+                          + (f" · as of {_ig_asof}" if _ig_asof else ""))
 
     # ── Sentiment items with context (Sprint 27) ──────────────────────────
     # Each item is a dict with optional bar + caption so VIX and UMich can
@@ -721,7 +766,7 @@ def render_macro_tab(qdvd_yield=None):
         })
 
     # UMich Sentiment — pull 10Y history for data-driven bar position
-    um_latest, um_prev, _ = _fred_latest("UMCSENT")
+    um_latest, um_prev, _um_date = _fred_latest("UMCSENT")
     if um_latest:
         _um_hist = _fred_history("UMCSENT", months=120)
         if _um_hist:
@@ -730,6 +775,11 @@ def render_macro_tab(qdvd_yield=None):
         else:
             _um_min, _um_max = None, None
         um_label, um_color, um_pct, um_caption = _umich_band(um_latest, _um_min, _um_max)
+        _um_asof = _fmt_asof(_um_date, "monthly")[0]
+        if _um_asof and um_caption:
+            um_caption = f"{um_caption} · {_um_asof}"
+        elif _um_asof:
+            um_caption = _um_asof
         sentiment_items.append({
             "name": "UMich Sentiment",
             "value": f"{um_latest:.1f}",
@@ -1062,7 +1112,7 @@ def render_macro_tab(qdvd_yield=None):
                 display_prev = f"{prev_yoy:.2f}%" if prev_yoy is not None else "—"
                 trend = "down" if yoy and prev_yoy and yoy < prev_yoy else "up" if yoy and prev_yoy and yoy > prev_yoy else "neutral"
                 signal = _signal_for_econ(name, yoy, prev_yoy)
-                date_label = obs[0].get("date", "")[:7]
+                date_label = _fmt_asof(obs[0].get("date", ""), "monthly")[0]
 
             else:
                 latest_val = float(obs[0]["value"])
@@ -1071,7 +1121,11 @@ def render_macro_tab(qdvd_yield=None):
                 display_prev = _fmt_econ_val(name, prev_val) if prev_val else "—"
                 trend = "down" if prev_val and latest_val < prev_val else "up" if prev_val and latest_val > prev_val else "neutral"
                 signal = _signal_for_econ(name, latest_val, prev_val)
-                date_label = obs[0].get("date", "")[:10]
+                _freq = cfg.get("freq", "monthly")
+                date_label = _fmt_asof(obs[0].get("date", ""),
+                                       "weekly" if _freq == "weekly" else
+                                       "quarterly" if _freq == "quarterly" else
+                                       "monthly")[0]
 
             econ_rows.append((name, display_val, display_prev, trend, date_label, signal))
 
