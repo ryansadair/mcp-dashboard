@@ -733,7 +733,38 @@ INDICES = {
 }
 
 
-def fetch_and_push_intraday(tickers):
+def _push_snapshot_bars(want, prices, indices):
+    """
+    Fallback intraday source (2026-08-06): when Yahoo refuses sub-daily
+    data even to GitHub Actions, build one bar per ticker per quick-run
+    from the Finviz/index prices fetched seconds earlier in this same
+    run. The Overview chart then draws a 15-minute-resolution line (one
+    point per prefetch cycle) with the live Finviz endpoint keeping the
+    tip minute-fresh — coarser than 5-min bars, immune to Yahoo forever.
+    Timestamps round down to the 5-min grid so re-runs in the same
+    window upsert instead of duplicating.
+    """
+    if not prices and not indices:
+        print("  [WARN] snapshot fallback has no price data to draw from")
+        return
+    now = _utc_now()
+    ts = now.replace(minute=now.minute - now.minute % 5, second=0,
+                     microsecond=0).isoformat()
+    rows = []
+    for t in want:
+        px = None
+        if prices and t in prices:
+            px = prices[t].get("price")
+        if not px and indices and t in indices:
+            px = indices[t].get("price")
+        if px:
+            rows.append({"ticker": t, "ts": ts, "close": round(float(px), 4)})
+    print(f"  Snapshot bars: {len(rows)}/{len(want)} tickers at {ts}")
+    if rows:
+        sb_upsert("intraday_bars", rows, chunk_size=500)
+
+
+def fetch_and_push_intraday(tickers, prices=None, indices=None):
     """
     Fetch today's 5-minute bars and upsert to Supabase `intraday_bars`.
 
@@ -762,8 +793,9 @@ def fetch_and_push_intraday(tickers):
         print(f"  [WARN] intraday fetch raised: {e}")
         return
     if data is None or (hasattr(data, "empty") and data.empty):
-        print("  [WARN] intraday fetch returned EMPTY — if persistent, "
-              "Actions IPs may now be blocked for sub-daily data too")
+        print("  [WARN] Yahoo intraday returned EMPTY — falling back to "
+              "Finviz snapshot bars (15-min resolution)")
+        _push_snapshot_bars(want, prices, indices)
         return
 
     rows = []
@@ -1840,7 +1872,7 @@ def main():
     indices = fetch_index_data()
 
     print(f"\n[3b] Fetching intraday bars (5m) for the Overview chart...")
-    fetch_and_push_intraday(tickers)
+    fetch_and_push_intraday(tickers, prices=prices, indices=indices)
 
     # 3. Mode-dependent fetches
     dividends = None
