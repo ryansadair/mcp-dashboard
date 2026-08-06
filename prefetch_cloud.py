@@ -733,6 +733,72 @@ INDICES = {
 }
 
 
+def fetch_and_push_intraday(tickers):
+    """
+    Fetch today's 5-minute bars and upsert to Supabase `intraday_bars`.
+
+    Added 2026-08-06: Yahoo began returning EMPTY for all sub-daily
+    interval requests from Streamlit Cloud's shared IPs (daily data still
+    served; confirmed via the in-app ?debug=1 diag while the identical
+    call succeeded from other networks). GitHub Actions' IPs are still
+    served, so the every-15-min quick prefetch now owns intraday and the
+    Overview chart reads Supabase instead of calling Yahoo app-side.
+
+    Rolling window: prunes rows older than 3 days each run. Logs coverage
+    so a future block of Actions IPs is visible in the run log (and would
+    surface on the dashboard as the chart's "no bars" placeholder).
+    """
+    import pandas as pd
+    import yfinance as yf
+
+    want = sorted(set(list(tickers) + ["^GSPC", "SPYD"]))
+    try:
+        data = yf.download(
+            tickers=" ".join(want), period="1d", interval="5m",
+            group_by="ticker", progress=False, threads=True,
+            auto_adjust=False,
+        )
+    except Exception as e:
+        print(f"  [WARN] intraday fetch raised: {e}")
+        return
+    if data is None or (hasattr(data, "empty") and data.empty):
+        print("  [WARN] intraday fetch returned EMPTY — if persistent, "
+              "Actions IPs may now be blocked for sub-daily data too")
+        return
+
+    rows = []
+    covered = 0
+    for t in want:
+        try:
+            df = data[t] if t in data.columns.get_level_values(0) else data
+            df = df.dropna(subset=["Close"])
+            if df.empty:
+                continue
+            covered += 1
+            for ts, close in df["Close"].items():
+                rows.append({
+                    "ticker": t,
+                    "ts": pd.Timestamp(ts).tz_convert("UTC").isoformat(),
+                    "close": round(float(close), 4),
+                })
+        except Exception:
+            continue
+    print(f"  Intraday: {covered}/{len(want)} tickers, {len(rows)} bars")
+    if not rows:
+        return
+    sb_upsert("intraday_bars", rows, chunk_size=500)
+
+    # prune the rolling window
+    try:
+        cutoff = (_utc_now() - timedelta(days=3)).isoformat()
+        requests.delete(
+            f"{SUPABASE_URL}/rest/v1/intraday_bars",
+            headers=SB_HEADERS, params={"ts": f"lt.{cutoff}"}, timeout=20,
+        )
+    except Exception as e:
+        print(f"  [WARN] intraday prune skipped: {e}")
+
+
 def fetch_index_data():
     """
     Fetch major market indices for the ticker bar.
@@ -1772,6 +1838,9 @@ def main():
 
     print(f"\n[3] Fetching market indices...")
     indices = fetch_index_data()
+
+    print(f"\n[3b] Fetching intraday bars (5m) for the Overview chart...")
+    fetch_and_push_intraday(tickers)
 
     # 3. Mode-dependent fetches
     dividends = None

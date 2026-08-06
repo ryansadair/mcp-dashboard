@@ -62,6 +62,72 @@ def _today_session_bounds_pt():
     return open_et.astimezone(_PT), close_et.astimezone(_PT)
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_intraday_supabase(tickers_tuple):
+    """
+    Read today's 5-minute bars from Supabase `intraday_bars` — written by
+    the quick-mode prefetch every 15 minutes from GitHub Actions.
+
+    Added 2026-08-06 when Yahoo began returning empty for all sub-daily
+    requests from Streamlit Cloud's IPs (daily still served). Same return
+    contract as the direct fetch: {ticker: DataFrame[Close]} indexed by
+    tz-aware UTC datetimes, plus a "__diag__" entry. 60s cache so the
+    chart picks up each prefetch cycle promptly.
+    """
+    diag = {"requested": list(tickers_tuple), "rows": 0, "shape": "supabase",
+            "columns_sample": None, "error": None}
+    out = {t: pd.DataFrame() for t in tickers_tuple}
+    try:
+        from data.market_data import _sb_get
+        start_utc = datetime.now(_PT).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ).astimezone(ZoneInfo("UTC")).isoformat()
+        rows = _sb_get(
+            "intraday_bars",
+            select="ticker,ts,close",
+            filters={"ts": f"gte.{start_utc}",
+                     "ticker": f"in.({','.join(tickers_tuple)})",
+                     "order": "ts.asc",
+                     "limit": "20000"},
+        )
+        if not rows:
+            diag["error"] = ("no intraday_bars rows for today (prefetch "
+                             "not run yet, or its intraday fetch is blocked)")
+            return {**out, "__diag__": diag}
+        diag["rows"] = len(rows)
+        by_t = {}
+        for r in rows:
+            by_t.setdefault(r["ticker"], []).append(r)
+        for t, rws in by_t.items():
+            if t not in out:
+                continue
+            idx = pd.to_datetime([r["ts"] for r in rws], utc=True)
+            out[t] = pd.DataFrame({"Close": [r["close"] for r in rws]},
+                                  index=idx)
+    except Exception as e:
+        diag["error"] = f"supabase read failed: {e}"
+    return {**out, "__diag__": diag}
+
+
+def _fetch_intraday_bars(tickers_tuple):
+    """
+    Router: Supabase-first (the pipeline that works), direct Yahoo as a
+    fallback for environments where it still responds (local dev). If
+    both come back empty the chart shows its placeholder and the diag
+    (?debug=1) explains which layer failed.
+    """
+    sb = _fetch_intraday_supabase(tickers_tuple)
+    if any(len(sb.get(t, [])) for t in tickers_tuple):
+        return sb
+    yf_res = _fetch_intraday_5m(tickers_tuple)
+    if any(len(yf_res.get(t, [])) for t in tickers_tuple):
+        return yf_res
+    # neither worked — return the Supabase result but carry both diags
+    sb_diag = dict(sb.get("__diag__", {}))
+    sb_diag["yf_fallback"] = yf_res.get("__diag__", {})
+    return {**sb, "__diag__": sb_diag}
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def _fetch_intraday_5m(tickers_tuple):
     """
@@ -260,7 +326,7 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed, _retry=True):
     # is skipped cleanly.
     quotes = _fetch_market_quotes() or {}
     idx_tickers = tuple(t for t, _ in CHART_INDICES)
-    idx_intraday = _fetch_intraday_5m(idx_tickers)
+    idx_intraday = _fetch_intraday_bars(idx_tickers)
 
     # Pull Supabase prices once for any ticker not in the Markets quote dict.
     _missing = tuple(t for t in idx_tickers if t not in quotes)
@@ -300,7 +366,7 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed, _retry=True):
             denom = equity_weight + cash_decimal
 
             tickers = tuple(holdings["symbol"].tolist())
-            holdings_intraday = _fetch_intraday_5m(tickers)
+            holdings_intraday = _fetch_intraday_bars(tickers)
             # Holdings are not in _fetch_market_quotes (Markets-tab tickers only).
             # Pull from Supabase via fetch_batch_prices, which already has
             # previous_close stored for every Tamarac holding via the prefetch
@@ -382,6 +448,7 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed, _retry=True):
         _now_pt = datetime.now(_PT)
         if open_pt <= _now_pt <= open_pt + timedelta(minutes=45):
             try:
+                _fetch_intraday_supabase.clear()
                 _fetch_intraday_5m.clear()
             except Exception:
                 pass
