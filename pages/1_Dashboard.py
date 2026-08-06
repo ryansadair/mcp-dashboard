@@ -509,7 +509,7 @@ with _search_col:
         key="ticker_search_main",
         label_visibility="collapsed",
         on_change=_on_ticker_search,
-        placeholder="Search ticker — e.g. NKE",
+        placeholder="Search ticker — e.g. NVDA",
     )
 
 # Handle pending ticker navigation set by the search callback above.
@@ -678,6 +678,19 @@ with tab_overview:
             _idx_series = _intra["indices"]
 
             _has_data = bool(_strat_series["x"]) or any(s["x"] for s in _idx_series)
+
+            if not _has_data:
+                # Never vanish silently: in the first minutes of a session
+                # (or on days Yahoo withholds intraday bars) say so instead
+                # of leaving an unexplained gap between the KPIs and the
+                # heatmap.
+                st.markdown(
+                    '<div style="font-size:11px;color:rgba(255,255,255,0.3);'
+                    'padding:18px 4px;">Intraday chart populates a few '
+                    'minutes after the open — no 5-minute bars available '
+                    'yet for today\'s session.</div>',
+                    unsafe_allow_html=True,
+                )
 
             if _has_data:
                 fig_intra = go.Figure()

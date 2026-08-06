@@ -22,7 +22,7 @@ Numbers are computed live; nothing here writes to Supabase. The 15-min
 per cache window).
 """
 
-from datetime import datetime, time as _dttime
+from datetime import datetime, timedelta, time as _dttime
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -220,7 +220,7 @@ def _append_live_point(x, y, live_chg, open_pt, close_pt):
     return x, y
 
 
-def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
+def fetch_intraday_chart_data(active_strategy, tamarac_parsed, _retry=True):
     """
     Build the three series for the Overview intraday chart:
         - Active strategy (weighted average of holdings' intraday paths,
@@ -358,7 +358,7 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
                     strategy_x, strategy_y, live_wsum / denom, open_pt, close_pt
                 )
 
-    return {
+    result = {
         "strategy": {"name": active_strategy, "x": strategy_x, "y": strategy_y},
         "indices":  index_series,
         "session":  (open_pt, close_pt),
@@ -367,3 +367,25 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed):
             "holdings_5m": holdings_intraday.get("__diag__", {}) if isinstance(holdings_intraday, dict) else {},
         },
     }
+
+    # ── Early-session cache-poisoning guard (2026-08-06) ───────────────────
+    # The first render after the open can ask Yahoo before ANY 5-min bar
+    # for today exists; that empty answer then sits in the 15-minute cache
+    # and the chart stays blank until expiry even though bars appear within
+    # minutes (observed: blank at 6:44 AM while Yahoo already had 4 bars).
+    # If every line is empty during the first 45 minutes of the session,
+    # drop the cached fetch and retry ONCE immediately — if Yahoo has bars
+    # by now the chart appears this run instead of at cache expiry.
+    _all_empty = (not result["strategy"]["x"]
+                  and not any(s["x"] for s in result["indices"]))
+    if _all_empty and _retry:
+        _now_pt = datetime.now(_PT)
+        if open_pt <= _now_pt <= open_pt + timedelta(minutes=45):
+            try:
+                _fetch_intraday_5m.clear()
+            except Exception:
+                pass
+            return fetch_intraday_chart_data(active_strategy, tamarac_parsed,
+                                             _retry=False)
+
+    return result
