@@ -56,3 +56,37 @@ def render_header():
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+    # ── Mobile-only refinements (Sprint 27) ────────────────────────────────
+    # Every rule lives inside @media (max-width: 640px), which desktop
+    # browsers never evaluate — the desktop render is untouched by
+    # construction. Phones get: reclaimed side padding (the single biggest
+    # usable-width win for tables and charts), denser tab strip (more of
+    # the 9 tabs visible per screen), a compacted header (subtitle hidden,
+    # smaller logo), tighter ticker-bar items (more quotes per screen),
+    # and slightly smaller KPI values so the 2x2 card grid breathes.
+    st.markdown("""
+    <style>
+    @media (max-width: 640px) {
+        .block-container {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
+        button[data-baseweb="tab"] {
+            padding-left: 10px !important;
+            padding-right: 10px !important;
+        }
+        button[data-baseweb="tab"] p { font-size: 12px !important; }
+        .mcp-header { padding: 8px 2px !important; }
+        .mcp-firm-name { font-size: 14px !important; }
+        .mcp-firm-sub { display: none !important; }
+        .mcp-logo, .mcp-logo img { height: 30px !important; width: 30px !important; }
+        .mcp-header-right { font-size: 11px !important; }
+        .mc-ticker-track > div {
+            padding: 8px 12px !important;
+            gap: 6px !important;
+        }
+        .mcp-kpi-value { font-size: 19px !important; }
+    }
+    </style>
+    """, unsafe_allow_html=True)

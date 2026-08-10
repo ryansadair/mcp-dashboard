@@ -27,7 +27,7 @@ def _kpi_card(label, value, color="rgba(255,255,255,0.95)", sub_text=None):
         f'border-radius:10px;padding:14px 16px;">'
         f'<div style="font-size:10px;color:rgba(255,255,255,0.35);text-transform:uppercase;'
         f'letter-spacing:0.08em;font-weight:600;margin-bottom:6px;">{label}</div>'
-        f'<div style="font-size:22px;font-weight:700;font-family:\'DM Serif Display\',serif;'
+        f'<div class="mcp-kpi-value" style="font-size:22px;font-weight:700;font-family:\'DM Serif Display\',serif;'
         f'color:{color};line-height:1.1;">{value}</div>'
         f'{sub_html}'
         f'</div>'
@@ -59,7 +59,7 @@ def render_kpi_cards(strategy: str, kpis: dict):
     holdings_str = str(holdings)
 
     cards_html = (
-        f'<div style="display:flex;flex-wrap:wrap;gap:10px;">'
+        f'<div class="mcp-kpi-row" style="display:flex;flex-wrap:wrap;gap:10px;">'
         f'<div style="flex:1 1 180px;min-width:140px;">{_kpi_card("Daily Return", daily_str, daily_color)}</div>'
         f'<div style="flex:1 1 180px;min-width:140px;">{_kpi_card("Cash", cash_str)}</div>'
         f'<div style="flex:1 1 180px;min-width:140px;">{_kpi_card("Dividend Yield", yield_str, yield_color)}</div>'
