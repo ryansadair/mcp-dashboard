@@ -60,43 +60,43 @@ def render_header():
     # ── Mobile-only refinements (Sprint 27) ────────────────────────────────
     # Every rule lives inside @media (max-width: 640px), which desktop
     # browsers never evaluate — the desktop render is untouched by
-    # construction. Phones get: reclaimed side padding (the single biggest
-    # usable-width win for tables and charts), denser tab strip (more of
-    # the 9 tabs visible per screen), a compacted header (subtitle hidden,
-    # smaller logo), tighter ticker-bar items (more quotes per screen),
-    # and slightly smaller KPI values so the 2x2 card grid breathes.
+    # construction. Phones get: reclaimed side padding, denser tab strip,
+    # compacted header, tighter ticker items, smaller KPI values, and a
+    # status strip that wraps as centered chips with dividers hidden.
+    #
+    # NOTE: the CSS string content is deliberately at column 0 — markdown
+    # treats a first line indented by 4+ spaces as a CODE BLOCK, which
+    # silently swallowed the entire <style> element in the first version
+    # of this block (2026-08-10). The ticker's @keyframes CSS works for
+    # exactly this reason. Keep it flush-left.
     st.markdown("""
-    <style>
-    @media (max-width: 640px) {
-        .block-container {
-            padding-left: 0.75rem !important;
-            padding-right: 0.75rem !important;
-        }
-        button[data-baseweb="tab"] {
-            padding-left: 10px !important;
-            padding-right: 10px !important;
-        }
-        button[data-baseweb="tab"] p { font-size: 12px !important; }
-        .mcp-header { padding: 8px 2px !important; }
-        .mcp-firm-name { font-size: 14px !important; }
-        .mcp-firm-sub { display: none !important; }
-        .mcp-logo, .mcp-logo img { height: 30px !important; width: 30px !important; }
-        .mcp-header-right { font-size: 11px !important; }
-        .mc-ticker-track > div {
-            padding: 8px 12px !important;
-            gap: 6px !important;
-        }
-        .mcp-kpi-value { font-size: 19px !important; }
-        /* Status strip: on phone, wrap as centered pills with even gaps
-           instead of a right-ragged line with orphaned chips; the "|"
-           dividers read badly across wrapped lines, so the flex gap does
-           the separating and the dividers hide. */
-        .mcp-status-strip {
-            justify-content: center !important;
-            padding: 4px 8px 2px !important;
-            gap: 3px 14px !important;
-        }
-        .mcp-status-div { display: none !important; }
+<style>
+@media (max-width: 640px) {
+    .block-container {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
     }
-    </style>
+    button[data-baseweb="tab"] {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+    button[data-baseweb="tab"] p { font-size: 12px !important; }
+    .mcp-header { padding: 8px 2px !important; }
+    .mcp-firm-name { font-size: 14px !important; }
+    .mcp-firm-sub { display: none !important; }
+    .mcp-logo, .mcp-logo img { height: 30px !important; width: 30px !important; }
+    .mcp-header-right { font-size: 11px !important; }
+    .mc-ticker-track > div {
+        padding: 8px 12px !important;
+        gap: 6px !important;
+    }
+    .mcp-kpi-value { font-size: 19px !important; }
+    .mcp-status-strip {
+        justify-content: center !important;
+        padding: 4px 8px 2px !important;
+        gap: 3px 14px !important;
+    }
+    .mcp-status-div { display: none !important; }
+}
+</style>
     """, unsafe_allow_html=True)
