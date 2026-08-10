@@ -309,11 +309,11 @@ except Exception:
     )
 
 if _status_parts:
-    _divider = '<span style="opacity:0.2;margin:0 6px;">|</span>'
+    _divider = '<span class="mcp-status-div" style="opacity:0.2;margin:0 6px;">|</span>'
     # Sprint 26: flex-wrap:wrap lets the status strip break to a second line
     # on phone instead of overflowing the viewport.
     st.markdown(
-        f'<div style="display:flex;align-items:center;justify-content:flex-end;'
+        f'<div class="mcp-status-strip" style="display:flex;align-items:center;justify-content:flex-end;'
         f'flex-wrap:wrap;padding:4px 28px 2px;gap:6px;font-size:10px;'
         f'color:rgba(255,255,255,0.30);">'
         f'{_divider.join(_status_parts)}'

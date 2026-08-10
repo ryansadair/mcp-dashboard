@@ -87,6 +87,16 @@ def render_header():
             gap: 6px !important;
         }
         .mcp-kpi-value { font-size: 19px !important; }
+        /* Status strip: on phone, wrap as centered pills with even gaps
+           instead of a right-ragged line with orphaned chips; the "|"
+           dividers read badly across wrapped lines, so the flex gap does
+           the separating and the dividers hide. */
+        .mcp-status-strip {
+            justify-content: center !important;
+            padding: 4px 8px 2px !important;
+            gap: 3px 14px !important;
+        }
+        .mcp-status-div { display: none !important; }
     }
     </style>
     """, unsafe_allow_html=True)
