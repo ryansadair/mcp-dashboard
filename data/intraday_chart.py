@@ -63,7 +63,7 @@ def _today_session_bounds_pt():
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _fetch_intraday_supabase(tickers_tuple):
+def _fetch_intraday_supabase_v2(tickers_tuple):
     """
     Read today's 5-minute bars from Supabase `intraday_bars` — written by
     the quick-mode prefetch every 15 minutes from GitHub Actions.
@@ -82,14 +82,33 @@ def _fetch_intraday_supabase(tickers_tuple):
         start_utc = datetime.now(_PT).replace(
             hour=0, minute=0, second=0, microsecond=0
         ).astimezone(ZoneInfo("UTC")).isoformat()
-        rows = _sb_get(
-            "intraday_bars",
-            select="ticker,ts,close",
-            filters={"ts": f"gte.{start_utc}",
-                     "ticker": f"in.({','.join(tickers_tuple)})",
-                     "order": "ts.asc",
-                     "limit": "20000"},
-        )
+        # Paginate: PostgREST silently caps any single response at its
+        # max-rows setting (1,000 by default) regardless of the limit
+        # param. 37 holdings x 5-min bars crosses 1,000 rows a couple
+        # hours into the session, which truncated the strategy line at
+        # ~8:40 AM PT every day (2026-08-11) while the 2-ticker index
+        # batch never hit the cap — hence indices wiggling on while QDVD
+        # ran straight to the live endpoint.
+        rows = []
+        _offset = 0
+        while True:
+            page = _sb_get(
+                "intraday_bars",
+                select="ticker,ts,close",
+                filters={"ts": f"gte.{start_utc}",
+                         "ticker": f"in.({','.join(tickers_tuple)})",
+                         "order": "ts.asc",
+                         "limit": "1000",
+                         "offset": str(_offset)},
+            )
+            if not page:
+                break
+            rows.extend(page)
+            if len(page) < 1000:
+                break
+            _offset += 1000
+            if _offset > 40000:   # safety valve
+                break
         if not rows:
             diag["error"] = ("no intraday_bars rows for today (prefetch "
                              "not run yet, or its intraday fetch is blocked)")
@@ -116,7 +135,7 @@ def _fetch_intraday_bars(tickers_tuple):
     both come back empty the chart shows its placeholder and the diag
     (?debug=1) explains which layer failed.
     """
-    sb = _fetch_intraday_supabase(tickers_tuple)
+    sb = _fetch_intraday_supabase_v2(tickers_tuple)
     if any(len(sb.get(t, [])) for t in tickers_tuple):
         return sb
     yf_res = _fetch_intraday_5m(tickers_tuple)
@@ -448,7 +467,7 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed, _retry=True):
         _now_pt = datetime.now(_PT)
         if open_pt <= _now_pt <= open_pt + timedelta(minutes=45):
             try:
-                _fetch_intraday_supabase.clear()
+                _fetch_intraday_supabase_v2.clear()
                 _fetch_intraday_5m.clear()
             except Exception:
                 pass
