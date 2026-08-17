@@ -670,7 +670,17 @@ with tab_overview:
         # to prevent label crowding.
         if INTRADAY_CHART_AVAILABLE and SPRINT2_AVAILABLE and tamarac_parsed:
             with st.spinner("Loading intraday performance..."):
-                _intra = fetch_intraday_chart_data(active, tamarac_parsed)
+                # Page-level guard (2026-08-17): an exception inside the
+                # chart pipeline took down the ENTIRE Overview (pandas
+                # duplicate-label raise from paginated reads). The chart
+                # is one component — on failure it degrades to its
+                # placeholder and the rest of the page lives.
+                try:
+                    _intra = fetch_intraday_chart_data(active, tamarac_parsed)
+                except Exception:
+                    _intra = {"strategy": {"name": active, "x": [], "y": []},
+                              "indices": [], "session": (None, None),
+                              "diag": {}}
 
             _strat_color = STRAT_COLORS.get(active, "#569542")
             _open_pt, _close_pt = _intra["session"]

@@ -63,7 +63,7 @@ def _today_session_bounds_pt():
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _fetch_intraday_supabase_v2(tickers_tuple):
+def _fetch_intraday_supabase_v3(tickers_tuple):
     """
     Read today's 5-minute bars from Supabase `intraday_bars` — written by
     the quick-mode prefetch every 15 minutes from GitHub Actions.
@@ -97,7 +97,14 @@ def _fetch_intraday_supabase_v2(tickers_tuple):
                 select="ticker,ts,close",
                 filters={"ts": f"gte.{start_utc}",
                          "ticker": f"in.({','.join(tickers_tuple)})",
-                         "order": "ts.asc",
+                         # Composite sort (2026-08-17): ordering by ts alone
+                         # is non-unique (137 tickers share each bar), and
+                         # PostgREST guarantees no stable order within equal
+                         # keys across paged requests — a page boundary can
+                         # serve the same row twice. The duplicate (ticker,
+                         # ts) then made pandas raise "cannot reindex on an
+                         # axis with duplicate labels" and killed the page.
+                         "order": "ts.asc,ticker.asc",
                          "limit": "1000",
                          "offset": str(_offset)},
             )
@@ -121,8 +128,12 @@ def _fetch_intraday_supabase_v2(tickers_tuple):
             if t not in out:
                 continue
             idx = pd.to_datetime([r["ts"] for r in rws], utc=True)
-            out[t] = pd.DataFrame({"Close": [r["close"] for r in rws]},
-                                  index=idx)
+            df_t = pd.DataFrame({"Close": [r["close"] for r in rws]},
+                                index=idx)
+            # Defensive dedupe: whatever the transport does in the future,
+            # a duplicated timestamp must never reach .reindex().
+            df_t = df_t[~df_t.index.duplicated(keep="last")].sort_index()
+            out[t] = df_t
     except Exception as e:
         diag["error"] = f"supabase read failed: {e}"
     return {**out, "__diag__": diag}
@@ -135,7 +146,7 @@ def _fetch_intraday_bars(tickers_tuple):
     both come back empty the chart shows its placeholder and the diag
     (?debug=1) explains which layer failed.
     """
-    sb = _fetch_intraday_supabase_v2(tickers_tuple)
+    sb = _fetch_intraday_supabase_v3(tickers_tuple)
     if any(len(sb.get(t, [])) for t in tickers_tuple):
         return sb
     yf_res = _fetch_intraday_5m(tickers_tuple)
@@ -467,7 +478,7 @@ def fetch_intraday_chart_data(active_strategy, tamarac_parsed, _retry=True):
         _now_pt = datetime.now(_PT)
         if open_pt <= _now_pt <= open_pt + timedelta(minutes=45):
             try:
-                _fetch_intraday_supabase_v2.clear()
+                _fetch_intraday_supabase_v3.clear()
                 _fetch_intraday_5m.clear()
             except Exception:
                 pass
